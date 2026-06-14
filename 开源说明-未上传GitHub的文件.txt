@@ -1,0 +1,201 @@
+================================================================================
+  FunPlanet 开源说明 — 未上传 GitHub 的文件及原因
+================================================================================
+
+仓库地址：https://github.com/Luokey-cmd/FunPlanet
+
+本文档说明：克隆本仓库后，哪些内容在 GitHub 上找不到、为什么故意不上传，
+以及拿到源码后如何自行补齐。并非项目源码缺失，而是出于安全与工程惯例的
+有意排除。
+
+--------------------------------------------------------------------------------
+一、请先理解：GitHub 上有什么？
+--------------------------------------------------------------------------------
+
+已包含（可正常阅读与二次开发）：
+  · Flutter 客户端源码（lib/、android/、ios/ 等）
+  · Node.js 后端源码（server/）
+  · React 管理后台源码（admin/）
+  · 数据库结构迁移（server/prisma/）
+  · Docker 部署配置（docker-compose.yml、server/Dockerfile）
+  · 环境变量模板（.env.example、.env.production.example、admin/.env.example）
+  · 内置静态资源（assets/ 下商品图、Banner、AI 角色图等演示素材）
+
+未包含的内容见下文，多数可通过「安装依赖 + 复制配置 + 本地编译」自行生成。
+
+--------------------------------------------------------------------------------
+二、因安全原因未上传（请勿自行提交到公开仓库）
+--------------------------------------------------------------------------------
+
+【1】环境变量与密钥文件
+  未上传：
+    · 根目录 .env
+    · .env.local、.env.production 等（除 *.example 外的一切 .env.*）
+    · server/.env
+    · admin/.env
+
+  原因：
+    含数据库密码、JWT 签名密钥、DeepSeek API Key、通义万相 DASHSCOPE_API_KEY 等。
+    一旦公开，他人可盗用 AI 额度、伪造登录令牌或访问你的数据库。
+
+  如何补齐：
+    · 本地开发：复制 .env.example 为 .env，按注释填写
+    · 生产部署：复制 .env.production.example 为 .env，填写强密码与真实 Key
+    · 管理后台：参考 admin/.env.example 配置 VITE_API_PROXY_TARGET
+
+【2】Android 签名文件
+  未上传：
+    · android/key.properties
+    · *.keystore、*.jks
+
+  原因：
+    用于 Release 包签名。泄露后他人可冒充你的应用发布更新。
+
+  如何补齐：
+    自行在 Android Studio 生成调试/发布密钥，或使用 flutter build apk 默认调试签名。
+
+【3】管理员运行时账号数据
+  未上传：
+    · server/data/admin-accounts.json
+    · server/data/admin-settings.json
+
+  原因：
+    由服务端首次运行或管理员操作写入，含真实管理员账号与密码哈希/配置，
+    属于生产环境运行时数据，不应进入版本库。
+
+  如何补齐：
+    启动 API 后通过管理后台注册/登录流程创建；或参考 server 源码中的默认逻辑。
+    docker-compose 部署时，这两个文件会挂载在 server/data/ 目录下本地生成。
+
+--------------------------------------------------------------------------------
+三、因体积与可重建性未上传（依赖与构建产物）
+--------------------------------------------------------------------------------
+
+【4】Node.js 依赖
+  未上传：
+    · server/node_modules/
+    · admin/node_modules/
+    · 任意 node_modules/
+
+  原因：
+    体积巨大（数万文件），且 package.json / package-lock.json 已锁定版本，
+    任何人执行 npm install 即可还原。
+
+  如何补齐：
+    cd server && npm install
+    cd admin && npm install
+
+【5】Flutter / 前端构建输出
+  未上传：
+    · build/（含 APK 输出目录）
+    · *.apk、*.aab、*.ipa
+    · admin/dist/、admin/dist-ssr/
+    · android/app/debug、profile、release 构建目录
+    · .dart_tool/、.flutter-plugins-dependencies
+
+  原因：
+    编译产物，随源码与机器环境变化，提交无意义且占用仓库空间。
+
+  如何补齐：
+    flutter pub get
+    flutter build apk --release
+    cd admin && npm run build
+
+【6】iOS / Android 本地缓存
+  未上传：
+    · ios/Pods/
+    · android/.gradle/
+    · android/local.properties（本机 SDK 路径，每人不同）
+
+  原因：
+    平台工具链自动下载的缓存，与开发者本机环境绑定。
+
+  如何补齐：
+    在 macOS 上 pod install；Android 由 Gradle 首次构建时自动拉取。
+
+--------------------------------------------------------------------------------
+四、运行时用户数据与线上状态（不在 Git 中，属正常现象）
+--------------------------------------------------------------------------------
+
+【7】PostgreSQL 数据库内容
+  未上传：
+    · 用户账号、订单、购物车、优惠券、聊天记录等全部业务数据
+
+  原因：
+    数据库运行在 Docker 或本机 PostgreSQL 中，不属于源码仓库范畴。
+    开源版克隆后数据库为空，需自行 migrate + seed。
+
+  如何补齐：
+    cd server && npx prisma migrate deploy && node prisma/seed.js
+    （或使用 docker-compose 启动 db 服务后执行迁移）
+
+【8】用户上传的媒体文件（部分）
+  说明：
+    assets/ 目录中已包含演示用商品图、Banner、AI 角色素材等。
+    但以下目录中的文件，多为用户/管理员在运行期间上传，通常只存在于
+    部署服务器本地，不会也不应全部同步到 GitHub：
+      · assets/images/user-avatars/     用户头像
+      · assets/images/reviews/          评价图片
+      · assets/images/ai-community/     AI 社区发帖图片
+      · assets/images/ai-art/           AI 绘画生成图（除少量示例外）
+      · assets/images/support-chat/     客服聊天图片（仓库内可能仅有少量测试图）
+
+  原因：
+    属于运行时用户生成内容（UGC），体积不定且含隐私，不适合纳入开源仓库。
+
+  影响：
+    克隆后功能完整，但看不到线上真实用户的头像、评价图等；需自行注册测试账号体验。
+
+--------------------------------------------------------------------------------
+五、IDE 与个人环境文件（与项目功能无关）
+--------------------------------------------------------------------------------
+
+  未上传：
+    · .idea/、*.iml          Android Studio / IntelliJ 配置
+    · .vscode/、.cursor/      编辑器个人配置
+    · .DS_Store、Thumbs.db  操作系统索引文件
+    · *.log                   运行日志
+    · __pycache__/、.venv/   Python 工具脚本缓存（tool/ 目录）
+
+  原因：
+    仅服务本机开发体验，对他人无参考价值。
+
+--------------------------------------------------------------------------------
+六、第三方服务（仓库内无账号，需自行申请）
+--------------------------------------------------------------------------------
+
+  以下能力依赖外部 API，源码中只预留接口，不包含作者的私人 Key：
+    · DeepSeek API        — 小豆 AI 对话（DEEPSEEK_API_KEY）
+    · 阿里云通义万相      — AI 绘画（DASHSCOPE_API_KEY）
+    · PostgreSQL          — 需自行安装或使用 docker-compose 中的 db 服务
+
+  未配置 Key 时：部分 AI 功能不可用，其余商城/订单/登录等功能仍可本地调试。
+
+--------------------------------------------------------------------------------
+七、快速上手（给克隆仓库的网友）
+--------------------------------------------------------------------------------
+
+  1. 复制 .env.example → .env，填写 DATABASE_URL、JWT_SECRET 等
+  2. 启动 PostgreSQL，执行 prisma migrate deploy 与 seed
+  3. cd server && npm install && npm start
+  4. cd admin && npm install && npm run dev
+  5. flutter pub get && flutter run
+
+  更完整步骤见项目 docs/ 目录（如有）及 server/prisma/ 迁移文件。
+
+--------------------------------------------------------------------------------
+八、总结
+--------------------------------------------------------------------------------
+
+  GitHub 仓库提供的是「完整可编译、可部署的源代码 + 演示静态资源 + 配置模板」，
+  故意不包含：密钥、签名、依赖包、编译产物、生产数据库、用户上传媒体。
+
+  若克隆后发现没有 .env、node_modules、build/、admin-accounts.json 等文件，
+  这是预期行为，不是仓库损坏或作者藏私源码。
+
+  如有问题，欢迎在 GitHub Issues 反馈：
+  https://github.com/Luokey-cmd/FunPlanet/issues
+
+================================================================================
+  文档版本：2026-06-04
+================================================================================
