@@ -181,7 +181,7 @@
   4. cd admin && npm install && npm run dev
   5. flutter pub get && flutter run
 
-  更完整步骤见项目 docs/ 目录（如有）及 server/prisma/ 迁移文件。
+  更完整步骤见 server/prisma/ 迁移文件与 docker-compose.yml。
 
 --------------------------------------------------------------------------------
 八、总结
