@@ -1,0 +1,34 @@
+{
+  "name": "funplanet-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:phase2": "prisma migrate dev --name phase2_user_data",
+    "db:migrate:phase3": "prisma migrate dev --name phase3_orders_addresses",
+    "db:migrate:profile": "prisma migrate dev --name profile_cloud_sync",
+    "db:migrate:ledger": "prisma migrate dev --name wallet_ledger",
+    "db:seed": "node prisma/seed.js",
+    "db:reset-demo": "node scripts/reset-demo-user.js",
+    "db:studio": "prisma studio",
+    "db:export": "python ../tool/export_products_json.py"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.8.2",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "prisma": "^6.8.2"
+  }
+}

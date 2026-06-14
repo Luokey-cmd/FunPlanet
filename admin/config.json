@@ -1,0 +1,55 @@
+{
+  "routes": [
+    {
+      "path": "/",
+      "src": "src/pages/Index.tsx"
+    }
+  ],
+  "components": [
+    {
+      "name": "CategoryPieChart",
+      "src": "src/components/CategoryPieChart.tsx",
+      "route": "/preview/category-pie-chart"
+    },
+    {
+      "name": "ConversionFunnel",
+      "src": "src/components/ConversionFunnel.tsx",
+      "route": "/preview/conversion-funnel"
+    },
+    {
+      "name": "RecentOrders",
+      "src": "src/components/RecentOrders.tsx",
+      "route": "/preview/recent-orders"
+    },
+    {
+      "name": "RevenueChart",
+      "src": "src/components/RevenueChart.tsx",
+      "route": "/preview/revenue-chart"
+    },
+    {
+      "name": "Sidebar",
+      "src": "src/components/Sidebar.tsx",
+      "route": "/preview/sidebar"
+    },
+    {
+      "name": "StatCard",
+      "src": "src/components/StatCard.tsx",
+      "route": "/preview/stat-card"
+    },
+    {
+      "name": "TopProducts",
+      "src": "src/components/TopProducts.tsx",
+      "route": "/preview/top-products"
+    },
+    {
+      "name": "Topbar",
+      "src": "src/components/Topbar.tsx",
+      "route": "/preview/topbar"
+    },
+    {
+      "name": "WeeklyBarChart",
+      "src": "src/components/WeeklyBarChart.tsx",
+      "route": "/preview/weekly-bar-chart"
+    }
+  ]
+}

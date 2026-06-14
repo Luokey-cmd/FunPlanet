@@ -1,0 +1,412 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// 用户账号信息：手机号、密码、昵称、对外 user_id
+model User {
+  id            String              @id @default(cuid())
+  phone         String              @unique
+  password      String
+  nickname      String
+  userId        String              @unique @map("user_id")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  profile       UserProfile?
+  cartItems     CartItem[]
+  favorites     Favorite[]
+  browseHistory BrowseHistoryItem[]
+  userCoupons   UserCoupon[]
+  notifications Notification[]
+  addresses     Address[]
+  orders                Order[]
+  walletLedgers         WalletLedger[]
+  supportConversations  SupportConversation[]
+  productReviews        ProductReview[]
+  aiArtworks            AiArtwork[]
+  aiCommunityPosts      AiCommunityPost[]
+  aiCommunityComments   AiCommunityComment[]
+  aiCommunityLikes      AiCommunityLike[]
+
+  @@map("user_accounts")
+}
+
+/// 用户扩展资料：头像、积分、趣币、VIP、每日任务
+model UserProfile {
+  userId                     String   @id @map("user_id")
+  newcomerClaimed            Boolean  @default(false) @map("newcomer_claimed")
+  memberMonthlyCouponClaimed Boolean  @default(false) @map("member_monthly_coupon_claimed")
+  points                     Int      @default(0)
+  funCoins                   Int      @default(0) @map("fun_coins")
+  vipLevel                   Int      @default(1) @map("vip_level")
+  avatarPath                 String   @default("") @map("avatar_path")
+  dailyCheckInDone           Boolean  @default(false) @map("daily_check_in_done")
+  dailyShareDone             Boolean  @default(false) @map("daily_share_done")
+  dailyBrowseRewardClaimed   Boolean  @default(false) @map("daily_browse_reward_claimed")
+  dailyBrowseCount           Int      @default(0) @map("daily_browse_count")
+  pushEnabled                Boolean  @default(true) @map("push_enabled")
+  createdAt                  DateTime @default(now()) @map("created_at")
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+/// 商品主表
+model Product {
+  id            String              @id
+  name          String
+  nameEn        String              @map("name_en")
+  price         Decimal             @db.Decimal(10, 2)
+  originalPrice Decimal?            @map("original_price") @db.Decimal(10, 2)
+  category      String
+  subCategory   String              @map("sub_category")
+  majorCategory String              @map("major_category")
+  tag           String?
+  tagColor      String?             @map("tag_color")
+  spec          String?
+  description   String              @db.Text
+  purchaseNotes String              @map("purchase_notes") @db.Text
+  rating        Decimal             @db.Decimal(3, 1)
+  sales         Int                 @default(0)
+  imagePath     String              @map("image_path")
+  createdAt     DateTime            @default(now()) @map("created_at")
+  updatedAt     DateTime            @updatedAt @map("updated_at")
+  banners       Banner[]
+  cartItems     CartItem[]
+  favorites     Favorite[]
+  browseHistory BrowseHistoryItem[]
+  orderItems    OrderItem[]
+  reviews       ProductReview[]
+
+  @@map("shop_products")
+}
+
+/// 首页轮播图
+model Banner {
+  id        String   @id @default(cuid())
+  imagePath String   @map("image_path")
+  productId String   @map("product_id")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("shop_banners")
+}
+
+/// 购物车
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  quantity  Int      @default(1)
+  spec      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("shop_cart_items")
+}
+
+/// 商品收藏
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("user_favorites")
+}
+
+/// 商品浏览记录
+model BrowseHistoryItem {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  productId String   @map("product_id")
+  viewedAt  DateTime @default(now()) @map("viewed_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([userId, viewedAt(sort: Desc)])
+  @@map("user_browse_history")
+}
+
+/// 优惠券模板
+model CouponTemplate {
+  id          String       @id
+  title       String
+  discount    Decimal      @db.Decimal(10, 2)
+  condition   String
+  expireAt    DateTime     @map("expire_at")
+  claimType   String?      @map("claim_type")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  userCoupons UserCoupon[]
+
+  @@map("shop_coupon_templates")
+}
+
+/// 用户已领取的优惠券
+model UserCoupon {
+  id         String         @id @default(cuid())
+  userId     String         @map("user_id")
+  templateId String         @map("template_id")
+  used       Boolean        @default(false)
+  claimedAt  DateTime       @default(now()) @map("claimed_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template   CouponTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, templateId])
+  @@map("user_coupons")
+}
+
+/// App 内通知
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  title     String
+  body      String   @db.Text
+  type      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("user_notifications")
+}
+
+/// 收货地址
+model Address {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  name      String
+  phone     String
+  detail    String   @db.Text
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_addresses")
+}
+
+/// 订单主表
+model Order {
+  id               String      @id @default(cuid())
+  userId           String      @map("user_id")
+  orderNo          String      @unique @map("order_no")
+  status           String      @default("pending")
+  subtotal         Decimal     @db.Decimal(10, 2)
+  discount         Decimal     @default(0) @db.Decimal(10, 2)
+  total            Decimal     @db.Decimal(10, 2)
+  addressName      String?     @map("address_name")
+  addressPhone     String?     @map("address_phone")
+  addressDetail    String?     @map("address_detail") @db.Text
+  couponTemplateId String?     @map("coupon_template_id")
+  paymentMethod    String?     @map("payment_method")
+  paymentStatus    String      @default("pending") @map("payment_status")
+  paidAt           DateTime?   @map("paid_at")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items            OrderItem[]
+  reviews          ProductReview[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("shop_orders")
+}
+
+/// 订单明细
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String   @map("order_id")
+  productId String   @map("product_id")
+  name      String
+  quantity  Int
+  spec      String?
+  unitPrice Decimal  @map("unit_price") @db.Decimal(10, 2)
+  subtotal  Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@map("shop_order_items")
+}
+
+/// 积分/趣币流水
+model WalletLedger {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  walletType String   @map("wallet_type")
+  amount     Int
+  title      String
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, walletType, createdAt(sort: Desc)])
+  @@map("user_wallet_ledgers")
+}
+
+/// 客服会话
+model SupportConversation {
+  id                 String           @id @default(cuid())
+  userId             String           @map("user_id")
+  status             String           @default("open")
+  subject            String?
+  productId          String?          @map("product_id")
+  productName        String?          @map("product_name")
+  lastMessageAt      DateTime         @default(now()) @map("last_message_at")
+  lastMessagePreview String?          @map("last_message_preview")
+  unreadAdmin        Int              @default(0) @map("unread_admin")
+  unreadUser         Int              @default(0) @map("unread_user")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages           SupportMessage[]
+
+  @@index([userId, status, lastMessageAt(sort: Desc)])
+  @@index([status, lastMessageAt(sort: Desc)])
+  @@map("admin_support_conversations")
+}
+
+/// 客服消息
+model SupportMessage {
+  id             String              @id @default(cuid())
+  conversationId String              @map("conversation_id")
+  senderRole     String              @map("sender_role")
+  senderName     String?             @map("sender_name")
+  messageType    String              @default("text") @map("message_type")
+  content        String              @db.Text
+  mediaUrl       String?             @map("media_url")
+  stickerId      String?             @map("sticker_id")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt(sort: Asc)])
+  @@map("admin_support_messages")
+}
+
+/// 商品评价
+model ProductReview {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  productId  String   @map("product_id")
+  orderId    String   @map("order_id")
+  content    String   @db.Text
+  rating     Int      @default(5)
+  imagePaths String[] @default([]) @map("image_paths")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orderId, productId])
+  @@index([productId, createdAt(sort: Desc)])
+  @@map("shop_product_reviews")
+}
+
+/// AI 绘画作品
+model AiArtwork {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  prompt    String   @db.Text
+  style     String   @default("")
+  imagePath String   @map("image_path")
+  model     String   @default("wan2.7-image")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("ai_artworks")
+}
+
+/// AI 角色配置
+model AiFriend {
+  id           String               @id
+  name         String
+  avatarPath   String               @default("") @map("avatar_path")
+  avatarColor  String               @default("#A389F4") @map("avatar_color")
+  systemPrompt String               @map("system_prompt") @db.Text
+  sortOrder    Int                  @default(0) @map("sort_order")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  posts        AiCommunityPost[]
+  comments     AiCommunityComment[]
+  likes        AiCommunityLike[]
+
+  @@map("ai_friends")
+}
+
+/// AI 社区动态
+model AiCommunityPost {
+  id         String               @id @default(cuid())
+  authorType String               @map("author_type")
+  userId     String?              @map("user_id")
+  aiFriendId String?              @map("ai_friend_id")
+  content    String               @db.Text
+  imagePath  String               @default("") @map("image_path")
+  createdAt  DateTime             @default(now()) @map("created_at")
+  updatedAt  DateTime             @updatedAt @map("updated_at")
+  user       User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiFriend   AiFriend?            @relation(fields: [aiFriendId], references: [id], onDelete: Cascade)
+  comments   AiCommunityComment[]
+  likes      AiCommunityLike[]
+
+  @@index([createdAt(sort: Desc)])
+  @@map("ai_community_posts")
+}
+
+/// AI 社区评论
+model AiCommunityComment {
+  id         String          @id @default(cuid())
+  postId     String          @map("post_id")
+  authorType String          @map("author_type")
+  userId     String?         @map("user_id")
+  aiFriendId String?         @map("ai_friend_id")
+  content    String          @db.Text
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  post       AiCommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user       User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiFriend   AiFriend?       @relation(fields: [aiFriendId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt(sort: Asc)])
+  @@map("ai_community_comments")
+}
+
+/// AI 社区点赞
+model AiCommunityLike {
+  id         String          @id @default(cuid())
+  postId     String          @map("post_id")
+  likerKey   String          @map("liker_key")
+  userId     String?         @map("user_id")
+  aiFriendId String?         @map("ai_friend_id")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  post       AiCommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user       User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiFriend   AiFriend?       @relation(fields: [aiFriendId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, likerKey])
+  @@map("ai_community_likes")
+}
