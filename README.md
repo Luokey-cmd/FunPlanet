@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="assets/icon/app_icon.png" alt="趣玩星球 App 图标" width="180" />
+</p>
+
+
 # 趣玩星球 FunPlanet (Flutter项目)
 
 面向潮玩爱好者的 Flutter 移动电商 App，含商城购物、会员体系、AI 助手「小豆」、AI 绘画、AI 社区与在线客服。配套 Node.js 后端、React 管理后台与 PostgreSQL 数据库，已完成 Android Release 打包与云服务器部署。
