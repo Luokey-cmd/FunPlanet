@@ -323,5 +323,5 @@ flutter build apk --release --dart-define=API_BASE_URL=http://你的服务器:30
 
 ## License
 
-暂未指定开源协议。如需参加竞赛或商用，请先通过 Issues 联系作者luoqiwenju@qq.com。
+暂未指定开源协议。如需参加竞赛或商用，请先通过 Issues 联系作者huanghengxin_2004@qq.com。
 
