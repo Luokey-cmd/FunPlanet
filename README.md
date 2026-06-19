@@ -5,7 +5,21 @@
 
 # 趣玩星球 FunPlanet (Flutter项目)
 
+原创作者：黄恒鑫
+
 面向潮玩爱好者的 Flutter 移动电商 App，含商城购物、会员体系、AI 助手「小豆」、AI 绘画、AI 社区与在线客服。配套 Node.js 后端、React 管理后台与 PostgreSQL 数据库，已完成 Android Release 打包与云服务器部署。
+
+| 模块 | 技术 | 说明 |
+|------|------|------|
+| 移动端框架 | Flutter | 跨平台移动应用开发框架 |
+| 移动端语言 | Dart | Flutter 官方编程语言 |
+| 后端运行环境 | Node.js | JavaScript 运行时环境 |
+| 后端框架 | Express | Node.js Web 应用框架 |
+| 后端语言 | JavaScript | 服务器端编程语言 |
+| 管理员后台框架 | React | 前端 UI 框架 |
+| 管理员后台语言 | TypeScript | 类型安全的 JavaScript 超集 |
+| 数据库 | PostgreSQL | 关系型数据库 |
+| ORM | Prisma | 后端与数据库之间的对象关系映射 |
 
 [![Release](https://img.shields.io/github/v/release/Luokey-cmd/FunPlanet?label=Release)](https://github.com/Luokey-cmd/FunPlanet/releases)
 
