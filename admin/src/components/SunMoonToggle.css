@@ -1,0 +1,272 @@
+.sun-moon-toggle {
+  --box-height: 36px;
+  --box-width: calc(var(--box-height) * 2.5);
+  --ball-size: calc(var(--box-height) * 0.85);
+  --ball-margin: calc(var(--box-height) * 0.1);
+  --move-duration: 1.2s;
+  --opacity-duration: calc(var(--move-duration) / 1.8);
+  --sky-duration: var(--move-duration);
+  --near-cloud-size: var(--ball-size);
+  --near-cloud-duration: calc(var(--move-duration) * 1.2);
+  --far-cloud-size: var(--ball-size);
+  --far-cloud-duration: calc(var(--move-duration) * 1.3);
+  --star-size: calc(var(--ball-size) / 15);
+
+  position: relative;
+  height: var(--box-height);
+  width: var(--box-width);
+  border-radius: calc(var(--box-height) / 2);
+  overflow: hidden;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.sun-moon-toggle .sky {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.sun-moon-toggle .inner-shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(var(--box-height) / 2);
+  box-shadow: inset 0 0 0.5em rgba(0, 0, 0, 0.45);
+  z-index: 4;
+  pointer-events: none;
+}
+
+.sun-moon-toggle.is-day .inner-shadow {
+  box-shadow: inset 0 1px 0.35em rgba(255, 255, 255, 0.55), inset 0 -1px 0.25em rgba(80, 140, 200, 0.25);
+}
+
+.sun-moon-toggle .sky-day {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(135deg, rgb(120, 195, 255) 0%, rgb(85, 165, 245) 55%, rgb(100, 180, 255) 100%);
+  transition: background var(--sky-duration);
+}
+
+.sun-moon-toggle.is-day {
+  box-shadow: 0 0 12px rgba(100, 190, 255, 0.45);
+}
+
+.sun-moon-toggle .sky-night {
+  height: 100%;
+  width: 100%;
+  background-color: rgb(23, 30, 51);
+  transition: background-color var(--sky-duration);
+}
+
+.sun-moon-toggle .star-cloud-box {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.sun-moon-toggle .star-box {
+  position: absolute;
+  inset: 0;
+  transition: transform var(--move-duration) cubic-bezier(0.26, 0.97, 0.2, 1.08);
+}
+
+.sun-moon-toggle.is-day .star-box {
+  transform: translateY(-100%);
+}
+
+.sun-moon-toggle .star {
+  position: absolute;
+  background: white;
+  clip-path: polygon(
+    50% 0%,
+    62% 38%,
+    100% 50%,
+    62% 62%,
+    50% 100%,
+    38% 62%,
+    0% 50%,
+    38% 38%
+  );
+}
+
+.sun-moon-toggle .cloud-box {
+  position: absolute;
+  inset: 0;
+}
+
+.sun-moon-toggle .cloud-near,
+.sun-moon-toggle .cloud-far {
+  position: absolute;
+  inset: 0;
+  transform: translateY(0);
+  transition: none;
+}
+
+.sun-moon-toggle.is-night .cloud-near,
+.sun-moon-toggle.is-night .cloud-far {
+  transform: translateY(100%);
+  transition: transform var(--near-cloud-duration) cubic-bezier(0.49, 1.57, 0.04, 0.83);
+}
+
+.sun-moon-toggle.is-night .cloud-far {
+  transition-duration: var(--far-cloud-duration);
+}
+
+.sun-moon-toggle .cloud {
+  position: absolute;
+  border-radius: 50%;
+}
+
+.sun-moon-toggle .cloud-near .cloud {
+  background-color: white;
+  z-index: 2;
+}
+
+.sun-moon-toggle.is-day .cloud-far .cloud {
+  background-color: rgb(210, 235, 255);
+}
+
+.sun-moon-toggle.is-day .halo-inner,
+.sun-moon-toggle.is-day .halo-middle,
+.sun-moon-toggle.is-day .halo-outer {
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+.sun-moon-toggle .halo-box {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.sun-moon-toggle .halo-inner,
+.sun-moon-toggle .halo-middle,
+.sun-moon-toggle .halo-outer {
+  position: absolute;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.08);
+  z-index: 3;
+  transition: all var(--move-duration) cubic-bezier(0.26, 0.97, 0.2, 1.08);
+}
+
+.sun-moon-toggle .halo-inner {
+  height: calc(var(--box-height) * 1.47);
+  width: calc(var(--box-height) * 1.47);
+}
+
+.sun-moon-toggle .halo-middle {
+  height: calc(var(--box-height) * 1.77);
+  width: calc(var(--box-height) * 1.77);
+}
+
+.sun-moon-toggle .halo-outer {
+  height: calc(var(--box-height) * 2.07);
+  width: calc(var(--box-height) * 2.07);
+}
+
+.sun-moon-toggle .halo-left.halo-inner,
+.sun-moon-toggle .halo-left.halo-middle,
+.sun-moon-toggle .halo-left.halo-outer {
+  transform: translateX(calc(-1 * var(--ball-margin)));
+}
+
+.sun-moon-toggle .halo-right.halo-inner,
+.sun-moon-toggle .halo-right.halo-middle,
+.sun-moon-toggle .halo-right.halo-outer {
+  transform: translateX(calc(var(--box-width) - 100% + var(--ball-margin)));
+}
+
+.sun-moon-toggle .ball-box {
+  position: absolute;
+  height: var(--ball-size);
+  width: var(--ball-size);
+  top: calc((var(--box-height) - var(--ball-size)) / 2);
+  left: 0;
+  z-index: 5;
+  transition: transform var(--move-duration) cubic-bezier(0.26, 0.97, 0.2, 1.08);
+}
+
+.sun-moon-toggle.is-day .ball-box {
+  transform: translateX(var(--ball-margin));
+}
+
+.sun-moon-toggle.is-night .ball-box {
+  transform: translateX(calc(var(--box-width) - var(--ball-size) - var(--ball-margin)));
+}
+
+.sun-moon-toggle .cloud-far .cloud {
+  background-color: rgb(168, 197, 227);
+  z-index: 1;
+}
+
+.sun-moon-toggle .ball-cut-in {
+  position: relative;
+  height: var(--ball-size);
+  width: var(--ball-size);
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0.3em 0.3em 0.5em rgba(0, 0, 0, 0.45);
+}
+
+.sun-moon-toggle.is-day .ball-cut-in {
+  box-shadow:
+    0 0 10px rgba(255, 220, 80, 0.75),
+    0.2em 0.2em 0.4em rgba(0, 0, 0, 0.2);
+}
+
+.sun-moon-toggle .sun {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgb(255, 248, 180) 0%, rgb(255, 225, 70) 45%, rgb(255, 200, 40) 100%);
+  box-shadow:
+    inset 0.25em 0.25em 0.35em rgba(255, 255, 255, 0.95),
+    inset -0.15em -0.15em 0.5em rgba(255, 180, 30, 0.35);
+}
+
+.sun-moon-toggle .moon {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-color: rgb(195, 201, 211);
+  transform: translateX(100%);
+  transition: transform var(--opacity-duration);
+}
+
+.sun-moon-toggle.is-night .moon {
+  transform: translateX(0);
+}
+
+.sun-moon-toggle .moon-body {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-color: rgb(195, 201, 211);
+}
+
+.sun-moon-toggle .moon-shadow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow:
+    inset 0.3em 0.3em 0.3em rgba(255, 255, 255, 0.8),
+    inset -0.3em -0.3em 1em rgba(0, 0, 0, 0.35);
+  z-index: 2;
+}
+
+.sun-moon-toggle .moon-crater {
+  position: absolute;
+  border-radius: 50%;
+  background-color: rgb(145, 151, 165);
+}
+
+.sun-moon-toggle .moon-crater::before {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background-color: rgb(156, 159, 179);
+}
