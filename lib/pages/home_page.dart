@@ -13,7 +13,6 @@ import '../widgets/banner_carousel.dart';
 import '../widgets/home_top_bar.dart';
 import '../widgets/sparkle_background.dart';
 import '../widgets/staggered_product_grid.dart';
-import '../widgets/tab_transition_scope.dart';
 import 'user_feature_sheets.dart';
 
 import '../widgets/click_effect/app_pressable.dart';
@@ -25,6 +24,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  List<Widget>? _slivers;
+
   void _claimNewcomer(UserProvider user) {
     if (user.newcomerClaimed) {
       UserFeatureSheets.showCoupons(context);
@@ -38,25 +39,29 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  List<Widget> _buildSlivers() {
+    return [
+      const SliverToBoxAdapter(child: HomeTopBar()),
+      const SliverToBoxAdapter(child: BannerCarousel()),
+      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
+      const SliverToBoxAdapter(child: _QuickActions()),
+      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
+      SliverToBoxAdapter(child: _NewcomerSection(onClaim: _claimNewcomer)),
+      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(24))),
+      const SliverToBoxAdapter(child: RepaintBoundary(child: _MarketSection())),
+      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
-    final tabAnimating = TabTransitionScope.isTabAnimating(context);
+    _slivers ??= _buildSlivers();
 
     return RepaintBoundary(
       child: SparkleBackground(
         child: CustomScrollView(
-          physics: tabAnimating ? const NeverScrollableScrollPhysics() : const ClampingScrollPhysics(),
-          slivers: [
-            const SliverToBoxAdapter(child: HomeTopBar()),
-            SliverToBoxAdapter(child: BannerCarousel()),
-            SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
-            SliverToBoxAdapter(child: _QuickActions()),
-            SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
-            SliverToBoxAdapter(child: _NewcomerSection(onClaim: _claimNewcomer)),
-            SliverToBoxAdapter(child: SizedBox(height: AppScale.s(24))),
-            SliverToBoxAdapter(child: RepaintBoundary(child: _MarketSection())),
-            SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
-          ],
+          physics: const ClampingScrollPhysics(),
+          slivers: _slivers!,
         ),
       ),
     );
@@ -64,6 +69,8 @@ class _HomePageState extends State<HomePage> {
 }
 
 class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+
   static const _items = ['每日任务', '会员专享', '领券中心', '趣玩分类'];
 
   @override
@@ -477,6 +484,8 @@ class _ChatBubblePainter extends CustomPainter {
 }
 
 class _MarketSection extends StatefulWidget {
+  const _MarketSection();
+
   @override
   State<_MarketSection> createState() => _MarketSectionState();
 }
@@ -513,6 +522,8 @@ class _MarketSectionState extends State<_MarketSection> {
                 final active = _tab == t.$1;
                 return AppGestureDetector(
                   onTap: () => setState(() => _tab = t.$1),
+                  enablePressScale: false,
+                  enableParticle: false,
                   child: Container(
                     margin: EdgeInsets.only(right: AppScale.s(16)),
                     child: Column(
@@ -526,8 +537,7 @@ class _MarketSectionState extends State<_MarketSection> {
                           ),
                         ),
                         SizedBox(height: AppScale.s(4)),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
+                        Container(
                           width: active ? AppScale.s(20) : 0,
                           height: AppScale.s(3),
                           decoration: BoxDecoration(

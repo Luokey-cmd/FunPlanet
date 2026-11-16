@@ -350,7 +350,7 @@ const memberSubscribeCoinPrice = 299;
 const oneEyedGiftBoxPath = 'assets/images/独眼礼盒.png';
 const inviteCharactersPath = 'assets/images/两小人物.png';
 const aiPaintEntryPath = 'assets/images/AI绘画.png';
-const aiCommunityEntryPath = 'assets/images/AI社区.png';
+const aiCommunityEntryPath = 'assets/images/AI社区.jpg';
 
 const quickActionIconPaths = {
   '每日任务': 'assets/images/每日任务.png',

@@ -42,7 +42,9 @@ class _SearchPageState extends State<SearchPage> {
     super.initState();
     _query = widget.initialQuery ?? '';
     _controller = TextEditingController(text: _query);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
+    if (_query.trim().isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _focusNode.requestFocus());
+    }
   }
 
   @override

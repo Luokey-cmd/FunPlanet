@@ -133,15 +133,12 @@ class _UserCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(_ps(12)),
                   child: Row(
                     children: [
-                      Container(
-                        width: _ps(56),
-                        height: _ps(56),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: _ps(2)),
+                      ClipOval(
+                        child: SizedBox(
+                          width: _ps(56),
+                          height: _ps(56),
+                          child: UserAvatarImage(path: user.avatarPath, fit: BoxFit.cover),
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: UserAvatarImage(path: user.avatarPath, fit: BoxFit.cover),
                       ),
                       SizedBox(width: _ps(12)),
                       Expanded(

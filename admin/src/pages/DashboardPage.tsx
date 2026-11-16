@@ -6,8 +6,13 @@ import ProvinceHeatMap from "../components/ProvinceHeatMap";
 import RecentOrders from "../components/RecentOrders";
 import TopProducts from "../components/TopProducts";
 import { adminApi } from "../lib/api";
+import type { NavPage } from "../types";
 
-export default function DashboardPage() {
+interface DashboardPageProps {
+  onNavigate?: (page: NavPage) => void;
+}
+
+export default function DashboardPage({ onNavigate }: DashboardPageProps) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["admin-dashboard"],
     queryFn: () => adminApi.dashboard(),
@@ -41,6 +46,7 @@ export default function DashboardPage() {
             growth={0}
             iconSrc="/images/dashboard-icon-1.png"
             prefix="¥"
+            onClick={onNavigate ? () => onNavigate("analytics") : undefined}
           />
         </div>
         <div className="flex-1 min-w-[200px]">
@@ -49,6 +55,7 @@ export default function DashboardPage() {
             value={stats.totalOrders}
             growth={0}
             iconSrc="/images/dashboard-icon-2.png"
+            onClick={onNavigate ? () => onNavigate("orders") : undefined}
           />
         </div>
         <div className="flex-1 min-w-[200px]">
@@ -57,6 +64,7 @@ export default function DashboardPage() {
             value={stats.totalUsers}
             growth={0}
             iconSrc="/images/dashboard-icon-3.png"
+            onClick={onNavigate ? () => onNavigate("users") : undefined}
           />
         </div>
         <div className="flex-1 min-w-[200px]">
@@ -65,6 +73,7 @@ export default function DashboardPage() {
             value={stats.totalProducts}
             growth={0}
             iconSrc="/images/dashboard-icon-4.png"
+            onClick={onNavigate ? () => onNavigate("products") : undefined}
           />
         </div>
       </div>

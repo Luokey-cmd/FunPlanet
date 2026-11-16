@@ -41,8 +41,10 @@ class AppTabBar extends StatelessWidget {
           return Expanded(
             child: AppInkWell(
               onTap: () => onChange(tab.$1),
-              splashColor: AppColors.primary.withValues(alpha: 0.12),
-              highlightColor: AppColors.primary.withValues(alpha: 0.06),
+              enablePressScale: false,
+              enableParticle: false,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: AppScale.s(12)),
                 child: Column(
@@ -51,19 +53,10 @@ class AppTabBar extends StatelessWidget {
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        AnimatedScale(
-                          scale: isActive ? 1.08 : 1.0,
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            child: Icon(
-                              isActive ? tab.$4 : tab.$3,
-                              key: ValueKey('${tab.$1}_$isActive'),
-                              size: AppScale.s(32),
-                              color: isActive ? AppColors.primary : AppColors.mutedForeground,
-                            ),
-                          ),
+                        Icon(
+                          isActive ? tab.$4 : tab.$3,
+                          size: AppScale.s(32),
+                          color: isActive ? AppColors.primary : AppColors.mutedForeground,
                         ),
                         if (showBadge)
                           Positioned(
@@ -91,15 +84,13 @@ class AppTabBar extends StatelessWidget {
                       ],
                     ),
                     SizedBox(height: AppScale.s(6)),
-                    AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
+                    Text(
+                      tab.$2,
                       style: AppTheme.baseText.copyWith(
                         fontSize: AppScale.t(16),
                         fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
                         color: isActive ? AppColors.primary : AppColors.mutedForeground,
                       ),
-                      child: Text(tab.$2),
                     ),
                   ],
                 ),

@@ -151,7 +151,7 @@ export default function AdminLayout() {
 
         <main className="flex-1 overflow-y-auto">
 
-          {activePage === "dashboard" && <DashboardPage />}
+          {activePage === "dashboard" && <DashboardPage onNavigate={setActivePage} />}
 
           {activePage === "analytics" && <AnalyticsPage />}
 

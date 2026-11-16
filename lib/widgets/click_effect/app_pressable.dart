@@ -93,12 +93,9 @@ class _AppPressableState extends State<AppPressable> {
         _downPos = null;
         _setPressed(false);
       },
-      child: AnimatedScale(
+      // 瞬时缩放，避免 AnimatedScale 与粒子同帧抢预算。
+      child: Transform.scale(
         scale: _pressed ? widget.scale : 1.0,
-        duration: _pressed
-            ? const Duration(milliseconds: 40)
-            : const Duration(milliseconds: 140),
-        curve: _pressed ? Curves.easeOut : Curves.easeOutBack,
         child: widget.child,
       ),
     );
@@ -143,10 +140,8 @@ class _AppFocusableState extends State<AppFocusable> {
           });
         }
       },
-      child: AnimatedScale(
+      child: Transform.scale(
         scale: _focused && ClickEffectController.effectsEnabled ? widget.focusedScale : 1.0,
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOutCubic,
         child: widget.child,
       ),
     );
