@@ -1,5 +1,5 @@
-name: figmamake
-description: "A new Flutter project."
+name: funplanet
+description: "FunPlanet（趣玩星球）— Flutter 潮玩电商 App，含商城、会员、AI 助手「小豆」、AI 绘画与 AI 社区。"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
