@@ -1,6 +1,7 @@
 export type NavPage =
   | "dashboard"
   | "products"
+  | "categories"
   | "orders"
   | "users"
   | "analytics"
@@ -8,6 +9,8 @@ export type NavPage =
   | "banners"
   | "settings"
   | "changelog"
+  | "admins"
+  | "audit"
   | "support";
 
 export interface Notification {

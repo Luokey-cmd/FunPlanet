@@ -1,0 +1,32 @@
+[
+  {
+    "id": "cat-toy",
+    "name": "玩具",
+    "sortOrder": 1
+  },
+  {
+    "id": "cat-plush",
+    "name": "公仔",
+    "sortOrder": 2
+  },
+  {
+    "id": "cat-figure",
+    "name": "手办",
+    "sortOrder": 3
+  },
+  {
+    "id": "cat-merch",
+    "name": "谷子",
+    "sortOrder": 4
+  },
+  {
+    "id": "cat-card",
+    "name": "小卡",
+    "sortOrder": 5
+  },
+  {
+    "id": "cat-stationery",
+    "name": "文具",
+    "sortOrder": 6
+  }
+]

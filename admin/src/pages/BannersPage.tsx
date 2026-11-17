@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PlusIcon, EditIcon, TrashIcon, XIcon, SearchIcon } from "lucide-react";
+import { PlusIcon, EditIcon, TrashIcon, XIcon, SearchIcon, ZoomInIcon } from "lucide-react";
 import { toast } from "sonner";
 import AdminImagePicker from "../components/AdminImagePicker";
 import BannerImage from "../components/BannerImage";
 import { adminApi, type AdminBanner } from "../lib/api";
+import { resolveAssetUrl } from "../lib/assets";
 
 const emptyBanner = { imagePath: "", productId: "", sortOrder: 0 };
 
@@ -15,6 +16,17 @@ export default function BannersPage() {
   );
   const [isNew, setIsNew] = useState(false);
   const [search, setSearch] = useState("");
+  const [preview, setPreview] = useState<AdminBanner | null>(null);
+
+  // 放大查看时按 Esc 关闭
+  useEffect(() => {
+    if (!preview) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPreview(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [preview]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-banners"],
@@ -98,7 +110,19 @@ export default function BannersPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {banners.map((banner) => (
             <div key={banner.id} className="bg-card rounded-2xl border border-border shadow-custom overflow-hidden">
-              <BannerImage imagePath={banner.imagePath} alt={banner.productName} className="h-36" />
+              <button
+                type="button"
+                onClick={() => setPreview(banner)}
+                className="relative block w-full cursor-zoom-in group"
+                title="点击放大查看"
+                aria-label={`放大查看 ${banner.productName}`}
+              >
+                <BannerImage imagePath={banner.imagePath} alt={banner.productName} className="h-36" />
+                <span className="absolute inset-0 flex items-center justify-center gap-1.5 bg-black/45 text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                  <ZoomInIcon size={14} />
+                  点击放大查看
+                </span>
+              </button>
               <div className="p-4">
                 <p className="text-sm font-medium text-foreground truncate">{banner.productName}</p>
                 <p className="text-xs text-muted-foreground mt-1 truncate">{banner.imagePath}</p>
@@ -127,6 +151,38 @@ export default function BannersPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {preview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+          onClick={() => setPreview(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="轮播图放大查看"
+        >
+          <button
+            type="button"
+            onClick={() => setPreview(null)}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/15 text-white flex items-center justify-center hover:bg-white/30 transition-colors"
+            aria-label="关闭放大查看"
+          >
+            <XIcon size={18} />
+          </button>
+          <div className="max-w-4xl w-full flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={resolveAssetUrl(preview.imagePath)}
+              alt={preview.productName}
+              className="max-h-[78vh] w-auto max-w-full object-contain rounded-2xl shadow-2xl"
+            />
+            <div className="text-center">
+              <p className="text-sm font-medium text-white">{preview.productName}</p>
+              <p className="text-xs text-white/70 mt-0.5">
+                {preview.imagePath} · 排序 {preview.sortOrder} · 商品 {preview.productId}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

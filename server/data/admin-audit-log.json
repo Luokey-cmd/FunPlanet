@@ -1,0 +1,18 @@
+[
+  {
+    "id": "8510468c-e4d0-4e3d-ba79-d2fa68c46804",
+    "time": "2026-11-17T06:35:52.644Z",
+    "username": "admin",
+    "name": "骆七",
+    "action": "商品上下架",
+    "detail": "PATCH /products/p55/shelf"
+  },
+  {
+    "id": "f08edac0-62a0-4dfb-bef5-281ca99d9858",
+    "time": "2026-11-17T06:35:51.356Z",
+    "username": "admin",
+    "name": "骆七",
+    "action": "商品上下架",
+    "detail": "PATCH /products/p55/shelf"
+  }
+]

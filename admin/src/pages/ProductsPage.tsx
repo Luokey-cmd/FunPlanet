@@ -6,7 +6,8 @@ import AdminImagePicker from "../components/AdminImagePicker";
 import ProductImageThumb from "../components/ProductImageThumb";
 import { adminApi, type AdminProduct } from "../lib/api";
 
-const categories = ["全部", "玩具", "公仔", "手办", "谷子", "小卡", "文具"];
+// 分类改从「分类管理」接口读；接口不可用时用这组默认值兜底
+const FALLBACK_CATEGORY_NAMES = ["玩具", "公仔", "手办", "谷子", "小卡", "文具"];
 
 const emptyForm: Partial<AdminProduct> & { id: string; name: string } = {
   id: "",
@@ -20,6 +21,8 @@ const emptyForm: Partial<AdminProduct> & { id: string; name: string } = {
   tag: null,
   tagColor: null,
   spec: null,
+  stock: 100,
+  isOnShelf: true,
   description: "",
   purchaseNotes: "",
   rating: 5,
@@ -32,6 +35,13 @@ export default function ProductsPage() {
   const [category, setCategory] = useState("全部");
   const [editing, setEditing] = useState<(Partial<AdminProduct> & { id: string; name: string }) | null>(null);
   const [isNew, setIsNew] = useState(false);
+
+  const { data: categoriesData } = useQuery({
+    queryKey: ["admin-categories"],
+    queryFn: () => adminApi.categories(),
+  });
+  const categoryNames = categoriesData?.categories.map((c) => c.name) ?? FALLBACK_CATEGORY_NAMES;
+  const filterCategories = ["全部", ...categoryNames];
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-products", search, category],
@@ -56,6 +66,16 @@ export default function ProductsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const shelfMutation = useMutation({
+    mutationFn: ({ id, isOnShelf }: { id: string; isOnShelf: boolean }) =>
+      adminApi.toggleProductShelf(id, isOnShelf),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+      toast.success(vars.isOnShelf ? "商品已上架" : "商品已下架，App 商城里将不再显示");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => adminApi.deleteProduct(id),
     onSuccess: () => {
@@ -65,7 +85,20 @@ export default function ProductsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const products = data?.products ?? [];
+  // 商品列表按编号数字从大到小排：越晚添加（P 数字越大）越靠前。
+  // 只在后台这一层排序，不影响 App 商城里的商品顺序。
+  const products = [...(data?.products ?? [])].sort((a, b) => {
+    const numOf = (id: string) => {
+      const m = id.match(/\d+/);
+      return m ? parseInt(m[0], 10) : Number.NaN;
+    };
+    const na = numOf(a.id);
+    const nb = numOf(b.id);
+    if (!Number.isNaN(na) && !Number.isNaN(nb) && na !== nb) return nb - na;
+    if (!Number.isNaN(na) && Number.isNaN(nb)) return -1;
+    if (Number.isNaN(na) && !Number.isNaN(nb)) return 1;
+    return b.id.localeCompare(a.id);
+  });
 
   const openEdit = (p: AdminProduct) => {
     setIsNew(false);
@@ -105,7 +138,7 @@ export default function ProductsPage() {
           />
         </div>
         <div className="flex gap-2 flex-wrap">
-          {categories.map((cat) => (
+          {filterCategories.map((cat) => (
             <button
               key={cat}
               onClick={() => setCategory(cat)}
@@ -133,6 +166,8 @@ export default function ProductsPage() {
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-muted-foreground">分类</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-muted-foreground">价格</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-muted-foreground">销量</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-muted-foreground">库存</th>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-muted-foreground">状态</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-muted-foreground">收藏数</th>
                   <th className="text-left px-5 py-3.5 text-xs font-semibold text-muted-foreground">操作</th>
                 </tr>
@@ -146,7 +181,7 @@ export default function ProductsPage() {
                     }`}
                   >
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
+                      <div className={`flex items-center gap-3 ${product.isOnShelf ? "" : "opacity-50"}`}>
                         <ProductImageThumb imagePath={product.imagePath} alt={product.name} size={40} />
                         <div>
                           <p className="text-sm font-medium text-foreground">{product.name}</p>
@@ -161,6 +196,31 @@ export default function ProductsPage() {
                     </td>
                     <td className="px-5 py-4 text-sm font-semibold text-foreground">¥{product.price}</td>
                     <td className="px-5 py-4 text-sm text-foreground">{product.sales}</td>
+                    <td className="px-5 py-4">
+                      <span className={`text-sm ${product.stock <= 0 ? "text-destructive font-semibold" : "text-foreground"}`}>
+                        {product.stock}
+                      </span>
+                      {product.stock <= 0 && <span className="ml-1.5 text-xs text-destructive">缺货</span>}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => shelfMutation.mutate({ id: product.id, isOnShelf: !product.isOnShelf })}
+                          disabled={shelfMutation.isPending}
+                          title={product.isOnShelf ? "点击下架" : "点击上架"}
+                          className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            product.isOnShelf ? "bg-primary" : "bg-muted-foreground/30"
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
+                              product.isOnShelf ? "left-[22px]" : "left-0.5"
+                            }`}
+                          />
+                        </button>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{product.isOnShelf ? "上架" : "下架"}</span>
+                      </div>
+                    </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-1">
                         <HeartIcon size={13} fill="#f48fb1" stroke="#f48fb1" />
@@ -232,11 +292,20 @@ export default function ProductsPage() {
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-muted-foreground">大类</span>
-                <input
+                <select
                   value={editing.majorCategory ?? ""}
                   onChange={(e) => setEditing({ ...editing, majorCategory: e.target.value })}
                   className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                />
+                >
+                  {categoryNames.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                  {editing.majorCategory && !categoryNames.includes(editing.majorCategory) && (
+                    <option value={editing.majorCategory}>{editing.majorCategory}</option>
+                  )}
+                </select>
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-muted-foreground">子类</span>
@@ -255,6 +324,29 @@ export default function ProductsPage() {
                   className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </label>
+              <div className="flex gap-3">
+                <label className="flex flex-col gap-1 text-sm flex-1">
+                  <span className="text-muted-foreground">库存</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editing.stock ?? 0}
+                    onChange={(e) => setEditing({ ...editing, stock: Number(e.target.value) })}
+                    className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm flex-1">
+                  <span className="text-muted-foreground">上架状态</span>
+                  <select
+                    value={editing.isOnShelf === false ? "off" : "on"}
+                    onChange={(e) => setEditing({ ...editing, isOnShelf: e.target.value === "on" })}
+                    className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="on">上架（App 可见）</option>
+                    <option value="off">下架（App 隐藏）</option>
+                  </select>
+                </label>
+              </div>
               <AdminImagePicker
                 label="商品图片"
                 imagePath={editing.imagePath ?? ""}

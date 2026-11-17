@@ -8,7 +8,9 @@ import Topbar from "../components/Topbar";
 
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
-import { adminApi, ApiError } from "../lib/api";
+import { adminApi, ApiError, ADMIN_ROLE_LABEL } from "../lib/api";
+
+import { canAccess } from "../lib/permissions";
 
 import AnalyticsPage from "./AnalyticsPage";
 
@@ -21,6 +23,12 @@ import DashboardPage from "./DashboardPage";
 import OrdersPage from "./OrdersPage";
 
 import ProductsPage from "./ProductsPage";
+
+import CategoriesPage from "./CategoriesPage";
+
+import AdminsPage from "./AdminsPage";
+
+import AuditLogsPage from "./AuditLogsPage";
 
 import ChangelogPage from "./ChangelogPage";
 
@@ -61,6 +69,8 @@ export default function AdminLayout() {
   const [activePage, setActivePage] = useState<NavPage>("dashboard");
 
   const [supportConversationId, setSupportConversationId] = useState<string | null>(null);
+
+  const effectivePage: NavPage = canAccess(admin?.role, activePage) ? activePage : "dashboard";
 
 
 
@@ -110,13 +120,13 @@ export default function AdminLayout() {
 
     <div className="flex h-screen overflow-hidden bg-background" data-cmp="AdminLayout">
 
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <Sidebar activePage={effectivePage} onNavigate={setActivePage} role={admin?.role ?? "super"} />
 
       <div className="flex flex-col flex-1 overflow-hidden">
 
         <Topbar
 
-          activePage={activePage}
+          activePage={effectivePage}
 
           adminName={admin?.name ?? "管理员"}
 
@@ -124,7 +134,7 @@ export default function AdminLayout() {
 
           adminAvatarPath={admin?.avatarPath}
 
-          adminRole="超级管理员"
+          adminRole={ADMIN_ROLE_LABEL[admin?.role ?? "super"]}
 
           notifications={notifications}
 
@@ -151,21 +161,23 @@ export default function AdminLayout() {
 
         <main className="flex-1 overflow-y-auto">
 
-          {activePage === "dashboard" && <DashboardPage onNavigate={setActivePage} />}
+          {effectivePage === "dashboard" && <DashboardPage onNavigate={setActivePage} />}
 
-          {activePage === "analytics" && <AnalyticsPage />}
+          {effectivePage === "analytics" && <AnalyticsPage />}
 
-          {activePage === "products" && <ProductsPage />}
+          {effectivePage === "products" && <ProductsPage />}
 
-          {activePage === "orders" && <OrdersPage />}
+          {effectivePage === "categories" && <CategoriesPage />}
 
-          {activePage === "users" && <UsersPage />}
+          {effectivePage === "orders" && <OrdersPage />}
 
-          {activePage === "coupons" && <CouponsPage />}
+          {effectivePage === "users" && <UsersPage />}
 
-          {activePage === "banners" && <BannersPage />}
+          {effectivePage === "coupons" && <CouponsPage />}
 
-          {activePage === "support" && (
+          {effectivePage === "banners" && <BannersPage />}
+
+          {effectivePage === "support" && (
 
             <SupportPage
 
@@ -177,9 +189,13 @@ export default function AdminLayout() {
 
           )}
 
-          {activePage === "changelog" && <ChangelogPage />}
+          {effectivePage === "changelog" && <ChangelogPage />}
 
-          {activePage === "settings" && <SettingsPage />}
+          {effectivePage === "admins" && <AdminsPage currentUsername={admin?.username ?? ""} />}
+
+          {effectivePage === "audit" && <AuditLogsPage />}
+
+          {effectivePage === "settings" && <SettingsPage />}
 
         </main>
 

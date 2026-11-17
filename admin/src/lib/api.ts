@@ -62,6 +62,11 @@ export const adminApi = {
   updateProduct: (id: string, body: Partial<AdminProduct>) =>
     request<{ product: AdminProduct }>(`/products/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteProduct: (id: string) => request<{ deleted: boolean }>(`/products/${id}`, { method: "DELETE" }),
+  toggleProductShelf: (id: string, isOnShelf: boolean) =>
+    request<{ product: AdminProduct }>(`/products/${id}/shelf`, {
+      method: "PATCH",
+      body: JSON.stringify({ isOnShelf }),
+    }),
   orders: (params?: { status?: string; keyword?: string }) => {
     const q = new URLSearchParams();
     if (params?.status) q.set("status", params.status);
@@ -106,6 +111,31 @@ export const adminApi = {
     }),
   syncProductSales: () => request<{ synced: boolean }>("/settings/sync-sales", { method: "POST" }),
   dataSummary: () => request<{ summary: AdminDataSummary }>("/settings/data-summary"),
+  admins: () => request<{ admins: AdminAccountItem[] }>("/admins"),
+  updateAdminRole: (username: string, role: AdminRole) =>
+    request<{ updated: boolean }>(`/admins/${username}/role`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+  updateAdminDisabled: (username: string, disabled: boolean) =>
+    request<{ updated: boolean }>(`/admins/${username}/disabled`, {
+      method: "PATCH",
+      body: JSON.stringify({ disabled }),
+    }),
+  auditLogs: (username?: string) =>
+    request<{ entries: AuditLogEntry[] }>(`/audit-logs${username ? `?username=${encodeURIComponent(username)}` : ""}`),
+  categories: () => request<{ categories: AdminCategory[] }>("/categories"),
+  createCategory: (body: CategoryInput) =>
+    request<{ category: AdminCategory; categories: AdminCategory[] }>("/categories", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  updateCategory: (id: string, body: CategoryInput) =>
+    request<{ category: AdminCategory; categories: AdminCategory[] }>(`/categories/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+  deleteCategory: (id: string) => request<{ deleted: boolean }>(`/categories/${id}`, { method: "DELETE" }),
   changelog: () => request<{ entries: ChangelogEntry[] }>("/changelog"),
   createChangelog: (body: ChangelogInput) =>
     request<{ entry: ChangelogEntry }>("/changelog", { method: "POST", body: JSON.stringify(body) }),
@@ -187,12 +217,40 @@ export interface SupportMessage {
   createdAt: string;
 }
 
+export type AdminRole = "super" | "operator" | "support";
+
+export const ADMIN_ROLE_LABEL: Record<AdminRole, string> = {
+  super: "超级管理员",
+  operator: "运营管理员",
+  support: "客服专员",
+};
+
 export interface AdminInfo {
   username: string;
   name: string;
   systemName?: string;
   avatarPath?: string | null;
   notifications?: AdminNotifications;
+  role?: AdminRole;
+}
+
+export interface AdminAccountItem {
+  username: string;
+  name: string;
+  avatarPath: string | null;
+  role: AdminRole;
+  disabled: boolean;
+  createdAt: string | null;
+  builtin: boolean;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  time: string;
+  username: string;
+  name: string;
+  action: string;
+  detail: string;
 }
 
 export interface AdminNotifications {
@@ -230,6 +288,18 @@ export interface ChangelogInput {
   items: string[] | string;
 }
 
+export interface AdminCategory {
+  id: string;
+  name: string;
+  sortOrder: number;
+  productCount: number;
+}
+
+export interface CategoryInput {
+  name: string;
+  sortOrder?: number;
+}
+
 export interface AdminProduct {
   id: string;
   name: string;
@@ -246,6 +316,8 @@ export interface AdminProduct {
   purchaseNotes: string;
   rating: number;
   sales: number;
+  stock: number;
+  isOnShelf: boolean;
   imagePath: string;
   favoriteCount?: number;
 }
