@@ -7,7 +7,7 @@ import ProductImageThumb from "../components/ProductImageThumb";
 import { adminApi, type AdminProduct } from "../lib/api";
 
 // 分类改从「分类管理」接口读；接口不可用时用这组默认值兜底
-const FALLBACK_CATEGORY_NAMES = ["玩具", "公仔", "手办", "谷子", "小卡", "文具"];
+const FALLBACK_CATEGORY_NAMES = ["玩具", "公仔", "手办", "谷子", "小卡", "文具", "实用类周边"];
 
 const emptyForm: Partial<AdminProduct> & { id: string; name: string } = {
   id: "",

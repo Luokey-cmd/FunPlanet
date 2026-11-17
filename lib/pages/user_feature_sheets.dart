@@ -21,7 +21,7 @@ class UserFeatureSheets {
     switch (label) {
       case '优惠券':
         showCoupons(context);
-      case '趣玩币明细':
+      case '趣玩币':
         showFunCoinLedger(context);
       case '地址管理':
         showAddresses(context);

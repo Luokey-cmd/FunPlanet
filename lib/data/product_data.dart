@@ -289,6 +289,7 @@ const categoryTags = [
   Category(id: 'merch', name: '谷子'),
   Category(id: 'card', name: '小卡'),
   Category(id: 'stationery', name: '文具'),
+  Category(id: 'utility', name: '实用类周边'),
 ];
 
 const mallCategoryTags = [
@@ -299,6 +300,7 @@ const mallCategoryTags = [
   Category(id: 'merch', name: '谷子'),
   Category(id: 'card', name: '小卡'),
   Category(id: 'stationery', name: '文具'),
+  Category(id: 'utility', name: '实用类周边'),
 ];
 
 const marketTabs = [

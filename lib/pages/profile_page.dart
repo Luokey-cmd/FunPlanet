@@ -481,7 +481,7 @@ class _ServiceSection extends StatelessWidget {
   ];
   static const _row2 = [
     (DrawnIconType.coupon, '优惠券'),
-    (DrawnIconType.coins, '趣玩币明细'),
+    (DrawnIconType.coins, '趣玩币'),
     (DrawnIconType.address, '地址管理'),
     (DrawnIconType.favoriteStar, '收藏夹'),
     (DrawnIconType.history, '浏览记录'),

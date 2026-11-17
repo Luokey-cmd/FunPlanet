@@ -1,7 +1,7 @@
 import { prisma } from '../db.js';
 import { serializeProduct } from './product.js';
 
-export const MAJOR_CATEGORIES = ['玩具', '文具', '手办', '公仔', '谷子', '小卡'];
+export const MAJOR_CATEGORIES = ['玩具', '文具', '手办', '公仔', '谷子', '小卡', '实用类周边'];
 const SEARCH_LIMIT = 3;
 
 export const XIAODOU_TOOLS = [

@@ -363,6 +363,7 @@ router.get('/dashboard', adminAuthRequired, async (_req, res) => {
     手办: '#fcc351',
     谷子: '#fd8d6e',
     小卡: '#fa86a9',
+    实用类周边: '#c4b5fd',
     其他: '#a1dee0',
   };
   const FALLBACK_COLORS = ['#9adbc5', '#a1dee0', '#dfde6c', '#fcc351', '#fd8d6e', '#fa86a9'];

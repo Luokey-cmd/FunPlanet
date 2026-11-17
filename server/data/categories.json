@@ -28,5 +28,10 @@
     "id": "cat-stationery",
     "name": "文具",
     "sortOrder": 6
+  },
+  {
+    "id": "47ba5388-f01f-41e1-9025-aea557c9b292",
+    "name": "实用类周边",
+    "sortOrder": 7
   }
 ]
