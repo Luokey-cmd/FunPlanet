@@ -289,7 +289,7 @@ router.post('/posts/:id/comments', authRequired, async (req, res) => {
     }
   }
 
-  await prisma.aiCommunityComment.create({
+  const newComment = await prisma.aiCommunityComment.create({
     data: {
       postId,
       authorType: 'user',
@@ -302,17 +302,59 @@ router.post('/posts/:id/comments', authRequired, async (req, res) => {
     },
   });
 
-  if (post.authorType === 'ai_friend' && post.aiFriend && parentId === '0') {
-    const user = await prisma.user.findUnique({ where: { id: req.user.sub } });
-    scheduleAiReplyToUserComment({
-      postId,
-      post,
-      friend: post.aiFriend,
-      userComment: content,
-      userName: user?.nickname || '朋友',
-      prisma,
-      config: deepseekConfig(),
+  // AI 回复触发条件（放开到第二回合）：
+  // 1) 在 AI 好友的帖子下发一级评论 → 帖主 AI 回复；
+  // 2) 回复的是某位 AI 好友的评论（不限帖子作者）→ 那位 AI 接着回。
+  // 同一评论串里 AI 最多回 3 次，防止无限聊和刷屏。
+  let replyFriend = null;
+  let parentComment = null;
+  if (parentId !== '0') {
+    parentComment = await prisma.aiCommunityComment.findFirst({
+      where: { id: parentId, postId },
+      include: { aiFriend: true },
     });
+    if (parentComment?.authorType === 'ai_friend' && parentComment.aiFriend) {
+      replyFriend = parentComment.aiFriend;
+    }
+  } else if (post.authorType === 'ai_friend' && post.aiFriend) {
+    replyFriend = post.aiFriend;
+  }
+
+  if (replyFriend) {
+    const threadRoot = rootId !== '0' ? rootId : newComment.id;
+    const aiRepliesInThread = await prisma.aiCommunityComment.count({
+      where: { postId, rootId: threadRoot, authorType: 'ai_friend' },
+    });
+    if (aiRepliesInThread < 3) {
+      const user = await prisma.user.findUnique({ where: { id: req.user.sub } });
+      const recent = await prisma.aiCommunityComment.findMany({
+        where: { postId },
+        orderBy: { createdAt: 'asc' },
+        take: 10,
+        include: { user: true, aiFriend: true },
+      });
+      const contextComments = recent.map((c) => ({
+        name:
+          c.authorType === 'ai_friend'
+            ? c.aiFriend?.name || 'AI好友'
+            : c.user?.nickname || '用户',
+        content: c.content,
+      }));
+      scheduleAiReplyToUserComment({
+        postId,
+        post,
+        friend: replyFriend,
+        userComment: content,
+        userName: user?.nickname || '朋友',
+        prisma,
+        config: deepseekConfig(),
+        parentCommentId: newComment.id,
+        rootId: threadRoot,
+        replyToUserId: req.user.sub,
+        replyToUserName: user?.nickname || '朋友',
+        contextComments,
+      });
+    }
   }
 
   const row = await prisma.aiCommunityPost.findUnique({

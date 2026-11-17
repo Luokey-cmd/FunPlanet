@@ -15,6 +15,8 @@ export function serializeProduct(p) {
     purchaseNotes: p.purchaseNotes,
     rating: Number(p.rating),
     sales: p.sales,
+    stock: p.stock ?? 100,
+    isOnShelf: p.isOnShelf ?? true,
     imagePath: p.imagePath,
   };
 }

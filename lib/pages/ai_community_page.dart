@@ -225,7 +225,8 @@ class _AiCommunityPageState extends State<AiCommunityPage> {
           _expandedRootsByPost.putIfAbsent(post.id, () => <String>{}).add(replyTo.threadRootId);
         }
       });
-      if (post.author.isAiFriend && parentId == '0') {
+      // 在 AI 好友帖下留言、或回复了某位 AI 好友的评论，服务端都会安排 AI 回话，都要等一等
+      if ((post.author.isAiFriend && parentId == '0') || (replyTo?.author.isAiFriend ?? false)) {
         _pollPostUpdates(post.id, expectAiReply: true);
       }
     } catch (error) {
@@ -246,16 +247,15 @@ class _AiCommunityPageState extends State<AiCommunityPage> {
 
   Future<void> _pollPostUpdates(String postId, {required bool expectAiReply}) async {
     final baseline = _posts.firstWhere((p) => p.id == postId, orElse: () => _posts.first).comments.length;
-    for (var i = 0; i < 5; i++) {
+    // 服务端 AI 评论最晚约 25 秒到齐，轮询窗口放宽到 40 秒；
+    // 只等「新评论出现」才收工，点赞先到也不会提前停（旧逻辑会因此漏看评论）。
+    for (var i = 0; i < 10; i++) {
       await Future<void>.delayed(const Duration(seconds: 4));
       if (!mounted) return;
       try {
         final updated = await _service.fetchPost(postId);
         _replacePost(updated);
-        if (expectAiReply && updated.comments.length > baseline) {
-          return;
-        }
-        if (!expectAiReply && (updated.comments.length > baseline || updated.likeCount > 0)) {
+        if (updated.comments.length > baseline) {
           return;
         }
       } catch (_) {}

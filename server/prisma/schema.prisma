@@ -74,6 +74,8 @@ model Product {
   purchaseNotes String              @map("purchase_notes") @db.Text
   rating        Decimal             @db.Decimal(3, 1)
   sales         Int                 @default(0)
+  stock         Int                 @default(100)
+  isOnShelf     Boolean             @default(true) @map("is_on_shelf")
   imagePath     String              @map("image_path")
   createdAt     DateTime            @default(now()) @map("created_at")
   updatedAt     DateTime            @updatedAt @map("updated_at")

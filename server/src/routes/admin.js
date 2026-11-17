@@ -4,13 +4,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { prisma } from '../db.js';
 import { adminAuthRequired } from '../middleware/adminAuth.js';
-import { signToken } from '../utils/jwt.js';
+import { signToken, verifyToken } from '../utils/jwt.js';
 import { serializeProduct } from '../utils/product.js';
 import { getPaidSalesMap, syncAllProductSales } from '../utils/product-sales.js';
 import {
   changeAdminPassword,
   createAdminAccount,
   resolveAdminProfile,
+  resolveAdminRole,
   updateAdminAvatar,
   updateAdminDisplayName,
   verifyRegisteredAdmin,
@@ -20,13 +21,25 @@ import {
   verifyAdminPassword,
   writeAdminSettings,
 } from '../utils/admin-settings.js';
-import { isRegisteredAdmin } from '../utils/admin-accounts.js';
+import {
+  isRegisteredAdmin,
+  listAdminAccountsSafe,
+  setAdminAccountDisabled,
+  updateAdminAccountRole,
+} from '../utils/admin-accounts.js';
+import { appendAuditLog, readAuditLog } from '../utils/audit-log.js';
 import {
   createChangelogEntry,
   deleteChangelogEntry,
   readChangelog,
   updateChangelogEntry,
 } from '../utils/changelog.js';
+import {
+  createCategory,
+  deleteCategory,
+  readCategories,
+  updateCategory,
+} from '../utils/categories.js';
 import { formatChinaDate, formatChinaDateTime } from '../utils/datetime.js';
 import { aggregateProvinceHeat } from '../utils/province.js';
 import { isDisplayableAvatarPath } from '../utils/avatar-media.js';
@@ -36,6 +49,61 @@ import adminSupportRoutes from './admin-support.js';
 
 const router = Router();
 const assetsRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../assets');
+
+// 仅超级管理员可访问的接口守卫
+function superAdminRequired(req, res, next) {
+  if (resolveAdminRole(req.admin?.username) !== 'super') {
+    fail(res, 403, '只有超级管理员可以进行此操作');
+    return;
+  }
+  next();
+}
+
+// 把请求路径翻译成操作日志里的人话
+function auditActionLabel(method, p) {
+  const seg = p.split('/').filter(Boolean);
+  const head = seg[0] ?? '';
+  const verb = method === 'POST' ? '新增' : method === 'DELETE' ? '删除' : '编辑';
+  if (head === 'products') {
+    if (p.includes('/shelf')) return '商品上下架';
+    return `${verb}商品`;
+  }
+  if (head === 'categories') return `${verb}分类`;
+  if (head === 'banners') return `${verb}轮播图`;
+  if (head === 'coupons') return `${verb}优惠券`;
+  if (head === 'changelog') return `${verb}更新日志`;
+  if (head === 'orders') return '更新订单状态';
+  if (head === 'users') return '编辑用户资料';
+  if (head === 'admins') return '调整管理员账号';
+  if (head === 'support') return '客服中心操作';
+  if (head === 'settings') {
+    if (p.includes('password')) return '修改登录密码';
+    if (p.includes('sync-sales')) return '同步商品销量';
+    if (p.includes('notifications')) return '修改通知偏好';
+    if (p.includes('avatar')) return '更换管理员头像';
+    return '修改系统设置';
+  }
+  return null;
+}
+
+// 操作日志：所有写操作成功后自动记一条（登录在登录接口里单独记）
+router.use((req, res, next) => {
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && !req.path.startsWith('/auth')) {
+    res.on('finish', () => {
+      if (res.statusCode >= 400 || !req.admin?.username) return;
+      const action = auditActionLabel(req.method, req.path);
+      if (!action) return;
+      const profile = resolveAdminProfile(req.admin.username);
+      appendAuditLog({
+        username: req.admin.username,
+        name: profile.name,
+        action,
+        detail: `${req.method} ${req.path}`,
+      });
+    });
+  }
+  next();
+});
 
 router.use('/support', adminSupportRoutes);
 
@@ -68,10 +136,20 @@ router.post('/auth/login', async (req, res) => {
   const u = String(username ?? '').trim();
   const p = String(password ?? '');
 
-  const registered = await verifyRegisteredAdmin(u, p);
+  let registered = null;
+  try {
+    registered = await verifyRegisteredAdmin(u, p);
+  } catch (err) {
+    if (err.code === 'ACCOUNT_DISABLED') {
+      fail(res, 403, '该账号已被禁用，请联系超级管理员');
+      return;
+    }
+    throw err;
+  }
   if (registered) {
     const profile = resolveAdminProfile(registered.username);
     const token = signToken({ role: 'admin', username: registered.username, name: profile.name });
+    appendAuditLog({ username: registered.username, name: profile.name, action: '登录后台', detail: '' });
     ok(res, { token, admin: profile });
     return;
   }
@@ -80,6 +158,7 @@ router.post('/auth/login', async (req, res) => {
   if (u === adminUser && verifyAdminPassword(p)) {
     const profile = resolveAdminProfile(adminUser);
     const token = signToken({ role: 'admin', username: adminUser, name: profile.name });
+    appendAuditLog({ username: adminUser, name: profile.name, action: '登录后台', detail: '' });
     ok(res, { token, admin: profile });
     return;
   }
@@ -139,6 +218,101 @@ router.post('/auth/register', async (req, res) => {
 
 router.get('/auth/me', adminAuthRequired, (req, res) => {
   ok(res, { admin: resolveAdminProfile(req.admin.username) });
+});
+
+// 管理员账号管理（仅超级管理员）：内置账号固定超级管理员，注册账号可调角色/禁用
+router.get('/admins', adminAuthRequired, superAdminRequired, (_req, res) => {
+  const builtinProfile = resolveAdminProfile(getAdminUsername());
+  const builtin = {
+    username: builtinProfile.username,
+    name: builtinProfile.name,
+    avatarPath: builtinProfile.avatarPath ?? null,
+    role: 'super',
+    disabled: false,
+    createdAt: null,
+    builtin: true,
+  };
+  ok(res, { admins: [builtin, ...listAdminAccountsSafe()] });
+});
+
+router.patch('/admins/:username/role', adminAuthRequired, superAdminRequired, (req, res) => {
+  const target = req.params.username;
+  if (target === getAdminUsername()) {
+    fail(res, 400, '内置管理员固定为超级管理员，不能修改');
+    return;
+  }
+  if (target === req.admin.username) {
+    fail(res, 400, '不能修改自己当前的角色');
+    return;
+  }
+  if (!updateAdminAccountRole(target, req.body?.role)) {
+    fail(res, 404, '账号不存在');
+    return;
+  }
+  ok(res, { updated: true });
+});
+
+router.patch('/admins/:username/disabled', adminAuthRequired, superAdminRequired, (req, res) => {
+  const target = req.params.username;
+  if (target === getAdminUsername()) {
+    fail(res, 400, '内置管理员不能禁用');
+    return;
+  }
+  if (target === req.admin.username) {
+    fail(res, 400, '不能禁用自己');
+    return;
+  }
+  if (!setAdminAccountDisabled(target, req.body?.disabled === true)) {
+    fail(res, 404, '账号不存在');
+    return;
+  }
+  ok(res, { updated: true });
+});
+
+// 操作日志（仅超级管理员查看）
+router.get('/audit-logs', adminAuthRequired, superAdminRequired, (req, res) => {
+  const username = String(req.query.username ?? '').trim();
+  let entries = readAuditLog();
+  if (username) entries = entries.filter((e) => e.username === username);
+  ok(res, { entries: entries.slice(0, 200) });
+});
+
+// 客服专员的写操作收口：只能改订单状态、回复客服、改自己的资料，其余写操作一律拒绝
+router.use((req, res, next) => {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    next();
+    return;
+  }
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) {
+    next();
+    return;
+  }
+  let username = null;
+  try {
+    username = verifyToken(token).username;
+  } catch {
+    next();
+    return;
+  }
+  if (resolveAdminRole(username) !== 'support') {
+    next();
+    return;
+  }
+  const p = req.path;
+  const allowed =
+    p.startsWith('/orders/') ||
+    p.startsWith('/support/') ||
+    p.startsWith('/settings/profile') ||
+    p.startsWith('/settings/password') ||
+    p.startsWith('/settings/avatar') ||
+    p.startsWith('/settings/notifications');
+  if (!allowed) {
+    fail(res, 403, '客服专员没有此操作权限');
+    return;
+  }
+  next();
 });
 
 router.get('/dashboard', adminAuthRequired, async (_req, res) => {
@@ -303,6 +477,8 @@ router.post('/products', adminAuthRequired, async (req, res) => {
       purchaseNotes: String(body.purchaseNotes ?? ''),
       rating: Number(body.rating ?? 5),
       sales: 0,
+      stock: body.stock != null ? Math.max(0, Math.trunc(Number(body.stock)) || 0) : 100,
+      isOnShelf: body.isOnShelf !== false,
       imagePath: String(body.imagePath ?? ''),
     },
   });
@@ -328,8 +504,22 @@ router.put('/products/:id', adminAuthRequired, async (req, res) => {
         description: body.description,
         purchaseNotes: body.purchaseNotes,
         rating: body.rating != null ? Number(body.rating) : undefined,
+        stock: body.stock != null ? Math.max(0, Math.trunc(Number(body.stock)) || 0) : undefined,
+        isOnShelf: typeof body.isOnShelf === 'boolean' ? body.isOnShelf : undefined,
         imagePath: body.imagePath,
       },
+    });
+    ok(res, { product: serializeProduct(product) });
+  } catch {
+    fail(res, 404, '商品不存在');
+  }
+});
+
+router.patch('/products/:id/shelf', adminAuthRequired, async (req, res) => {
+  try {
+    const product = await prisma.product.update({
+      where: { id: req.params.id },
+      data: { isOnShelf: req.body?.isOnShelf !== false },
     });
     ok(res, { product: serializeProduct(product) });
   } catch {
@@ -800,6 +990,72 @@ router.get('/settings/data-summary', adminAuthRequired, async (_req, res) => {
       pendingOrders,
     },
   });
+});
+
+async function categoriesWithCounts() {
+  const categories = readCategories();
+  const counts = await Promise.all(
+    categories.map((c) => prisma.product.count({ where: { majorCategory: c.name } })),
+  );
+  return categories.map((c, i) => ({ ...c, productCount: counts[i] }));
+}
+
+router.get('/categories', adminAuthRequired, async (_req, res) => {
+  ok(res, { categories: await categoriesWithCounts() });
+});
+
+router.post('/categories', adminAuthRequired, async (req, res) => {
+  try {
+    const category = createCategory(req.body ?? {});
+    const categories = await categoriesWithCounts();
+    ok(res, { category: categories.find((c) => c.id === category.id) ?? category, categories });
+  } catch (err) {
+    if (err.message === 'NAME_REQUIRED') fail(res, 400, '分类名称不能为空');
+    else if (err.message === 'NAME_TAKEN') fail(res, 400, '已存在同名分类');
+    else fail(res, 400, '创建失败');
+  }
+});
+
+router.put('/categories/:id', adminAuthRequired, async (req, res) => {
+  try {
+    const result = updateCategory(req.params.id, req.body ?? {});
+    if (!result) {
+      fail(res, 404, '分类不存在');
+      return;
+    }
+    // 改名时把该分类下商品的大类一起改掉，避免商品失去分类
+    if (result.renamedFrom) {
+      await prisma.product.updateMany({
+        where: { majorCategory: result.renamedFrom },
+        data: { majorCategory: result.category.name },
+      });
+    }
+    const categories = await categoriesWithCounts();
+    ok(res, {
+      category: categories.find((c) => c.id === result.category.id) ?? result.category,
+      categories,
+    });
+  } catch (err) {
+    if (err.message === 'NAME_REQUIRED') fail(res, 400, '分类名称不能为空');
+    else if (err.message === 'NAME_TAKEN') fail(res, 400, '已存在同名分类');
+    else fail(res, 400, '更新失败');
+  }
+});
+
+router.delete('/categories/:id', adminAuthRequired, async (req, res) => {
+  const categories = readCategories();
+  const target = categories.find((c) => c.id === req.params.id);
+  if (!target) {
+    fail(res, 404, '分类不存在');
+    return;
+  }
+  const productCount = await prisma.product.count({ where: { majorCategory: target.name } });
+  if (productCount > 0) {
+    fail(res, 400, `该分类下还有 ${productCount} 件商品，请先把商品移到其他分类再删除`);
+    return;
+  }
+  deleteCategory(req.params.id);
+  ok(res, { deleted: true });
 });
 
 router.get('/changelog', adminAuthRequired, (_req, res) => {

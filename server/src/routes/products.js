@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
   const category = String(req.query.category ?? '').trim();
   const keyword = String(req.query.keyword ?? '').trim();
 
-  const where = {};
+  const where = { isOnShelf: true };
   if (category && category !== 'all') {
     where.category = category;
   }

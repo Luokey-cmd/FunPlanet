@@ -1,6 +1,7 @@
 import {
   createAdminAccount,
   findAdminAccount,
+  getAccountRole,
   isRegisteredAdmin,
   updateAdminAccountAvatar,
   updateAdminAccountName,
@@ -15,6 +16,12 @@ import {
   writeAdminSettings,
 } from '../utils/admin-settings.js';
 
+// 角色解析：内置默认管理员永远是超级管理员；注册账号读账号文件里的 role
+export function resolveAdminRole(username) {
+  if (username === getAdminUsername()) return 'super';
+  return getAccountRole(findAdminAccount(username));
+}
+
 export function resolveAdminProfile(username) {
   const account = findAdminAccount(username);
   const settings = readAdminSettings();
@@ -25,12 +32,10 @@ export function resolveAdminProfile(username) {
       systemName: settings.systemName,
       avatarPath: account.avatarPath ?? null,
       notifications: settings.notifications,
+      role: resolveAdminRole(username),
     };
   }
-  if (username === getAdminUsername()) {
-    return getAdminProfile(username);
-  }
-  return getAdminProfile(username);
+  return { ...getAdminProfile(username), role: resolveAdminRole(username) };
 }
 
 export { createAdminAccount, verifyRegisteredAdmin, isRegisteredAdmin };

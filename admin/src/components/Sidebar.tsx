@@ -9,31 +9,42 @@ import {
   ImageIcon,
   ScrollTextIcon,
   HeadphonesIcon,
+  FolderTreeIcon,
+  ShieldCheckIcon,
+  HistoryIcon,
 } from "lucide-react";
 import type { NavPage } from "../types";
+import type { AdminRole } from "../lib/api";
+import { canAccess } from "../lib/permissions";
 
 interface SidebarProps {
   activePage?: NavPage;
   onNavigate?: (page: NavPage) => void;
+  role?: AdminRole;
 }
 
 const navItems: { key: NavPage; label: string; icon: React.ReactNode }[] = [
   { key: "dashboard", label: "数据看板", icon: <LayoutDashboardIcon size={15} /> },
   { key: "analytics", label: "营收分析", icon: <TrendingUpIcon size={15} /> },
   { key: "products", label: "商品管理", icon: <PackageIcon size={15} /> },
+  { key: "categories", label: "分类管理", icon: <FolderTreeIcon size={15} /> },
   { key: "orders", label: "订单管理", icon: <ShoppingCartIcon size={15} /> },
   { key: "users", label: "用户管理", icon: <UsersIcon size={15} /> },
   { key: "coupons", label: "优惠券管理", icon: <TicketIcon size={15} /> },
   { key: "banners", label: "轮播图管理", icon: <ImageIcon size={15} /> },
   { key: "support", label: "客服中心", icon: <HeadphonesIcon size={15} /> },
   { key: "changelog", label: "更新日志", icon: <ScrollTextIcon size={15} /> },
+  { key: "admins", label: "管理员管理", icon: <ShieldCheckIcon size={15} /> },
+  { key: "audit", label: "操作日志", icon: <HistoryIcon size={15} /> },
   { key: "settings", label: "系统设置", icon: <SettingsIcon size={15} /> },
 ];
 
 export default function Sidebar({
   activePage = "dashboard",
   onNavigate = () => {},
+  role = "super",
 }: SidebarProps) {
+  const visibleItems = navItems.filter((item) => canAccess(role, item.key));
   return (
     <div
       data-cmp="Sidebar"
@@ -49,7 +60,7 @@ export default function Sidebar({
       </div>
 
       <nav className="flex-1 py-2.5 px-2 flex flex-col gap-0.5 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = activePage === item.key;
           return (
             <button
