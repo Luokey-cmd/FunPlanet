@@ -465,10 +465,10 @@ class _HoloPainter extends CustomPainter {
       old.rarity != rarity;
 }
 
-/// 全息卡：3D 倾斜 + 稀有度光层 + 翻牌 + 点击居中放大旋转。
+/// 全息卡：3D 倾斜 + 稀有度光层 + 翻牌 + 点击飞向屏幕中央放大旋转。
 ///
 /// 未翻开时点按触发 [onTap]（由父级决定翻牌）；已翻开时点按打开
-/// 居中放大层（每点一次旋转一圈）。手指按住拖动时牌面跟随倾斜，
+/// 飞向中央的放大层（每点一次旋转一圈）。手指按住拖动时牌面跟随倾斜，
 /// 松手后按原版节奏慢漂回位。
 class HoloCard extends StatefulWidget {
   const HoloCard({
@@ -512,6 +512,7 @@ class _HoloCardState extends State<HoloCard>
   late final Ticker _ticker;
   Timer? _snapTimer;
   bool _interacting = false;
+  DateTime _lastInteractAt = DateTime.now();
   Size _size = Size.zero;
 
   List<_Spring1> get _springs => [
@@ -563,6 +564,12 @@ class _HoloCardState extends State<HoloCard>
     }
     if (!mounted) return;
     setState(() {});
+    // 鼠标悬停移出没有抬起事件，超过 1.5 秒无新互动则自动收尾
+    if (_interacting &&
+        DateTime.now().difference(_lastInteractAt).inMilliseconds > 1500 &&
+        _springs.every((s) => s.settled)) {
+      _endInteract();
+    }
     if (!_interacting && _springs.every((s) => s.settled)) {
       _ticker.stop();
     }
@@ -572,6 +579,7 @@ class _HoloCardState extends State<HoloCard>
     if (_size.width <= 0 || _size.height <= 0) return;
     _snapTimer?.cancel();
     _interacting = true;
+    _lastInteractAt = DateTime.now();
     final px = _clampD(local.dx / _size.width * 100, 0, 100);
     final py = _clampD(local.dy / _size.height * 100, 0, 100);
     final cx = px - 50;
@@ -614,9 +622,17 @@ class _HoloCardState extends State<HoloCard>
     }
   }
 
+  /// 这张牌当前在屏幕上的位置（全局坐标），放大飞行用。
+  Rect? _globalRect() {
+    if (!mounted) return null;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return null;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
   void _openPopover() {
-    final size = context.size;
-    if (size == null) return;
+    final rect = _globalRect();
+    if (rect == null) return;
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (_) => _HoloPopover(
@@ -625,7 +641,8 @@ class _HoloCardState extends State<HoloCard>
         rarity: widget.rarity,
         artWindow: widget.artWindow,
         radius: widget.radius,
-        srcSize: size,
+        srcRect: rect,
+        srcRectNow: _globalRect,
         onClose: () => entry.remove(),
       ),
     );
@@ -732,7 +749,9 @@ class _HoloCardState extends State<HoloCard>
   }
 }
 
-/// 居中放大层：入场旋转一圈，点按再转一圈，空闲时自动缓展示。
+/// 飞向中央的放大层：牌从小牌原位出发，边飞边转边放大到屏幕中央；
+/// 点按再转一圈；关闭时转着飞回原位。牌面始终按小牌原始尺寸排版、
+/// 整牌等比缩放，所以排版与光层位置永远和原位的小牌一致。
 class _HoloPopover extends StatefulWidget {
   const _HoloPopover({
     required this.front,
@@ -740,7 +759,8 @@ class _HoloPopover extends StatefulWidget {
     required this.rarity,
     required this.artWindow,
     required this.radius,
-    required this.srcSize,
+    required this.srcRect,
+    required this.srcRectNow,
     required this.onClose,
   });
 
@@ -749,7 +769,12 @@ class _HoloPopover extends StatefulWidget {
   final HoloRarity rarity;
   final Rect? artWindow;
   final double radius;
-  final Size srcSize;
+
+  /// 打开瞬间小牌在屏幕上的位置（全局坐标），飞行从这里开始。
+  final Rect srcRect;
+
+  /// 关闭时重新读取小牌位置（聊天列表可能已经滚动），飞回落点用。
+  final Rect? Function() srcRectNow;
   final VoidCallback onClose;
 
   @override
@@ -766,11 +791,15 @@ class _HoloPopoverState extends State<_HoloPopover>
   final _glareO = _Spring1(0);
   final _bgX = _Spring1(50);
   final _bgY = _Spring1(50);
-  final _scale = _Spring1(0.55);
+  final _scale = _Spring1(1);
+  final _scrim = _Spring1(0);
+  late final _Spring1 _cx;
+  late final _Spring1 _cy;
 
   late final Ticker _ticker;
-  bool _visible = false;
+  Timer? _failsafe;
   bool _closing = false;
+  bool _removed = false;
   DateTime _lastInteract = DateTime.now();
   double _showR = 0;
   Size _cardSize = Size.zero;
@@ -785,21 +814,42 @@ class _HoloPopoverState extends State<_HoloPopover>
     _bgX,
     _bgY,
     _scale,
+    _scrim,
+    _cx,
+    _cy,
   ];
 
   @override
   void initState() {
     super.initState();
+    _cx = _Spring1(widget.srcRect.center.dx);
+    _cy = _Spring1(widget.srcRect.center.dy);
+    _cardSize = widget.srcRect.size;
     _spin.set(360, k: 0.016, d: 0.30);
-    _scale.set(1, k: 0.028, d: 0.42);
     _ticker = createTicker(_onTick)..start();
+    // 下一帧拿到屏幕尺寸后设定飞行终点：屏幕中央 + 目标放大倍数
+    // （与演示版同参的位移/缩放弹簧 0.028 / 0.42）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _visible = true);
+      if (!mounted || _closing) return;
+      final screen = MediaQuery.of(context).size;
+      var target =
+          math.min(
+            math.min(widget.srcRect.width * 2.1, screen.width * 0.74),
+            330.0,
+          ) /
+          widget.srcRect.width;
+      final maxByHeight = screen.height * 0.78 / widget.srcRect.height;
+      if (target > maxByHeight) target = maxByHeight;
+      _cx.set(screen.width / 2, k: 0.028, d: 0.42);
+      _cy.set(screen.height / 2, k: 0.028, d: 0.42);
+      _scale.set(target, k: 0.028, d: 0.42);
+      _scrim.set(1, k: 0.05, d: 0.30);
     });
   }
 
   @override
   void dispose() {
+    _failsafe?.cancel();
     _ticker.dispose();
     super.dispose();
   }
@@ -820,11 +870,27 @@ class _HoloPopoverState extends State<_HoloPopover>
     for (final s in _springs) {
       s.tick();
     }
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    // 关闭飞行落位完成（位置与缩放都到家）就摘掉浮层，
+    // 底下原位的小牌无缝接棒，视觉上没有任何跳变。
+    if (_closing &&
+        !_removed &&
+        (_cx.target - _cx.value).abs() < 2 &&
+        (_cy.target - _cy.value).abs() < 2 &&
+        (_scale.target - _scale.value).abs() < 0.02) {
+      _remove();
+      return;
+    }
+    setState(() {});
+  }
+
+  void _remove() {
+    _removed = true;
+    widget.onClose();
   }
 
   void _interact(Offset local) {
-    if (_cardSize.width <= 0) return;
+    if (_cardSize.width <= 0 || _closing) return;
     _lastInteract = DateTime.now();
     final px = _clampD(local.dx / _cardSize.width * 100, 0, 100);
     final py = _clampD(local.dy / _cardSize.height * 100, 0, 100);
@@ -838,6 +904,7 @@ class _HoloPopoverState extends State<_HoloPopover>
   }
 
   void _spinAgain() {
+    if (_closing) return;
     _lastInteract = DateTime.now();
     _spin.set(_spin.target + 360, k: 0.016, d: 0.30);
   }
@@ -845,123 +912,137 @@ class _HoloPopoverState extends State<_HoloPopover>
   void _close() {
     if (_closing) return;
     _closing = true;
-    _spinAgain();
-    setState(() => _visible = false);
-    Timer(const Duration(milliseconds: 380), widget.onClose);
+    _lastInteract = DateTime.now();
+    _spin.set(_spin.target + 360, k: 0.016, d: 0.30);
+    final home = widget.srcRectNow() ?? widget.srcRect;
+    _cx.set(home.center.dx, k: 0.028, d: 0.42);
+    _cy.set(home.center.dy, k: 0.028, d: 0.42);
+    _scale.set(1, k: 0.028, d: 0.42);
+    _scrim.set(0, k: 0.05, d: 0.30);
+    _rotateX.set(0, k: 0.05, d: 0.24);
+    _rotateY.set(0, k: 0.05, d: 0.24);
+    // 兜底：弹簧万一没落位，3.2 秒后强制摘层
+    _failsafe = Timer(const Duration(milliseconds: 3200), () {
+      if (mounted && !_removed) _remove();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final popW = math.min(
-          math.min(widget.srcSize.width * 2.1, constraints.maxWidth * 0.74),
-          330.0,
-        );
-        final popH = popW * widget.srcSize.height / widget.srcSize.width;
-        _cardSize = Size(popW, popH);
-        final artRect = widget.artWindow == null
-            ? null
-            : Rect.fromLTRB(
-                widget.artWindow!.left * popW,
-                widget.artWindow!.top * popH,
-                widget.artWindow!.right * popW,
-                widget.artWindow!.bottom * popH,
-              );
-        final totalY = _spin.value + _rotateY.value;
-        final frontVisible =
-            math.cos(totalY * math.pi / 180) *
-                math.cos(_rotateX.value * math.pi / 180) >=
-            0;
-        final face = frontVisible
-            ? widget.front
-            : Transform(
-                alignment: Alignment.center,
-                transform: Matrix4.identity()..rotateY(math.pi),
-                child: widget.back,
-              );
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: _close,
-                child: AnimatedOpacity(
-                  opacity: _visible ? 1 : 0,
-                  duration: const Duration(milliseconds: 220),
-                  child: Container(color: const Color(0xB8000000)),
+    final srcW = widget.srcRect.width;
+    final srcH = widget.srcRect.height;
+    final artRect = widget.artWindow == null
+        ? null
+        : Rect.fromLTRB(
+            widget.artWindow!.left * srcW,
+            widget.artWindow!.top * srcH,
+            widget.artWindow!.right * srcW,
+            widget.artWindow!.bottom * srcH,
+          );
+    final totalY = _spin.value + _rotateY.value;
+    final frontVisible =
+        math.cos(totalY * math.pi / 180) *
+            math.cos(_rotateX.value * math.pi / 180) >=
+        0;
+    final face = frontVisible
+        ? widget.front
+        : Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()..rotateY(math.pi),
+            child: widget.back,
+          );
+    final glowAlpha = _clampD(_glareO.value * 0.55, 0, 0.6);
+    return SizedBox.expand(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _close,
+              child: Container(
+                color: Colors.black.withValues(
+                  alpha: 0.72 * _clampD(_scrim.value, 0, 1),
                 ),
               ),
             ),
-            Center(
-              child: AnimatedOpacity(
-                opacity: _visible ? 1 : 0,
-                duration: const Duration(milliseconds: 220),
-                child: SizedBox(
-                  width: popW,
-                  height: popH,
-                  child: Listener(
-                    onPointerDown: (e) => _interact(e.localPosition),
-                    onPointerMove: (e) {
-                      if (e.buttons != 0) _interact(e.localPosition);
-                    },
-                    child: GestureDetector(
-                      onTap: _spinAgain,
-                      child: Transform(
-                        alignment: Alignment.center,
-                        transform: Matrix4.identity()
-                          ..setEntry(3, 2, 0.0016)
-                          ..scaleByDouble(
-                            _scale.value,
-                            _scale.value,
-                            _scale.value,
-                            1,
-                          )
-                          ..rotateY(totalY * math.pi / 180)
-                          ..rotateX(_rotateX.value * math.pi / 180),
-                        child: Stack(
-                          fit: StackFit.passthrough,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(
-                                widget.radius,
-                              ),
-                              child: face,
-                            ),
-                            Positioned.fill(
-                              child: CustomPaint(
-                                painter: _HoloPainter(
-                                  rarity: widget.rarity,
-                                  bgX: _bgX.value,
-                                  bgY: _bgY.value,
-                                  glareX: _glareX.value,
-                                  glareY: _glareY.value,
-                                  opacity: _glareO.value,
-                                  hyp: _clampD(
-                                    math.sqrt(
-                                          math.pow(_glareY.value - 50, 2) +
-                                              math.pow(_glareX.value - 50, 2),
-                                        ) /
-                                        50,
-                                    0,
-                                    1,
-                                  ),
-                                  artRect: artRect,
-                                  radius: widget.radius,
-                                  noise: _NoiseTex.image,
-                                ),
-                              ),
-                            ),
-                          ],
+          ),
+          // 牌面按原始尺寸排版，靠位移 + 整牌缩放飞到中央
+          Positioned(
+            left: _cx.value - srcW / 2,
+            top: _cy.value - srcH / 2,
+            width: srcW,
+            height: srcH,
+            child: Listener(
+              onPointerDown: (e) => _interact(e.localPosition),
+              onPointerMove: (e) {
+                if (e.buttons != 0) _interact(e.localPosition);
+              },
+              child: GestureDetector(
+                onTap: _spinAgain,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()
+                    ..setEntry(3, 2, 0.0016)
+                    ..scaleByDouble(_scale.value, _scale.value, _scale.value, 1)
+                    ..rotateY(totalY * math.pi / 180)
+                    ..rotateX(_rotateX.value * math.pi / 180),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(widget.radius),
+                      boxShadow: [
+                        const BoxShadow(
+                          color: Color(0x59000000),
+                          blurRadius: 18,
+                          offset: Offset(0, 8),
                         ),
-                      ),
+                        BoxShadow(
+                          color: widget.rarity.glow.withValues(
+                            alpha: glowAlpha,
+                          ),
+                          blurRadius: 30,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: Stack(
+                      fit: StackFit.passthrough,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(widget.radius),
+                          child: face,
+                        ),
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _HoloPainter(
+                              rarity: widget.rarity,
+                              bgX: _bgX.value,
+                              bgY: _bgY.value,
+                              glareX: _glareX.value,
+                              glareY: _glareY.value,
+                              opacity: _glareO.value,
+                              hyp: _clampD(
+                                math.sqrt(
+                                      math.pow(_glareY.value - 50, 2) +
+                                          math.pow(_glareX.value - 50, 2),
+                                    ) /
+                                    50,
+                                0,
+                                1,
+                              ),
+                              artRect: artRect,
+                              radius: widget.radius,
+                              noise: _NoiseTex.image,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 }

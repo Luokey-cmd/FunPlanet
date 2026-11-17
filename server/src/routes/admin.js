@@ -511,8 +511,10 @@ router.put('/products/:id', adminAuthRequired, async (req, res) => {
       },
     });
     ok(res, { product: serializeProduct(product) });
-  } catch {
-    fail(res, 404, '商品不存在');
+  } catch (error) {
+    if (error?.code === 'P2025') return fail(res, 404, '商品不存在');
+    console.error('[admin] update product failed', error);
+    return fail(res, 500, '保存失败，请看服务端日志');
   }
 });
 
@@ -523,8 +525,12 @@ router.patch('/products/:id/shelf', adminAuthRequired, async (req, res) => {
       data: { isOnShelf: req.body?.isOnShelf !== false },
     });
     ok(res, { product: serializeProduct(product) });
-  } catch {
-    fail(res, 404, '商品不存在');
+  } catch (error) {
+    // P2025 才是真的找不到记录；其他错误（如数据库还没加 is_on_shelf 列）
+    // 不能再谎报「商品不存在」，把真实原因打进日志并如实返回
+    if (error?.code === 'P2025') return fail(res, 404, '商品不存在');
+    console.error('[admin] toggle shelf failed', error);
+    return fail(res, 500, '上下架失败，请看服务端日志');
   }
 });
 
@@ -532,8 +538,10 @@ router.delete('/products/:id', adminAuthRequired, async (req, res) => {
   try {
     await prisma.product.delete({ where: { id: req.params.id } });
     ok(res, { deleted: true });
-  } catch {
-    fail(res, 404, '商品不存在');
+  } catch (error) {
+    if (error?.code === 'P2025') return fail(res, 404, '商品不存在');
+    console.error('[admin] delete product failed', error);
+    return fail(res, 500, '删除失败，请看服务端日志');
   }
 });
 

@@ -1,10 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/product_catalog_provider.dart';
 import '../screens/main_screen.dart';
-import '../theme/app_colors.dart';
-import '../theme/app_scale.dart';
 import '../pages/login_page.dart';
 import '../utils/user_session_sync.dart';
 
@@ -16,9 +16,18 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
+  // 开屏页的最短展示时间：初始化再快，也不能让开屏图一闪而过。
+  bool _minSplashElapsed = false;
+  Timer? _splashTimer;
+
   @override
   void initState() {
     super.initState();
+    _splashTimer = Timer(const Duration(milliseconds: 1800), () {
+      if (mounted) {
+        setState(() => _minSplashElapsed = true);
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final auth = context.read<AuthProvider>();
       final catalog = context.read<ProductCatalogProvider>();
@@ -44,17 +53,22 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   @override
+  void dispose() {
+    _splashTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
 
-    if (!auth.isInitialized) {
+    // 初始化未完成、或开屏最短展示时间未到：全屏开屏图（替换原来的空白转圈页）。
+    if (!auth.isInitialized || !_minSplashElapsed) {
       return Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(
-          child: SizedBox(
-            width: AppScale.s(32),
-            height: AppScale.s(32),
-            child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.primary),
+        body: SizedBox.expand(
+          child: Image.asset(
+            'assets/images/splash_launch.jpg',
+            fit: BoxFit.cover,
           ),
         ),
       );

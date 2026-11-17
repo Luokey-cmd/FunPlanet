@@ -6,7 +6,7 @@ import '../pages/checkout_page.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../theme/app_theme.dart';
-import '../widgets/product_thumbnail.dart';
+import '../widgets/product_image.dart';
 import '../widgets/click_effect/app_buttons.dart';
 import 'holo_card.dart';
 
@@ -89,7 +89,7 @@ class _FateCard extends StatelessWidget {
         flipped: flipped,
         onTap: onFlip,
         // 商品图窗口位置（分数）：光柱只在这个区域里流动
-        artWindow: const Rect.fromLTRB(0.06, 0.14, 0.94, 0.47),
+        artWindow: const Rect.fromLTRB(0.05, 0.03, 0.95, 0.40),
         front: _front(context),
         back: _back(),
       ),
@@ -189,43 +189,56 @@ class _FateCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppScale.s(14)),
         border: Border.all(color: rarity.border, width: 1.5),
       ),
-      padding: EdgeInsets.all(AppScale.s(8)),
+      padding: EdgeInsets.all(AppScale.s(7)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: AppScale.s(7),
-                vertical: AppScale.s(2),
-              ),
-              decoration: BoxDecoration(
-                color: rarity.glow,
-                borderRadius: BorderRadius.circular(99),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: AppScale.t(10),
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF221638),
+          // 图窗吃掉全部剩余高度：文字行按真实字号（t(v)=0.8v+5）算死，
+          // 图窗弹性伸缩，所以任何字号下都不会再溢出。
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(AppScale.s(8)),
+                    child: _artwork(),
+                  ),
                 ),
-              ),
+                Positioned(
+                  left: AppScale.s(5),
+                  top: AppScale.s(5),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppScale.s(7),
+                      vertical: AppScale.s(2),
+                    ),
+                    decoration: BoxDecoration(
+                      color: rarity.glow,
+                      borderRadius: BorderRadius.circular(99),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: AppScale.t(10),
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF221638),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          SizedBox(height: AppScale.s(6)),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppScale.s(8)),
-            child: ProductThumbnail(
-              product: product,
-              width: double.infinity,
-              height: AppScale.s(72),
-            ),
-          ),
-          SizedBox(height: AppScale.s(6)),
+          SizedBox(height: AppScale.s(5)),
           SizedBox(
-            height: AppScale.s(28),
+            height: AppScale.s(44),
             child: Text(
               product.name,
               maxLines: 2,
@@ -233,50 +246,98 @@ class _FateCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: AppScale.t(11),
                 fontWeight: FontWeight.w600,
-                height: 1.25,
+                height: 1.2,
                 color: Colors.white,
               ),
             ),
           ),
-          Text(
-            '¥${product.price.toStringAsFixed(product.price.truncateToDouble() == product.price ? 0 : 2)}',
-            style: TextStyle(
-              fontSize: AppScale.t(13),
-              fontWeight: FontWeight.w800,
-              color: rarity.glow,
-            ),
-          ),
-          SizedBox(height: AppScale.s(3)),
+          SizedBox(height: AppScale.s(2)),
           SizedBox(
-            height: AppScale.s(26),
+            height: AppScale.s(40),
             child: Text(
               whisperFor(product.id),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: AppScale.t(10),
+                fontSize: AppScale.t(9.5),
                 color: Colors.white70,
-                height: 1.3,
+                height: 1.25,
               ),
             ),
           ),
-          const Spacer(),
-          AppFilledButton(
-            onPressed: () => CheckoutPage.openBuyNow(context, product),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              padding: EdgeInsets.symmetric(vertical: AppScale.s(6)),
-              minimumSize: Size(0, AppScale.s(28)),
-            ),
-            child: Text(
-              '带走',
-              style: TextStyle(
-                fontSize: AppScale.t(11),
-                fontWeight: FontWeight.w700,
+          SizedBox(height: AppScale.s(4)),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '¥${product.price.toStringAsFixed(product.price.truncateToDouble() == product.price ? 0 : 2)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: AppScale.t(13),
+                    fontWeight: FontWeight.w800,
+                    color: rarity.glow,
+                  ),
+                ),
               ),
-            ),
+              AppFilledButton(
+                onPressed: () => CheckoutPage.openBuyNow(context, product),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: EdgeInsets.symmetric(horizontal: AppScale.s(12)),
+                  minimumSize: Size(AppScale.s(52), AppScale.s(30)),
+                  // 安卓默认给按钮留 48 的最小点击高（与设定的高度无关），
+                  // 不关掉这一行就会比预算多占 24，光窗位置也会跟着错位。
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  '带走',
+                  style: TextStyle(
+                    fontSize: AppScale.t(11),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  // 图窗内容：深紫底打底，商品图裁剪填满（cover），不再露白板；
+  // 无图商品用商品色块 + 图标兜底。
+  Widget _artwork() {
+    if (product.imagePath.isEmpty) {
+      final bg = product.imageColor ?? AppColors.secondary;
+      return Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [bg, Color.lerp(bg, AppColors.primaryLight, 0.3)!],
+          ),
+        ),
+        child: product.imageIcon == null
+            ? null
+            : Center(
+                child: Icon(
+                  product.imageIcon,
+                  size: AppScale.s(30),
+                  color: Colors.white.withValues(alpha: 0.55),
+                ),
+              ),
+      );
+    }
+    return Container(
+      color: const Color(0xFF241B4D),
+      child: LayoutBuilder(
+        builder: (context, c) => ProductImage(
+          image: product.imagePath,
+          width: c.maxWidth,
+          height: c.maxHeight,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }

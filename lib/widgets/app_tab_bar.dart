@@ -6,6 +6,7 @@ import '../theme/app_scale.dart';
 import '../theme/app_theme.dart';
 
 import '../widgets/click_effect/app_pressable.dart';
+
 enum AppTab { home, mall, cart, profile }
 
 class AppTabBar extends StatelessWidget {
@@ -14,11 +15,32 @@ class AppTabBar extends StatelessWidget {
   final AppTab active;
   final ValueChanged<AppTab> onChange;
 
+  // 图标顺序：未选中（灰版珐琅） / 选中（彩色珐琅）。
   static const _tabs = [
-    (AppTab.home, '首页', Icons.home_outlined, Icons.home),
-    (AppTab.mall, '商城', Icons.storefront_outlined, Icons.storefront),
-    (AppTab.cart, '购物车', Icons.shopping_cart_outlined, Icons.shopping_cart),
-    (AppTab.profile, '我的', Icons.person_outline, Icons.person),
+    (
+      AppTab.home,
+      '首页',
+      'assets/images/icon_nav_home_off.png',
+      'assets/images/icon_nav_home.png',
+    ),
+    (
+      AppTab.mall,
+      '商城',
+      'assets/images/icon_nav_mall_off.png',
+      'assets/images/icon_nav_mall.png',
+    ),
+    (
+      AppTab.cart,
+      '购物车',
+      'assets/images/icon_nav_cart_off.png',
+      'assets/images/icon_nav_cart.png',
+    ),
+    (
+      AppTab.profile,
+      '我的',
+      'assets/images/icon_nav_profile_off.png',
+      'assets/images/icon_nav_profile.png',
+    ),
   ];
 
   @override
@@ -53,21 +75,28 @@ class AppTabBar extends StatelessWidget {
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        Icon(
+                        Image.asset(
                           isActive ? tab.$4 : tab.$3,
-                          size: AppScale.s(32),
-                          color: isActive ? AppColors.primary : AppColors.mutedForeground,
+                          width: AppScale.s(40),
+                          height: AppScale.s(40),
                         ),
                         if (showBadge)
                           Positioned(
                             top: AppScale.s(-4),
                             right: AppScale.s(-10),
                             child: Container(
-                              constraints: BoxConstraints(minWidth: AppScale.s(18), minHeight: AppScale.s(18)),
-                              padding: EdgeInsets.symmetric(horizontal: AppScale.s(5)),
+                              constraints: BoxConstraints(
+                                minWidth: AppScale.s(18),
+                                minHeight: AppScale.s(18),
+                              ),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: AppScale.s(5),
+                              ),
                               decoration: BoxDecoration(
                                 color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(AppScale.s(999)),
+                                borderRadius: BorderRadius.circular(
+                                  AppScale.s(999),
+                                ),
                               ),
                               alignment: Alignment.center,
                               child: Text(
@@ -88,8 +117,12 @@ class AppTabBar extends StatelessWidget {
                       tab.$2,
                       style: AppTheme.baseText.copyWith(
                         fontSize: AppScale.t(16),
-                        fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                        color: isActive ? AppColors.primary : AppColors.mutedForeground,
+                        fontWeight: isActive
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: isActive
+                            ? AppColors.primary
+                            : AppColors.mutedForeground,
                       ),
                     ),
                   ],

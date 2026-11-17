@@ -6,7 +6,6 @@ import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../utils/snackbar_utils.dart';
-import '../widgets/drawn_icon.dart';
 import '../widgets/notification_sheet.dart';
 import '../widgets/product_image.dart';
 import '../widgets/sparkle_background.dart';
@@ -19,6 +18,7 @@ import 'settings_page.dart';
 import 'user_feature_sheets.dart';
 
 import '../widgets/click_effect/app_pressable.dart';
+
 const _profilePageScale = 1.3;
 
 double _ps(double value) => AppScale.s(value * _profilePageScale);
@@ -61,16 +61,37 @@ class _ProfileHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('我的', style: TextStyle(fontSize: _ps(24) + AppScale.fontBump, fontWeight: FontWeight.bold)),
-                Text('开启惊喜 · 收集快乐', style: TextStyle(fontSize: _ps(12) + AppScale.fontBump, color: AppColors.mutedForeground)),
+                Text(
+                  '我的',
+                  style: TextStyle(
+                    fontSize: _ps(24) + AppScale.fontBump,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '开启惊喜 · 收集快乐',
+                  style: TextStyle(
+                    fontSize: _ps(12) + AppScale.fontBump,
+                    color: AppColors.mutedForeground,
+                  ),
+                ),
               ],
             ),
           ),
-          _HexIcon(icon: Icons.settings_outlined, onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage()));
-          }),
+          _HexIcon(
+            icon: Icons.settings_outlined,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              );
+            },
+          ),
           SizedBox(width: _ps(10)),
-          _HexIcon(icon: Icons.notifications_outlined, onTap: () => NotificationSheet.show(context)),
+          _HexIcon(
+            icon: Icons.notifications_outlined,
+            onTap: () => NotificationSheet.show(context),
+          ),
         ],
       ),
     );
@@ -118,120 +139,190 @@ class _UserCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            Positioned(top: _ps(10), right: _ps(28), child: _SparkleStar(size: _ps(8), opacity: 0.42)),
-            Positioned(top: _ps(32), right: _ps(72), child: _SparkleStar(size: _ps(5), opacity: 0.28)),
-            Positioned(top: _ps(18), left: _ps(108), child: _SparkleStar(size: _ps(6), opacity: 0.24)),
-            Positioned(top: _ps(46), left: _ps(196), child: _SparkleStar(size: _ps(4), opacity: 0.2)),
+            Positioned(
+              top: _ps(10),
+              right: _ps(28),
+              child: _SparkleStar(size: _ps(8), opacity: 0.42),
+            ),
+            Positioned(
+              top: _ps(32),
+              right: _ps(72),
+              child: _SparkleStar(size: _ps(5), opacity: 0.28),
+            ),
+            Positioned(
+              top: _ps(18),
+              left: _ps(108),
+              child: _SparkleStar(size: _ps(6), opacity: 0.24),
+            ),
+            Positioned(
+              top: _ps(46),
+              left: _ps(196),
+              child: _SparkleStar(size: _ps(4), opacity: 0.2),
+            ),
             Column(
               children: [
-            Padding(
-              padding: EdgeInsets.all(_ps(16)),
-              child: Material(
-                color: Colors.transparent,
-                child: AppInkWell(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileEditPage())),
-                  borderRadius: BorderRadius.circular(_ps(12)),
-                  child: Row(
-                    children: [
-                      ClipOval(
-                        child: SizedBox(
-                          width: _ps(56),
-                          height: _ps(56),
-                          child: UserAvatarImage(path: user.avatarPath, fit: BoxFit.cover),
+                Padding(
+                  padding: EdgeInsets.all(_ps(16)),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: AppInkWell(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileEditPage(),
                         ),
                       ),
-                      SizedBox(width: _ps(12)),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                      borderRadius: BorderRadius.circular(_ps(12)),
+                      child: Row(
+                        children: [
+                          ClipOval(
+                            child: SizedBox(
+                              width: _ps(56),
+                              height: _ps(56),
+                              child: UserAvatarImage(
+                                path: user.avatarPath,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: _ps(12)),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(user.nickname, style: TextStyle(fontSize: _ps(16) + AppScale.fontBump, fontWeight: FontWeight.bold, color: Colors.white)),
-                                SizedBox(width: _ps(6)),
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: _ps(6), vertical: _ps(2)),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(colors: [AppColors.gold, AppColors.goldDark]),
-                                    borderRadius: BorderRadius.circular(_ps(4)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.diamond, size: _ps(10), color: Colors.white),
-                                      SizedBox(width: _ps(2)),
-                                      Text('VIP${user.vipLevel}', style: TextStyle(fontSize: _ps(10) + AppScale.fontBump, color: Colors.white, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      user.nickname,
+                                      style: TextStyle(
+                                        fontSize: _ps(16) + AppScale.fontBump,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(width: _ps(6)),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: _ps(6),
+                                        vertical: _ps(2),
+                                      ),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            AppColors.gold,
+                                            AppColors.goldDark,
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          _ps(4),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.diamond,
+                                            size: _ps(10),
+                                            color: Colors.white,
+                                          ),
+                                          SizedBox(width: _ps(2)),
+                                          Text(
+                                            'VIP${user.vipLevel}',
+                                            style: TextStyle(
+                                              fontSize:
+                                                  _ps(10) + AppScale.fontBump,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: _ps(4)),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.diamond_outlined,
+                                      size: _ps(12),
+                                      color: Colors.white70,
+                                    ),
+                                    SizedBox(width: _ps(4)),
+                                    Text(
+                                      'ID: ${user.userId}',
+                                      style: TextStyle(
+                                        fontSize: _ps(11) + AppScale.fontBump,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                    SizedBox(width: _ps(4)),
+                                    Icon(
+                                      Icons.chevron_right,
+                                      size: _ps(14),
+                                      color: Colors.white70,
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            SizedBox(height: _ps(4)),
-                            Row(
-                              children: [
-                                Icon(Icons.diamond_outlined, size: _ps(12), color: Colors.white70),
-                                SizedBox(width: _ps(4)),
-                                Text('ID: ${user.userId}', style: TextStyle(fontSize: _ps(11) + AppScale.fontBump, color: Colors.white70)),
-                                SizedBox(width: _ps(4)),
-                                Icon(Icons.chevron_right, size: _ps(14), color: Colors.white70),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(
-                        width: _ps(56),
-                        height: _ps(56),
-                        child: Transform.translate(
-                          offset: Offset(-_ps(56 * 1.2) * 0.3, 0),
-                          child: Transform.scale(
-                            scale: 1.12 * 1.2,
-                            child: ProductImage(
-                              image: oneEyedGiftBoxPath,
-                              width: _ps(56),
-                              height: _ps(56),
-                              fit: BoxFit.contain,
+                          ),
+                          SizedBox(
+                            width: _ps(56),
+                            height: _ps(56),
+                            child: Transform.translate(
+                              offset: Offset(-_ps(56 * 1.2) * 0.3, 0),
+                              child: Transform.scale(
+                                scale: 1.12 * 1.2,
+                                child: ProductImage(
+                                  image: oneEyedGiftBoxPath,
+                                  width: _ps(56),
+                                  height: _ps(56),
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ),
-            Container(
-              margin: EdgeInsets.fromLTRB(_ps(12), 0, _ps(12), _ps(12)),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.38),
-                borderRadius: BorderRadius.circular(_ps(14)),
-              ),
-              child: IntrinsicHeight(
-                child: Row(
-                  children: [
-                    _StatCell(
-                      label: '积分',
-                      value: _fmt(user.points),
-                      iconPath: profileStatIconPaths['points'],
-                      onTap: () => UserFeatureSheets.handleStatBar(context, '积分'),
+                Container(
+                  margin: EdgeInsets.fromLTRB(_ps(12), 0, _ps(12), _ps(12)),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.38),
+                    borderRadius: BorderRadius.circular(_ps(14)),
+                  ),
+                  child: IntrinsicHeight(
+                    child: Row(
+                      children: [
+                        _StatCell(
+                          label: '积分',
+                          value: _fmt(user.points),
+                          iconPath: profileStatIconPaths['points'],
+                          onTap: () =>
+                              UserFeatureSheets.handleStatBar(context, '积分'),
+                        ),
+                        _StatCell(
+                          label: '趣玩币',
+                          value: _fmt(user.funCoins),
+                          iconPath: profileStatIconPaths['coins'],
+                          onTap: () =>
+                              UserFeatureSheets.handleStatBar(context, '趣玩币'),
+                        ),
+                        _StatCell(
+                          label: '优惠券',
+                          value: _fmt(user.couponCount),
+                          iconPath: profileStatIconPaths['coupon'],
+                          showBorder: false,
+                          onTap: () =>
+                              UserFeatureSheets.handleStatBar(context, '优惠券'),
+                        ),
+                      ],
                     ),
-                    _StatCell(
-                      label: '趣玩币',
-                      value: _fmt(user.funCoins),
-                      iconPath: profileStatIconPaths['coins'],
-                      onTap: () => UserFeatureSheets.handleStatBar(context, '趣玩币'),
-                    ),
-                    _StatCell(
-                      label: '优惠券',
-                      value: _fmt(user.couponCount),
-                      iconPath: profileStatIconPaths['coupon'],
-                      showBorder: false,
-                      onTap: () => UserFeatureSheets.handleStatBar(context, '优惠券'),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
               ],
             ),
           ],
@@ -273,7 +364,13 @@ class _StatCell extends StatelessWidget {
           child: Container(
             padding: EdgeInsets.symmetric(vertical: _ps(12)),
             decoration: showBorder
-                ? BoxDecoration(border: Border(right: BorderSide(color: AppColors.foreground.withValues(alpha: 0.12))))
+                ? BoxDecoration(
+                    border: Border(
+                      right: BorderSide(
+                        color: AppColors.foreground.withValues(alpha: 0.12),
+                      ),
+                    ),
+                  )
                 : null,
             child: Column(
               children: [
@@ -288,15 +385,29 @@ class _StatCell extends StatelessWidget {
                         height: iconSize,
                         fit: BoxFit.contain,
                         filterQuality: FilterQuality.high,
-                        errorBuilder: (context, error, stackTrace) => SizedBox(width: iconSize, height: iconSize),
+                        errorBuilder: (context, error, stackTrace) =>
+                            SizedBox(width: iconSize, height: iconSize),
                       ),
                       SizedBox(width: _ps(4)),
                     ],
-                    Text(value, style: TextStyle(color: AppColors.foreground, fontWeight: FontWeight.bold, fontSize: _ps(14) + AppScale.fontBump)),
+                    Text(
+                      value,
+                      style: TextStyle(
+                        color: AppColors.foreground,
+                        fontWeight: FontWeight.bold,
+                        fontSize: _ps(14) + AppScale.fontBump,
+                      ),
+                    ),
                   ],
                 ),
                 SizedBox(height: _ps(2)),
-                Text(label, style: TextStyle(color: AppColors.foreground.withValues(alpha: 0.65), fontSize: _ps(11) + AppScale.fontBump)),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: AppColors.foreground.withValues(alpha: 0.65),
+                    fontSize: _ps(11) + AppScale.fontBump,
+                  ),
+                ),
               ],
             ),
           ),
@@ -308,11 +419,11 @@ class _StatCell extends StatelessWidget {
 
 class _MemberSection extends StatelessWidget {
   static const _benefits = [
-    (DrawnIconType.memberCoupon, '每月赠券'),
-    (DrawnIconType.memberPoints, '积分加成'),
-    (DrawnIconType.memberDiscount, '专属折扣'),
-    (DrawnIconType.memberGift, '生日礼包'),
-    (DrawnIconType.memberShipping, '优先发货'),
+    ('assets/images/icon_pf_monthly_coupon.png', '每月赠券'),
+    ('assets/images/icon_pf_points_boost.png', '积分加成'),
+    ('assets/images/icon_pf_discount.png', '专属折扣'),
+    ('assets/images/icon_pf_birthday_gift.png', '生日礼包'),
+    ('assets/images/icon_pf_priority_shipping.png', '优先发货'),
   ];
 
   @override
@@ -328,15 +439,40 @@ class _MemberSection extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            Positioned(top: _ps(8), right: _ps(40), child: _SparkleStar(size: _ps(7), opacity: 0.38)),
-            Positioned(top: _ps(28), right: _ps(120), child: _SparkleStar(size: _ps(5), opacity: 0.28)),
-            Positioned(top: _ps(18), left: _ps(140), child: _SparkleStar(size: _ps(6), opacity: 0.24)),
-            Positioned(top: _ps(10), left: _ps(24), child: _SparkleStar(size: _ps(4), opacity: 0.2)),
-            Positioned(bottom: _ps(52), right: _ps(24), child: _SparkleStar(size: _ps(7), opacity: 0.22)),
+            Positioned(
+              top: _ps(8),
+              right: _ps(40),
+              child: _SparkleStar(size: _ps(7), opacity: 0.38),
+            ),
+            Positioned(
+              top: _ps(28),
+              right: _ps(120),
+              child: _SparkleStar(size: _ps(5), opacity: 0.28),
+            ),
+            Positioned(
+              top: _ps(18),
+              left: _ps(140),
+              child: _SparkleStar(size: _ps(6), opacity: 0.24),
+            ),
+            Positioned(
+              top: _ps(10),
+              left: _ps(24),
+              child: _SparkleStar(size: _ps(4), opacity: 0.2),
+            ),
+            Positioned(
+              bottom: _ps(52),
+              right: _ps(24),
+              child: _SparkleStar(size: _ps(7), opacity: 0.22),
+            ),
             Column(
               children: [
                 Padding(
-                  padding: EdgeInsets.fromLTRB(_ps(14), _ps(14), _ps(14), _ps(12)),
+                  padding: EdgeInsets.fromLTRB(
+                    _ps(14),
+                    _ps(14),
+                    _ps(14),
+                    _ps(12),
+                  ),
                   child: Row(
                     children: [
                       ClipRRect(
@@ -347,15 +483,20 @@ class _MemberSection extends StatelessWidget {
                           height: _ps(40),
                           fit: BoxFit.cover,
                           filterQuality: FilterQuality.high,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            width: _ps(40),
-                            height: _ps(40),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1A1A1A),
-                              borderRadius: BorderRadius.circular(_ps(10)),
-                            ),
-                            child: Icon(Icons.diamond, size: _ps(22), color: AppColors.gold),
-                          ),
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                                width: _ps(40),
+                                height: _ps(40),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1A1A1A),
+                                  borderRadius: BorderRadius.circular(_ps(10)),
+                                ),
+                                child: Icon(
+                                  Icons.diamond,
+                                  size: _ps(22),
+                                  color: AppColors.gold,
+                                ),
+                              ),
                         ),
                       ),
                       SizedBox(width: _ps(10)),
@@ -365,25 +506,42 @@ class _MemberSection extends StatelessWidget {
                           children: [
                             Text(
                               '趣玩星球会员',
-                              style: TextStyle(color: Colors.white, fontSize: _ps(15) + AppScale.fontBump, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: _ps(15) + AppScale.fontBump,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             SizedBox(height: _ps(2)),
                             Text(
                               '尊享专属权益，解锁更多惊喜福利',
-                              style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: _ps(10) + AppScale.fontBump),
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.75),
+                                fontSize: _ps(10) + AppScale.fontBump,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       Consumer<UserProvider>(
                         builder: (context, user, _) {
-                          final isMember = user.vipLevel >= memberTargetVipLevel;
+                          final isMember =
+                              user.vipLevel >= memberTargetVipLevel;
                           return AppGestureDetector(
-                            onTap: () => UserFeatureSheets.showMemberBenefits(context),
+                            onTap: () =>
+                                UserFeatureSheets.showMemberBenefits(context),
                             child: Container(
-                              padding: EdgeInsets.symmetric(horizontal: _ps(12), vertical: _ps(7)),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: _ps(12),
+                                vertical: _ps(7),
+                              ),
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(colors: [AppColors.gold, const Color(0xFFF5D78E)]),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.gold,
+                                    const Color(0xFFF5D78E),
+                                  ],
+                                ),
                                 borderRadius: BorderRadius.circular(_ps(999)),
                               ),
                               child: Text(
@@ -420,20 +578,26 @@ class _MemberSection extends StatelessWidget {
                             ),
                           Expanded(
                             child: AppInkWell(
-                              onTap: () => UserFeatureSheets.handleMemberBenefit(context, _benefits[i].$2),
+                              onTap: () =>
+                                  UserFeatureSheets.handleMemberBenefit(
+                                    context,
+                                    _benefits[i].$2,
+                                  ),
                               borderRadius: BorderRadius.circular(_ps(8)),
                               child: Column(
                                 children: [
-                                  DrawnFeatureIcon(
-                                    type: _benefits[i].$1,
-                                    size: _ps(28),
-                                    style: DrawnIconStyle.plain,
-                                    color: AppColors.primary,
+                                  Image.asset(
+                                    _benefits[i].$1,
+                                    width: _ps(34),
+                                    height: _ps(34),
                                   ),
                                   SizedBox(height: _ps(4)),
                                   Text(
                                     _benefits[i].$2,
-                                    style: TextStyle(fontSize: _ps(10) + AppScale.fontBump, color: AppColors.foreground),
+                                    style: TextStyle(
+                                      fontSize: _ps(10) + AppScale.fontBump,
+                                      color: AppColors.foreground,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -465,7 +629,9 @@ class _SparkleStar extends StatelessWidget {
       width: size,
       height: size,
       child: CustomPaint(
-        painter: _TitleStarPainter(color: Colors.white.withValues(alpha: opacity)),
+        painter: _TitleStarPainter(
+          color: Colors.white.withValues(alpha: opacity),
+        ),
       ),
     );
   }
@@ -473,19 +639,19 @@ class _SparkleStar extends StatelessWidget {
 
 class _ServiceSection extends StatelessWidget {
   static const _row1 = [
-    (DrawnIconType.order, '我的订单'),
-    (DrawnIconType.pendingPayment, '待发货'),
-    (DrawnIconType.shipping, '待收货'),
-    (DrawnIconType.orderCompleted, '已完成'),
-    (DrawnIconType.refund, '售后/退款'),
+    ('assets/images/icon_pf_my_orders.png', '我的订单'),
+    ('assets/images/icon_pf_to_ship.png', '待发货'),
+    ('assets/images/icon_pf_to_receive.png', '待收货'),
+    ('assets/images/icon_pf_completed.png', '已完成'),
+    ('assets/images/icon_pf_after_sales.png', '售后/退款'),
   ];
   static const _row2 = [
-    (DrawnIconType.coupon, '优惠券'),
-    (DrawnIconType.coins, '趣玩币'),
-    (DrawnIconType.address, '地址管理'),
-    (DrawnIconType.favoriteStar, '收藏夹'),
-    (DrawnIconType.history, '浏览记录'),
-    (DrawnIconType.service, '客服中心'),
+    ('assets/images/icon_pf_coupons.png', '优惠券'),
+    ('assets/images/icon_pf_coin_details.png', '趣玩币'),
+    ('assets/images/icon_pf_address.png', '地址管理'),
+    ('assets/images/icon_pf_favorites.png', '收藏夹'),
+    ('assets/images/icon_pf_history.png', '浏览记录'),
+    ('assets/images/icon_pf_support.png', '客服中心'),
   ];
 
   @override
@@ -508,10 +674,18 @@ class _ServiceSection extends StatelessWidget {
                 SizedBox(
                   width: _ps(14),
                   height: _ps(14),
-                  child: CustomPaint(painter: _TitleStarPainter(color: AppColors.primary)),
+                  child: CustomPaint(
+                    painter: _TitleStarPainter(color: AppColors.primary),
+                  ),
                 ),
                 SizedBox(width: _ps(6)),
-                Text('我的服务', style: TextStyle(fontSize: _ps(15) + AppScale.fontBump, fontWeight: FontWeight.bold)),
+                Text(
+                  '我的服务',
+                  style: TextStyle(
+                    fontSize: _ps(15) + AppScale.fontBump,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
             SizedBox(height: _ps(14)),
@@ -525,15 +699,22 @@ class _ServiceSection extends StatelessWidget {
                 return _ServiceRow(
                   items: _row1,
                   badgeCounts: badgeCounts,
-                  onTap: (label) => OrdersSheet.show(context, filterLabel: label),
+                  onTap: (label) =>
+                      OrdersSheet.show(context, filterLabel: label),
                 );
               },
             ),
             Padding(
               padding: EdgeInsets.symmetric(vertical: _ps(12)),
-              child: Divider(height: 1, color: AppColors.border.withValues(alpha: 0.6)),
+              child: Divider(
+                height: 1,
+                color: AppColors.border.withValues(alpha: 0.6),
+              ),
             ),
-            _ServiceRow(items: _row2, onTap: (label) => UserFeatureSheets.handleService(context, label)),
+            _ServiceRow(
+              items: _row2,
+              onTap: (label) => UserFeatureSheets.handleService(context, label),
+            ),
           ],
         ),
       ),
@@ -565,7 +746,8 @@ class _TitleStarPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _TitleStarPainter oldDelegate) => oldDelegate.color != color;
+  bool shouldRepaint(covariant _TitleStarPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class _ServiceRow extends StatelessWidget {
@@ -575,7 +757,7 @@ class _ServiceRow extends StatelessWidget {
     this.badgeCounts = const {},
   });
 
-  final List<(DrawnIconType, String)> items;
+  final List<(String, String)> items;
   final ValueChanged<String> onTap;
   final Map<String, int> badgeCounts;
 
@@ -594,18 +776,28 @@ class _ServiceRow extends StatelessWidget {
                   clipBehavior: Clip.none,
                   alignment: Alignment.center,
                   children: [
-                    DrawnFeatureIcon(type: item.$1, size: _ps(32 * 1.3), style: DrawnIconStyle.line),
+                    Image.asset(
+                      item.$1,
+                      width: _ps(32 * 1.3),
+                      height: _ps(32 * 1.3),
+                    ),
                     if (badge > 0)
                       Positioned(
                         top: _ps(-2),
                         right: _ps(-6),
                         child: Container(
-                          constraints: BoxConstraints(minWidth: _ps(16), minHeight: _ps(16)),
+                          constraints: BoxConstraints(
+                            minWidth: _ps(16),
+                            minHeight: _ps(16),
+                          ),
                           padding: EdgeInsets.symmetric(horizontal: _ps(4)),
                           decoration: BoxDecoration(
                             color: const Color(0xFFE53935),
                             borderRadius: BorderRadius.circular(_ps(999)),
-                            border: Border.all(color: Colors.white, width: _ps(1.2)),
+                            border: Border.all(
+                              color: Colors.white,
+                              width: _ps(1.2),
+                            ),
                           ),
                           alignment: Alignment.center,
                           child: Text(
@@ -626,7 +818,11 @@ class _ServiceRow extends StatelessWidget {
                   item.$2,
                   textAlign: TextAlign.center,
                   maxLines: 2,
-                  style: TextStyle(fontSize: _ps(10) + AppScale.fontBump, color: AppColors.mutedForeground, height: 1.2),
+                  style: TextStyle(
+                    fontSize: _ps(10) + AppScale.fontBump,
+                    color: AppColors.mutedForeground,
+                    height: 1.2,
+                  ),
                 ),
               ],
             ),
@@ -664,10 +860,16 @@ class _InviteBanner extends StatelessWidget {
                   gradient: const LinearGradient(
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
-                    colors: [Color(0xFFFFE6ED), Color(0xFFFFF6FA), Color(0xFFF3EEFF)],
+                    colors: [
+                      Color(0xFFFFE6ED),
+                      Color(0xFFFFF6FA),
+                      Color(0xFFF3EEFF),
+                    ],
                   ),
                   borderRadius: BorderRadius.circular(_ps(16)),
-                  border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.25)),
+                  border: Border.all(
+                    color: AppColors.primaryLight.withValues(alpha: 0.25),
+                  ),
                   boxShadow: AppColors.cardShadow,
                 ),
                 child: Row(
@@ -678,25 +880,64 @@ class _InviteBanner extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('邀请好友', style: TextStyle(fontSize: _ps(14) + AppScale.fontBump, fontWeight: FontWeight.bold, height: 1.15)),
-                          Text('领好礼', style: TextStyle(fontSize: _ps(14) + AppScale.fontBump, fontWeight: FontWeight.bold, height: 1.15)),
+                          Text(
+                            '邀请好友',
+                            style: TextStyle(
+                              fontSize: _ps(14) + AppScale.fontBump,
+                              fontWeight: FontWeight.bold,
+                              height: 1.15,
+                            ),
+                          ),
+                          Text(
+                            '领好礼',
+                            style: TextStyle(
+                              fontSize: _ps(14) + AppScale.fontBump,
+                              fontWeight: FontWeight.bold,
+                              height: 1.15,
+                            ),
+                          ),
                           SizedBox(height: _ps(2)),
-                          Text('一起开启惊喜之旅', style: TextStyle(fontSize: _ps(10) + AppScale.fontBump, color: AppColors.foreground)),
+                          Text(
+                            '一起开启惊喜之旅',
+                            style: TextStyle(
+                              fontSize: _ps(10) + AppScale.fontBump,
+                              color: AppColors.foreground,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     SizedBox(width: _ps(92)),
                     AppGestureDetector(
                       onTap: () {
-                        showTopSnackBar(context, content: Text('邀请链接已复制', style: TextStyle(fontSize: _ps(14) + AppScale.fontBump, fontWeight: FontWeight.w600)));
+                        showTopSnackBar(
+                          context,
+                          content: Text(
+                            '邀请链接已复制',
+                            style: TextStyle(
+                              fontSize: _ps(14) + AppScale.fontBump,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
                       },
                       child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: _ps(14), vertical: _ps(8)),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: _ps(14),
+                          vertical: _ps(8),
+                        ),
                         decoration: BoxDecoration(
                           gradient: AppColors.primaryGradient,
                           borderRadius: BorderRadius.circular(_ps(999)),
                         ),
-                        child: Text('立即邀请', style: TextStyle(color: Colors.white, fontSize: _ps(12) + AppScale.fontBump, fontWeight: FontWeight.w600)),
+                        child: Text(
+                          '立即邀请',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: _ps(12) + AppScale.fontBump,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -731,14 +972,20 @@ class _AiFeatureEntries extends StatelessWidget {
           Expanded(
             child: _AiEntryCard(
               imagePath: aiPaintEntryPath,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiPaintPage())),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AiPaintPage()),
+              ),
             ),
           ),
           SizedBox(width: _ps(10)),
           Expanded(
             child: _AiEntryCard(
               imagePath: aiCommunityEntryPath,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiCommunityPage())),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AiCommunityPage()),
+              ),
             ),
           ),
         ],
@@ -777,7 +1024,11 @@ class _AiEntryCard extends StatelessWidget {
                 errorBuilder: (context, error, stackTrace) => Container(
                   color: AppColors.muted,
                   alignment: Alignment.center,
-                  child: Icon(Icons.image_not_supported_outlined, size: _ps(28), color: AppColors.mutedForeground),
+                  child: Icon(
+                    Icons.image_not_supported_outlined,
+                    size: _ps(28),
+                    color: AppColors.mutedForeground,
+                  ),
                 ),
               ),
             ),
