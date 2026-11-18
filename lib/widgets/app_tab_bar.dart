@@ -53,8 +53,8 @@ class AppTabBar extends StatelessWidget {
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       padding: EdgeInsets.only(
-        top: AppScale.s(4),
-        bottom: MediaQuery.paddingOf(context).bottom + AppScale.s(16),
+        top: AppScale.s(2),
+        bottom: MediaQuery.paddingOf(context).bottom + AppScale.s(8),
       ),
       child: Row(
         children: _tabs.map((tab) {
@@ -68,7 +68,7 @@ class AppTabBar extends StatelessWidget {
               splashColor: Colors.transparent,
               highlightColor: Colors.transparent,
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: AppScale.s(12)),
+                padding: EdgeInsets.symmetric(vertical: AppScale.s(6)),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -112,7 +112,7 @@ class AppTabBar extends StatelessWidget {
                           ),
                       ],
                     ),
-                    SizedBox(height: AppScale.s(6)),
+                    SizedBox(height: AppScale.s(4)),
                     Text(
                       tab.$2,
                       style: AppTheme.baseText.copyWith(

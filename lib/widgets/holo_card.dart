@@ -145,6 +145,14 @@ class _HoloPainter extends CustomPainter {
     final rect = Offset.zero & size;
     canvas.save();
     canvas.clipRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+    // 商品图窗挖空：全息/眩光不叠到图上，避免变色挡看图。
+    if (artRect != null) {
+      final hole = Path()
+        ..fillType = PathFillType.evenOdd
+        ..addRect(rect)
+        ..addRect(artRect!);
+      canvas.clipPath(hole);
+    }
     switch (rarity) {
       case HoloRarity.gold:
         _paintGold(canvas, size, rect);
@@ -160,13 +168,9 @@ class _HoloPainter extends CustomPainter {
     canvas.restore();
   }
 
-  // Rare Holo：竖直彩虹光柱 + 条纹 + 光斑，只在画窗内流动。
+  // Rare Holo：竖直彩虹光柱 + 条纹 + 光斑（绕开商品图窗）。
   void _paintGold(Canvas canvas, Size size, Rect rect) {
     final bf = (hyp + 0.7) * 0.7; // 他源码里的亮度公式
-    canvas.save();
-    if (artRect != null) {
-      canvas.clipRect(artRect!);
-    }
     final w = size.width;
     final h = size.height;
     // 1) 色相光柱（16 段色相与黑条交替，周期 64）
@@ -247,7 +251,6 @@ class _HoloPainter extends CustomPainter {
       const [0, 0.25, 0.9],
     );
     canvas.drawRect(rect, p);
-    canvas.restore();
   }
 
   void _beams(
@@ -462,7 +465,50 @@ class _HoloPainter extends CustomPainter {
       old.opacity != opacity ||
       old.hyp != hyp ||
       old.noise != noise ||
-      old.rarity != rarity;
+      old.rarity != rarity ||
+      old.artRect != artRect;
+}
+
+Widget _holoOverlay({
+  required HoloRarity rarity,
+  required double bgX,
+  required double bgY,
+  required double glareX,
+  required double glareY,
+  required double opacity,
+  required Size size,
+  required Rect? artWindow,
+  required double radius,
+}) {
+  final dx = (glareX - 50) / 50;
+  final dy = (glareY - 50) / 50;
+  Rect? artRect;
+  if (artWindow != null && size.width > 0 && size.height > 0) {
+    artRect = Rect.fromLTRB(
+      artWindow.left * size.width,
+      artWindow.top * size.height,
+      artWindow.right * size.width,
+      artWindow.bottom * size.height,
+    );
+  }
+  return Positioned.fill(
+    child: IgnorePointer(
+      child: CustomPaint(
+        painter: _HoloPainter(
+          rarity: rarity,
+          bgX: bgX,
+          bgY: bgY,
+          glareX: glareX,
+          glareY: glareY,
+          opacity: opacity,
+          hyp: _clampD(math.sqrt(dx * dx + dy * dy), 0, 1),
+          artRect: artRect,
+          radius: radius,
+          noise: _NoiseTex.image,
+        ),
+      ),
+    ),
+  );
 }
 
 /// 全息卡：3D 倾斜 + 稀有度光层 + 翻牌 + 点击飞向屏幕中央放大旋转。
@@ -541,8 +587,6 @@ class _HoloCardState extends State<HoloCard>
     super.didUpdateWidget(old);
     if (old.flipped != widget.flipped) {
       _flip.set(widget.flipped ? 180 : 0, k: 0.02, d: 0.35);
-      _glareO.set(0.9, k: 0.05, d: 0.24);
-      _scheduleSnap(1100);
       _pump();
     }
   }
@@ -654,14 +698,6 @@ class _HoloCardState extends State<HoloCard>
     return LayoutBuilder(
       builder: (context, constraints) {
         _size = Size(constraints.maxWidth, constraints.maxHeight);
-        final artRect = widget.artWindow == null
-            ? null
-            : Rect.fromLTRB(
-                widget.artWindow!.left * _size.width,
-                widget.artWindow!.top * _size.height,
-                widget.artWindow!.right * _size.width,
-                widget.artWindow!.bottom * _size.height,
-              );
         final totalX = _rotateX.value + _flip.value;
         final frontVisible =
             math.cos(totalX * math.pi / 180) *
@@ -674,20 +710,14 @@ class _HoloCardState extends State<HoloCard>
                 transform: Matrix4.identity()..rotateX(math.pi),
                 child: widget.back,
               );
-        final glowAlpha = _clampD(_glareO.value * 0.55, 0, 0.6);
         return Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(widget.radius),
-            boxShadow: [
-              const BoxShadow(
+            boxShadow: const [
+              BoxShadow(
                 color: Color(0x59000000),
                 blurRadius: 18,
                 offset: Offset(0, 8),
-              ),
-              BoxShadow(
-                color: widget.rarity.glow.withValues(alpha: glowAlpha),
-                blurRadius: 30,
-                spreadRadius: 1,
               ),
             ],
           ),
@@ -707,38 +737,26 @@ class _HoloCardState extends State<HoloCard>
                   ..setEntry(3, 2, 0.0016)
                   ..rotateY(_rotateY.value * math.pi / 180)
                   ..rotateX(totalX * math.pi / 180),
-                child: Stack(
-                  fit: StackFit.passthrough,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(widget.radius),
-                      child: face,
-                    ),
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _HoloPainter(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(widget.radius),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      face,
+                      if (frontVisible)
+                        _holoOverlay(
                           rarity: widget.rarity,
                           bgX: _bgX.value,
                           bgY: _bgY.value,
                           glareX: _glareX.value,
                           glareY: _glareY.value,
                           opacity: _glareO.value,
-                          hyp: _clampD(
-                            math.sqrt(
-                                  math.pow(_glareY.value - 50, 2) +
-                                      math.pow(_glareX.value - 50, 2),
-                                ) /
-                                50,
-                            0,
-                            1,
-                          ),
-                          artRect: artRect,
+                          size: _size,
+                          artWindow: widget.artWindow,
                           radius: widget.radius,
-                          noise: _NoiseTex.image,
                         ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -825,8 +843,14 @@ class _HoloPopoverState extends State<_HoloPopover>
     _cx = _Spring1(widget.srcRect.center.dx);
     _cy = _Spring1(widget.srcRect.center.dy);
     _cardSize = widget.srcRect.size;
-    _spin.set(360, k: 0.016, d: 0.30);
+    // 从反面起飞：180→720（转 1.5 圈）后落在正面，挂在中央。
+    // 注意：从 180 出发若只加 360 会仍停在反面。
+    _spin.value = _spin.last = 180;
+    _spin.set(720, k: 0.016, d: 0.30);
     _ticker = createTicker(_onTick)..start();
+    _NoiseTex.ensure(() {
+      if (mounted) setState(() {});
+    });
     // 下一帧拿到屏幕尺寸后设定飞行终点：屏幕中央 + 目标放大倍数
     // （与演示版同参的位移/缩放弹簧 0.028 / 0.42）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -855,12 +879,12 @@ class _HoloPopoverState extends State<_HoloPopover>
   }
 
   void _onTick(Duration _) {
-    // 空闲超过 1.2 秒进入自动展示（原版 showcase 的缓转 + 光斑绕行）
+    // 空闲超过 1.2 秒：牌面挂住不动，只让金光/闪膜继续绕行。
     if (DateTime.now().difference(_lastInteract).inMilliseconds > 1200 &&
         !_closing) {
       _showR += 0.009;
-      _rotateY.set(math.sin(_showR) * 25, k: 0.015, d: 0.5);
-      _rotateX.set(math.cos(_showR) * 25, k: 0.015, d: 0.5);
+      _rotateX.set(0, k: 0.05, d: 0.30);
+      _rotateY.set(0, k: 0.05, d: 0.30);
       _glareX.set(55 + math.sin(_showR) * 55, k: 0.015, d: 0.5);
       _glareY.set(55 + math.cos(_showR) * 55, k: 0.015, d: 0.5);
       _glareO.set(0.8, k: 0.015, d: 0.5);
@@ -931,14 +955,6 @@ class _HoloPopoverState extends State<_HoloPopover>
   Widget build(BuildContext context) {
     final srcW = widget.srcRect.width;
     final srcH = widget.srcRect.height;
-    final artRect = widget.artWindow == null
-        ? null
-        : Rect.fromLTRB(
-            widget.artWindow!.left * srcW,
-            widget.artWindow!.top * srcH,
-            widget.artWindow!.right * srcW,
-            widget.artWindow!.bottom * srcH,
-          );
     final totalY = _spin.value + _rotateY.value;
     final frontVisible =
         math.cos(totalY * math.pi / 180) *
@@ -951,7 +967,6 @@ class _HoloPopoverState extends State<_HoloPopover>
             transform: Matrix4.identity()..rotateY(math.pi),
             child: widget.back,
           );
-    final glowAlpha = _clampD(_glareO.value * 0.55, 0, 0.6);
     return SizedBox.expand(
       child: Stack(
         children: [
@@ -988,53 +1003,34 @@ class _HoloPopoverState extends State<_HoloPopover>
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(widget.radius),
-                      boxShadow: [
-                        const BoxShadow(
+                      boxShadow: const [
+                        BoxShadow(
                           color: Color(0x59000000),
                           blurRadius: 18,
                           offset: Offset(0, 8),
                         ),
-                        BoxShadow(
-                          color: widget.rarity.glow.withValues(
-                            alpha: glowAlpha,
-                          ),
-                          blurRadius: 30,
-                          spreadRadius: 1,
-                        ),
                       ],
                     ),
-                    child: Stack(
-                      fit: StackFit.passthrough,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(widget.radius),
-                          child: face,
-                        ),
-                        Positioned.fill(
-                          child: CustomPaint(
-                            painter: _HoloPainter(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(widget.radius),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          face,
+                          if (frontVisible)
+                            _holoOverlay(
                               rarity: widget.rarity,
                               bgX: _bgX.value,
                               bgY: _bgY.value,
                               glareX: _glareX.value,
                               glareY: _glareY.value,
                               opacity: _glareO.value,
-                              hyp: _clampD(
-                                math.sqrt(
-                                      math.pow(_glareY.value - 50, 2) +
-                                          math.pow(_glareX.value - 50, 2),
-                                    ) /
-                                    50,
-                                0,
-                                1,
-                              ),
-                              artRect: artRect,
+                              size: Size(srcW, srcH),
+                              artWindow: widget.artWindow,
                               radius: widget.radius,
-                              noise: _NoiseTex.image,
                             ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
