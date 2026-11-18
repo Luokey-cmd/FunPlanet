@@ -31,9 +31,12 @@ Map<String, dynamic> _archiveOf(BuildContext context) {
 }
 
 class XiaodouChatPage extends StatefulWidget {
-  const XiaodouChatPage({super.key});
+  const XiaodouChatPage({super.key, this.autoDraw = false});
 
-  static Future<void> open(BuildContext context) {
+  /// 进来就自动抽一次命运三翻（今日星签的「再翻三张」和标题栏按钮用）。
+  final bool autoDraw;
+
+  static Future<void> open(BuildContext context, {bool autoDraw = false}) {
     final chat = context.read<XiaodouChatProvider>();
     return Navigator.push<void>(
       context,
@@ -43,7 +46,7 @@ class XiaodouChatPage extends StatefulWidget {
             ChangeNotifierProvider.value(value: chat),
             ChangeNotifierProvider.value(value: context.read<StarwishProfileProvider>()),
           ],
-          child: const XiaodouChatPage(),
+          child: XiaodouChatPage(autoDraw: autoDraw),
         ),
       ),
     );
@@ -53,12 +56,26 @@ class XiaodouChatPage extends StatefulWidget {
   State<XiaodouChatPage> createState() => _XiaodouChatPageState();
 }
 
+/// 自动抽三翻的定式话术：走现有对话流程，命中抽牌工具的概率最高。
+void _drawFateCards(BuildContext context) {
+  final chat = context.read<XiaodouChatProvider>();
+  if (chat.sending) return;
+  chat.send('小豆，帮我翻三张命运牌', starwish: _archiveOf(context));
+}
+
 class _XiaodouChatPageState extends State<XiaodouChatPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      if (widget.autoDraw) {
+        // 为抽牌而来：这次不弹星愿档案，稍等半拍直接抽。
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        if (!mounted) return;
+        _drawFateCards(context);
+        return;
+      }
       if (!context.read<StarwishProfileProvider>().isComplete) {
         showStarwishDossierSheet(context);
       }
@@ -79,6 +96,7 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
                 onOpenHistory: () => XiaodouChatHistoryPage.open(context),
                 onNewChat: () => _startNewChat(context),
                 onCopyChat: () => _copyCurrentChat(context),
+                onDrawFate: () => _drawFateCards(context),
               ),
             ),
             Divider(height: _xs(1), color: AppColors.border),
@@ -128,12 +146,14 @@ class _Header extends StatelessWidget {
     required this.onOpenHistory,
     required this.onNewChat,
     required this.onCopyChat,
+    required this.onDrawFate,
   });
 
   final VoidCallback onClose;
   final VoidCallback onOpenHistory;
   final VoidCallback onNewChat;
   final VoidCallback onCopyChat;
+  final VoidCallback onDrawFate;
 
   @override
   Widget build(BuildContext context) {
@@ -168,6 +188,33 @@ class _Header extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          Builder(
+            builder: (context) {
+              final sending = context.watch<XiaodouChatProvider>().sending;
+              return AppPressable(
+                enabled: !sending,
+                child: GestureDetector(
+                  onTap: sending ? null : onDrawFate,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: _xs(9), vertical: _xs(5)),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary,
+                      borderRadius: BorderRadius.circular(_xs(999)),
+                      border: Border.all(color: AppColors.gold),
+                    ),
+                    child: Text(
+                      '✦ 命运三翻',
+                      style: TextStyle(
+                        fontSize: _xs(9) + AppScale.fontBump,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.secondaryForeground,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
           AppIconButton(
             onPressed: () => showStarwishDossierSheet(context),

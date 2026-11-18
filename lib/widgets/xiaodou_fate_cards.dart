@@ -15,10 +15,18 @@ class XiaodouFateBoard extends StatefulWidget {
     super.key,
     required this.products,
     required this.roles,
+    this.flipped,
+    this.onFlip,
   });
 
   final List<Product> products;
   final List<String> roles;
+
+  /// 可选的受控翻牌状态：外部传入时由外部决定哪些牌已翻开
+  /// （今日星签半屏层的「翻开这张牌」按钮用）；不传则维持原行为，
+  /// 由牌板自己记状态（小豆聊天里的用法不变）。
+  final Set<int>? flipped;
+  final ValueChanged<int>? onFlip;
 
   @override
   State<XiaodouFateBoard> createState() => _XiaodouFateBoardState();
@@ -54,8 +62,14 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
                 rarity:
                     _rarities[i < widget.roles.length ? widget.roles[i] : ''] ??
                     HoloRarity.gold,
-                flipped: _flipped.contains(i),
-                onFlip: () => setState(() => _flipped.add(i)),
+                flipped: (widget.flipped ?? _flipped).contains(i),
+                onFlip: () {
+                  if (widget.onFlip != null) {
+                    widget.onFlip!(i);
+                  } else {
+                    setState(() => _flipped.add(i));
+                  }
+                },
               ),
             ),
           ],

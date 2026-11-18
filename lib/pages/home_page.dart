@@ -10,6 +10,7 @@ import '../theme/app_scale.dart';
 import '../utils/snackbar_utils.dart';
 import '../widgets/app_tab_bar.dart';
 import '../widgets/banner_carousel.dart';
+import '../widgets/daily_star_sign_strip.dart';
 import '../widgets/home_top_bar.dart';
 import '../widgets/sparkle_background.dart';
 import '../widgets/staggered_product_grid.dart';
@@ -43,7 +44,9 @@ class _HomePageState extends State<HomePage> {
     return [
       const SliverToBoxAdapter(child: HomeTopBar()),
       const SliverToBoxAdapter(child: BannerCarousel()),
-      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
+      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(12))),
+      const SliverToBoxAdapter(child: DailyStarSignStrip()),
+      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(12))),
       const SliverToBoxAdapter(child: _QuickActions()),
       SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
       SliverToBoxAdapter(child: _NewcomerSection(onClaim: _claimNewcomer)),
