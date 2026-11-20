@@ -34,7 +34,7 @@ class AuthFormField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: authText(13), fontWeight: FontWeight.w600, color: AppColors.foreground)),
+        Text(label, style: TextStyle(fontSize: authText(17), fontWeight: FontWeight.w600, color: AppColors.foreground)),
         SizedBox(height: AppScale.s(8)),
         AppTextField(
           controller: controller,
@@ -99,7 +99,7 @@ class AuthPrimaryButton extends StatelessWidget {
                       height: AppScale.s(22),
                       child: const CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
                     )
-                  : Text(label, style: TextStyle(color: Colors.white, fontSize: authText(16), fontWeight: FontWeight.bold)),
+                  : Text(label, style: TextStyle(color: Colors.white, fontSize: authText(20), fontWeight: FontWeight.bold)),
             ),
           ),
         ),

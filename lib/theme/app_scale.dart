@@ -1,11 +1,27 @@
 /// 全局 UI 尺寸缩放（基准 1.0 对应 1080×2412 竖屏逻辑尺寸）
+///
+/// 字号规矩（2026-11-20 规范化，hz 拍板）：
+/// - [t] 是全 App 唯一的字号函数：渲染大小 = 名义值 × [textFactor]。
+///   用乘法不用加法：大小之间的比例不被压扁，层级保得住。
+/// - 历史教训：旧版 t 是 0.8 倍再 +5 膨胀（fontBump，加法），起因是当年
+///   全局用马善政楷书、视觉显小，靠灌水补偿；结果小字被撑大、比例压扁。
+/// - 规范化第一版曾把 t 改成名义值原样（×1.0），hz 真机反馈字普遍偏小：
+///   各处名义值本就是按旧膨胀手感写下的，且系统字体同字号下视觉比楷书
+///   更小一圈。故定为 ×1.15：正文 14 渲染约 16.1，与旧手感（16.2）基本
+///   一致，但比例不再被压扁。觉得整体还要增减，只改 textFactor 一个数。
+/// - [s] 只管布局尺寸（边距、高度、圆角），与字号无关，保持 0.8 不动。
 class AppScale {
   static const factor = 0.8;
 
-  /// 字号额外加大（原先三号，楷书视觉偏小后再加大两号）
-  static const fontBump = 5.0;
+  /// 字号统一放大系数（乘法）。全 App 字体大小的总开关，只改这里。
+  static const textFactor = 1.15;
+
+  /// 已废弃，仅为兼容旧调用保留：过去给字号全局 +5 的补偿值，现为 0。
+  /// 旧代码里的 `+ AppScale.fontBump` 会自动变成 +0，不要再新写这种加法。
+  static const fontBump = 0.0;
 
   static double s(double value) => value * factor;
 
-  static double t(double value) => s(value) + fontBump;
+  /// 字号：名义值 × [textFactor]。
+  static double t(double value) => value * textFactor;
 }

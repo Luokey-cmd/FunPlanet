@@ -74,6 +74,12 @@ flutter:
     - assets/videos/
 
   fonts:
+    - family: NotoSerifSC
+      fonts:
+        - asset: assets/fonts/NotoSerifSC-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSerifSC-Bold.ttf
+          weight: 700
     - family: MaShanZheng
       fonts:
         - asset: assets/fonts/MaShanZheng-Regular.ttf

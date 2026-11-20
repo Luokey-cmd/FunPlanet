@@ -14,9 +14,9 @@ import '../widgets/sparkle_background.dart';
 import '../widgets/click_effect/app_pressable.dart';
 import '../widgets/click_effect/app_icon_button.dart';
 import '../widgets/click_effect/app_buttons.dart';
-const _uiScale = 1.5;
-
-double _xs(double value) => AppScale.s(value * _uiScale);
+// 2026-11-20 字体规范化：与聊天页同步，统一走 AppScale（字号 t = 写几号
+// 是几号，布局 s = 0.8 倍）；旧版 1.5 倍私自放大已废除。
+double _xs(double value) => AppScale.t(value);
 
 class XiaodouChatHistoryPage extends StatefulWidget {
   const XiaodouChatHistoryPage({super.key});

@@ -37,7 +37,10 @@ class CategoryChipBar extends StatelessWidget {
     final barHeight = _s(this.barHeight ?? (compact ? 26 : 34)) + AppScale.fontBump;
     final hPad = _s(chipHorizontalPadding ?? (compact ? 10 : 12));
     final vPad = _s(chipVerticalPadding ?? (compact ? 3 : 6));
-    final fontSize = (compact ? _s(12) : _s(13)) + AppScale.fontBump;
+    // 字号走全 App 统一的 t（写几号是几号），只保留本组件的 scale 放大意图
+    // （商城页传 1.2 时文字跟着放大）；旧写法拿布局系数算字号再 +fontBump，
+    // 已随 2026-11-20 字体规范化废除。
+    final fontSize = AppScale.t((compact ? 12 : 13) * scale);
     final gap = compact ? _s(5) : _s(6);
 
     final items = categories ?? categoryTags;
@@ -62,7 +65,6 @@ class CategoryChipBar extends StatelessWidget {
                 border: Border.all(
                   color: active ? AppColors.primary : AppColors.border,
                 ),
-                boxShadow: active ? null : AppColors.softShadow,
               ),
               alignment: Alignment.center,
               child: Text(

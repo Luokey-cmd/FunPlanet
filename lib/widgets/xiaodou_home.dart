@@ -6,11 +6,10 @@ import 'click_effect/app_pressable.dart';
 import 'floating_ai_assistant.dart';
 import 'product_image.dart';
 
-// 缩放与聊天页保持同一套：聊天页 _xs 是文件私有函数拿不到，这里照抄同一公式，
-// 保证首页区和对话区的字号、间距是一个比例，不会一页两套大小。
-const _uiScale = 1.5;
-
-double _hs(double value) => AppScale.s(value * _uiScale);
+// 缩放与聊天页保持同一套：统一走 AppScale（字号 t = 写几号是几号，
+// 布局 s = 0.8 倍）。2026-11-20 字体规范化时废除了旧版 1.5 倍私自放大，
+// 与聊天页 _xs 同步，保证首页区和对话区是一个比例。
+double _hs(double value) => AppScale.t(value);
 
 /// 小豆首页区：只在「还没有用户消息」时出现在消息列表顶部（显隐判定在聊天页）。
 ///

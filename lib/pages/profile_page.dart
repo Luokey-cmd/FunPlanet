@@ -25,6 +25,9 @@ const _profilePageScale = 1.3;
 
 double _ps(double value) => AppScale.s(value * _profilePageScale);
 
+/// 我的页正文字号：相对原设计加大一号（+2），顶栏「我的 / 副标题」不用。
+double _pt(double value) => _ps(value + 2) + AppScale.fontBump;
+
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
@@ -125,7 +128,7 @@ class _ProfileHeader extends StatelessWidget {
                           unread > 99 ? '99+' : '$unread',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: _ps(9) + AppScale.fontBump,
+                            fontSize: _pt(9),
                             fontWeight: FontWeight.bold,
                             height: 1.1,
                           ),
@@ -239,7 +242,7 @@ class _UserCard extends StatelessWidget {
                                     Text(
                                       user.nickname,
                                       style: TextStyle(
-                                        fontSize: _ps(16) + AppScale.fontBump,
+                                        fontSize: _pt(16),
                                         fontWeight: FontWeight.bold,
                                         color: Colors.white,
                                       ),
@@ -273,8 +276,7 @@ class _UserCard extends StatelessWidget {
                                           Text(
                                             'VIP${user.vipLevel}',
                                             style: TextStyle(
-                                              fontSize:
-                                                  _ps(10) + AppScale.fontBump,
+                                              fontSize: _pt(10),
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
                                             ),
@@ -296,7 +298,7 @@ class _UserCard extends StatelessWidget {
                                     Text(
                                       'ID: ${user.userId}',
                                       style: TextStyle(
-                                        fontSize: _ps(11) + AppScale.fontBump,
+                                        fontSize: _pt(11),
                                         color: Colors.white70,
                                       ),
                                     ),
@@ -314,8 +316,7 @@ class _UserCard extends StatelessWidget {
                                           content: Text(
                                             'ID 已复制',
                                             style: TextStyle(
-                                              fontSize:
-                                                  _ps(12) + AppScale.fontBump,
+                                              fontSize: _pt(12),
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
@@ -335,7 +336,7 @@ class _UserCard extends StatelessWidget {
                                     Text(
                                       '编辑资料',
                                       style: TextStyle(
-                                        fontSize: _ps(11) + AppScale.fontBump,
+                                        fontSize: _pt(11),
                                         color: Colors.white70,
                                       ),
                                     ),
@@ -512,7 +513,7 @@ class _StatCell extends StatelessWidget {
                       style: TextStyle(
                         color: AppColors.foreground,
                         fontWeight: FontWeight.bold,
-                        fontSize: _ps(14) + AppScale.fontBump,
+                        fontSize: _pt(14),
                       ),
                     ),
                   ],
@@ -522,7 +523,7 @@ class _StatCell extends StatelessWidget {
                   label,
                   style: TextStyle(
                     color: AppColors.foreground.withValues(alpha: 0.65),
-                    fontSize: _ps(11) + AppScale.fontBump,
+                    fontSize: _pt(11),
                   ),
                 ),
                 if (subLabel != null) ...[
@@ -533,7 +534,7 @@ class _StatCell extends StatelessWidget {
                       color: subLabelWarn
                           ? const Color(0xFFEA580C)
                           : AppColors.foreground.withValues(alpha: 0.45),
-                      fontSize: _ps(9) + AppScale.fontBump,
+                      fontSize: _pt(9),
                     ),
                   ),
                 ],
@@ -639,7 +640,7 @@ class _MemberSection extends StatelessWidget {
                               '趣玩星球会员',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: _ps(15) + AppScale.fontBump,
+                                fontSize: _pt(15),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -656,7 +657,7 @@ class _MemberSection extends StatelessWidget {
                                       : '$memberSubscribeCoinPrice 趣玩币/月 · 开通即享 5 项权益',
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.75),
-                                    fontSize: _ps(10) + AppScale.fontBump,
+                                    fontSize: _pt(10),
                                   ),
                                 );
                               },
@@ -689,7 +690,7 @@ class _MemberSection extends StatelessWidget {
                                 isMember ? '会员中心 >' : '办理会员 >',
                                 style: TextStyle(
                                   color: AppColors.foreground,
-                                  fontSize: _ps(11) + AppScale.fontBump,
+                                  fontSize: _pt(11),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -736,7 +737,7 @@ class _MemberSection extends StatelessWidget {
                                   Text(
                                     _benefits[i].$2,
                                     style: TextStyle(
-                                      fontSize: _ps(10) + AppScale.fontBump,
+                                      fontSize: _pt(10),
                                       color: AppColors.foreground,
                                     ),
                                   ),
@@ -744,7 +745,7 @@ class _MemberSection extends StatelessWidget {
                                   Text(
                                     _benefits[i].$3,
                                     style: TextStyle(
-                                      fontSize: _ps(9) + AppScale.fontBump,
+                                      fontSize: _pt(9),
                                       color: AppColors.primary,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -836,7 +837,7 @@ class _ServiceSection extends StatelessWidget {
                 Text(
                   '我的服务',
                   style: TextStyle(
-                    fontSize: _ps(15) + AppScale.fontBump,
+                    fontSize: _pt(15),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -856,7 +857,7 @@ class _ServiceSection extends StatelessWidget {
                         Text(
                           '全部订单',
                           style: TextStyle(
-                            fontSize: _ps(11) + AppScale.fontBump,
+                            fontSize: _pt(11),
                             color: AppColors.mutedForeground,
                           ),
                         ),
@@ -982,7 +983,7 @@ class _ContentSection extends StatelessWidget {
                 Text(
                   '我的内容',
                   style: TextStyle(
-                    fontSize: _ps(15) + AppScale.fontBump,
+                    fontSize: _pt(15),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -1082,7 +1083,7 @@ class _ServiceRow extends StatelessWidget {
                             badge > 99 ? '99+' : '$badge',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: _ps(9) + AppScale.fontBump,
+                              fontSize: _pt(9),
                               fontWeight: FontWeight.bold,
                               height: 1.1,
                             ),
@@ -1097,8 +1098,8 @@ class _ServiceRow extends StatelessWidget {
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   style: TextStyle(
-                    fontSize: _ps(10) + AppScale.fontBump,
-                    color: AppColors.mutedForeground,
+                    fontSize: _pt(10),
+                    color: AppColors.foreground,
                     height: 1.2,
                   ),
                 ),
@@ -1161,7 +1162,7 @@ class _InviteBanner extends StatelessWidget {
                           Text(
                             '邀请好友',
                             style: TextStyle(
-                              fontSize: _ps(14) + AppScale.fontBump,
+                              fontSize: _pt(14),
                               fontWeight: FontWeight.bold,
                               height: 1.15,
                             ),
@@ -1169,7 +1170,7 @@ class _InviteBanner extends StatelessWidget {
                           Text(
                             '领好礼',
                             style: TextStyle(
-                              fontSize: _ps(14) + AppScale.fontBump,
+                              fontSize: _pt(14),
                               fontWeight: FontWeight.bold,
                               height: 1.15,
                             ),
@@ -1178,7 +1179,7 @@ class _InviteBanner extends StatelessWidget {
                           Text(
                             '一起开启惊喜之旅',
                             style: TextStyle(
-                              fontSize: _ps(10) + AppScale.fontBump,
+                              fontSize: _pt(10),
                               color: AppColors.foreground,
                             ),
                           ),
@@ -1193,7 +1194,7 @@ class _InviteBanner extends StatelessWidget {
                           content: Text(
                             '邀请链接已复制',
                             style: TextStyle(
-                              fontSize: _ps(14) + AppScale.fontBump,
+                              fontSize: _pt(14),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1212,7 +1213,7 @@ class _InviteBanner extends StatelessWidget {
                           '立即邀请',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: _ps(12) + AppScale.fontBump,
+                            fontSize: _pt(12),
                             fontWeight: FontWeight.w600,
                           ),
                         ),

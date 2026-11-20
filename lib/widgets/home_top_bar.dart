@@ -7,6 +7,7 @@ import '../pages/search_page.dart';
 import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
+import '../theme/page_scales.dart';
 import 'category_chip_bar.dart';
 import 'drift_bottle_backdrop.dart';
 import 'notification_sheet.dart';
@@ -22,7 +23,7 @@ class HomeTopBar extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.fromLTRB(AppScale.s(16), top + AppScale.s(8), AppScale.s(16), AppScale.s(10)),
+          padding: EdgeInsets.fromLTRB(AppScale.s(16), top + AppScale.s(8), AppScale.s(16), hmS(12)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -86,18 +87,26 @@ class HomeTopBar extends StatelessWidget {
                     boxShadow: AppColors.softShadow,
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Icon(Icons.search, size: AppScale.s(18), color: AppColors.mutedForeground),
                       SizedBox(width: AppScale.s(8)),
-                      Text(
-                        '搜索商品 / 角色 / 周边',
-                        style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground),
+                      Transform.translate(
+                        offset: Offset(0, -AppScale.s(1)),
+                        child: Text(
+                          '搜索商品 / 角色 / 周边',
+                          style: TextStyle(
+                            fontSize: AppScale.t(13),
+                            color: AppColors.mutedForeground,
+                            height: 1.0,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-              SizedBox(height: AppScale.s(6)),
+              SizedBox(height: hmS(12)),
               CategoryChipBar(
                 activeId: '',
                 compact: true,
@@ -130,7 +139,7 @@ class _NotifyButton extends StatelessWidget {
         const padding = 10.0;
         final buttonSize = AppScale.s(padding * 2 + iconSize);
         return Transform.translate(
-          offset: Offset(-buttonSize * 0.3, buttonSize * 0.1),
+          offset: Offset(-buttonSize * 0.08, buttonSize * 0.1),
           child: AppInkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(AppScale.s(999)),

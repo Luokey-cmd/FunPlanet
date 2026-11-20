@@ -49,11 +49,11 @@ class _MallPageState extends State<MallPage> {
             child: CategoryChipBar(
               activeId: _activeCategory,
               categories: mallCategoryTags,
-              scale: homeMallPageScale,
-              chipHorizontalPadding: 12.7776,
-              chipVerticalPadding: 5.4,
-              barHeight: 30.6,
-              padding: EdgeInsets.symmetric(horizontal: hmS(12)),
+              compact: true,
+              chipHorizontalPadding: 18.5,
+              chipVerticalPadding: 3.9,
+              barHeight: 33.8,
+              padding: EdgeInsets.symmetric(horizontal: AppScale.s(16)),
               onSelected: (cat) => setState(() => _activeCategory = cat.id),
             ),
           ),
@@ -123,12 +123,20 @@ class _MallHeader extends StatelessWidget {
                   boxShadow: AppColors.softShadow,
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Icon(Icons.search, size: hmS(18), color: AppColors.mutedForeground),
+                    Icon(Icons.search, size: AppScale.s(18), color: AppColors.mutedForeground),
                     SizedBox(width: hmS(8)),
-                    Text(
-                      '搜索系列 / 角色 / 品类',
-                      style: TextStyle(fontSize: hmS(13) + AppScale.fontBump, color: AppColors.mutedForeground),
+                    Transform.translate(
+                      offset: Offset(0, -AppScale.s(1)),
+                      child: Text(
+                        '搜索系列 / 角色 / 品类',
+                        style: TextStyle(
+                          fontSize: AppScale.t(13),
+                          color: AppColors.mutedForeground,
+                          height: 1.0,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -219,7 +227,7 @@ class _CouponBanner extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('新人优惠券', style: TextStyle(fontSize: hmS(15) + AppScale.fontBump, fontWeight: FontWeight.bold)),
+                  Text('新人优惠券', style: TextStyle(fontSize: hmS(19) + AppScale.fontBump, fontWeight: FontWeight.bold)),
                   SizedBox(height: hmS(6)),
                   Row(
                     children: [
@@ -231,7 +239,7 @@ class _CouponBanner extends StatelessWidget {
                   SizedBox(height: hmS(4)),
                   Text(
                     '2024.11.01 – 2024.11.30',
-                    style: TextStyle(fontSize: hmS(10) + AppScale.fontBump, color: AppColors.mutedForeground),
+                    style: TextStyle(fontSize: hmS(14) + AppScale.fontBump, color: AppColors.mutedForeground),
                   ),
                 ],
               ),
@@ -248,7 +256,7 @@ class _CouponBanner extends StatelessWidget {
                     ),
                     child: Text(
                       user.newcomerClaimed ? '已领取' : '立即领取',
-                      style: TextStyle(color: Colors.white, fontSize: hmS(12) + AppScale.fontBump, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: Colors.white, fontSize: hmS(16) + AppScale.fontBump, fontWeight: FontWeight.w600),
                     ),
                   ),
                 );
@@ -274,7 +282,7 @@ class _CouponTag extends StatelessWidget {
         color: AppColors.card.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(hmS(6)),
       ),
-      child: Text(text, style: TextStyle(fontSize: hmS(11) + AppScale.fontBump, fontWeight: FontWeight.w600, color: AppColors.primary)),
+      child: Text(text, style: TextStyle(fontSize: hmS(15) + AppScale.fontBump, fontWeight: FontWeight.w600, color: AppColors.primary)),
     );
   }
 }

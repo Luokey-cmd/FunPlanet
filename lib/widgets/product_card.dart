@@ -60,7 +60,7 @@ class _TagBadge extends StatelessWidget {
       ),
       child: Text(
         product.tag!,
-        style: TextStyle(color: style.foreground, fontSize: s(10) + AppScale.fontBump, fontWeight: FontWeight.bold),
+        style: TextStyle(color: style.foreground, fontSize: AppScale.t(10), fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -187,7 +187,7 @@ class _StaggeredCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: s(12) + AppScale.fontBump,
+                      fontSize: AppScale.t(12),
                       fontWeight: FontWeight.w600,
                       color: AppColors.foreground,
                       height: 1.3,
@@ -197,7 +197,7 @@ class _StaggeredCard extends StatelessWidget {
                   Text(
                     '¥ ${product.price.toStringAsFixed(0)}',
                     style: TextStyle(
-                      fontSize: s(14) + AppScale.fontBump,
+                      fontSize: AppScale.t(14),
                       fontWeight: FontWeight.bold,
                       color: AppColors.priceRed,
                     ),
@@ -257,7 +257,7 @@ class _MallCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: s(12) + AppScale.fontBump,
+                        fontSize: AppScale.t(12),
                         fontWeight: FontWeight.w600,
                         color: AppColors.foreground,
                       ),
@@ -268,14 +268,14 @@ class _MallCard extends StatelessWidget {
                         product.subCategory,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: s(10) + AppScale.fontBump, color: AppColors.mutedForeground),
+                        style: TextStyle(fontSize: AppScale.t(10), color: AppColors.mutedForeground),
                       ),
                     ],
                     SizedBox(height: s(6)),
                     Text(
                       '¥ ${product.price.toStringAsFixed(2)}',
                       style: TextStyle(
-                        fontSize: s(14) + AppScale.fontBump,
+                        fontSize: AppScale.t(14),
                         fontWeight: FontWeight.bold,
                         color: AppColors.priceRed,
                       ),

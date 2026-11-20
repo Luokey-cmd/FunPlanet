@@ -15,7 +15,7 @@ class StaggeredProductGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (products.isEmpty) {
-      return Text('暂无推荐商品', style: TextStyle(fontSize: _s(13) + AppScale.fontBump, color: AppColors.mutedForeground));
+      return Text('暂无推荐商品', style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground));
     }
 
     final left = <Product>[];

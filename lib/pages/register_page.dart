@@ -40,7 +40,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_agreed) {
       showTopSnackBar(
         context,
-        content: Text('请先阅读并同意用户协议', style: TextStyle(fontSize: AppScale.s(14), fontWeight: FontWeight.w600)),
+        content: Text('请先阅读并同意用户协议', style: topSnackBarTextStyle()),
       );
       return;
     }
@@ -59,7 +59,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (error != null) {
       showTopSnackBar(
         context,
-        content: Text(error, style: TextStyle(fontSize: AppScale.s(14), fontWeight: FontWeight.w600)),
+        content: Text(error, style: topSnackBarTextStyle()),
       );
       return;
     }
@@ -78,7 +78,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!mounted) return;
     showTopSnackBar(
       context,
-      content: Text('注册成功，欢迎加入趣玩星球', style: TextStyle(fontSize: AppScale.s(14), fontWeight: FontWeight.w600)),
+      content: Text('注册成功，欢迎加入趣玩星球', style: topSnackBarTextStyle()),
     );
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
@@ -157,7 +157,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     padding: EdgeInsets.only(top: AppScale.s(2)),
                     child: Text(
                       '我已阅读并同意《趣玩星球用户协议》和《隐私政策》',
-                      style: TextStyle(fontSize: authText(12), color: AppColors.mutedForeground, height: 1.4),
+                      style: TextStyle(fontSize: authText(16), color: AppColors.mutedForeground, height: 1.4),
                     ),
                   ),
                 ),
@@ -169,10 +169,10 @@ class _RegisterPageState extends State<RegisterPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('已有账号？', style: TextStyle(fontSize: authText(13), color: AppColors.mutedForeground)),
+                Text('已有账号？', style: TextStyle(fontSize: authText(17), color: AppColors.mutedForeground)),
                 AppTextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('去登录', style: TextStyle(fontSize: authText(13), fontWeight: FontWeight.w600, color: AppColors.primary)),
+                  child: Text('去登录', style: TextStyle(fontSize: authText(17), fontWeight: FontWeight.w600, color: AppColors.primary)),
                 ),
               ],
             ),

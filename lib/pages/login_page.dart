@@ -52,7 +52,7 @@ class _LoginPageState extends State<LoginPage> {
     if (error != null) {
       showTopSnackBar(
         context,
-        content: Text(error, style: TextStyle(fontSize: AppScale.s(14), fontWeight: FontWeight.w600)),
+        content: Text(error, style: topSnackBarTextStyle()),
       );
       return;
     }
@@ -106,7 +106,7 @@ class _LoginPageState extends State<LoginPage> {
                 alignment: Alignment.centerRight,
                 child: Text(
                   '演示账号：13800138000 / 123456',
-                  style: TextStyle(fontSize: authText(11), color: AppColors.mutedForeground),
+                  style: TextStyle(fontSize: authText(15), color: AppColors.mutedForeground),
                 ),
               ),
             if (!kReleaseMode) SizedBox(height: AppScale.s(10)),
@@ -116,10 +116,10 @@ class _LoginPageState extends State<LoginPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text('还没有账号？', style: TextStyle(fontSize: authText(13), color: AppColors.mutedForeground)),
+                Text('还没有账号？', style: TextStyle(fontSize: authText(17), color: AppColors.mutedForeground)),
                 AppTextButton(
                   onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterPage())),
-                  child: Text('立即注册', style: TextStyle(fontSize: authText(13), fontWeight: FontWeight.w600, color: AppColors.primary)),
+                  child: Text('立即注册', style: TextStyle(fontSize: authText(17), fontWeight: FontWeight.w600, color: AppColors.primary)),
                 ),
               ],
             ),

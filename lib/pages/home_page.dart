@@ -25,8 +25,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<Widget>? _slivers;
-
   void _claimNewcomer(UserProvider user) {
     if (user.newcomerClaimed) {
       UserFeatureSheets.showCoupons(context);
@@ -40,31 +38,25 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  List<Widget> _buildSlivers() {
-    return [
-      const SliverToBoxAdapter(child: HomeTopBar()),
-      const SliverToBoxAdapter(child: BannerCarousel()),
-      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(12))),
-      const SliverToBoxAdapter(child: DailyStarSignStrip()),
-      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(12))),
-      const SliverToBoxAdapter(child: _QuickActions()),
-      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
-      SliverToBoxAdapter(child: _NewcomerSection(onClaim: _claimNewcomer)),
-      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(24))),
-      const SliverToBoxAdapter(child: RepaintBoundary(child: _MarketSection())),
-      SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
-    ];
-  }
-
   @override
   Widget build(BuildContext context) {
-    _slivers ??= _buildSlivers();
-
     return RepaintBoundary(
       child: SparkleBackground(
         child: CustomScrollView(
           physics: const ClampingScrollPhysics(),
-          slivers: _slivers!,
+          slivers: [
+            const SliverToBoxAdapter(child: HomeTopBar()),
+            const SliverToBoxAdapter(child: BannerCarousel()),
+            SliverToBoxAdapter(child: SizedBox(height: AppScale.s(12))),
+            const SliverToBoxAdapter(child: DailyStarSignStrip()),
+            SliverToBoxAdapter(child: SizedBox(height: AppScale.s(12))),
+            const SliverToBoxAdapter(child: _QuickActions()),
+            SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
+            SliverToBoxAdapter(child: _NewcomerSection(onClaim: _claimNewcomer)),
+            SliverToBoxAdapter(child: SizedBox(height: AppScale.s(24))),
+            const SliverToBoxAdapter(child: RepaintBoundary(child: _MarketSection())),
+            SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
+          ],
         ),
       ),
     );
@@ -512,7 +504,7 @@ class _MarketSectionState extends State<_MarketSection> {
               Text('趣玩市集', style: TextStyle(fontSize: AppScale.t(18), fontWeight: FontWeight.bold)),
               AppGestureDetector(
                 onTap: () => context.read<AppTabProvider>().goTo(AppTab.mall),
-                child: Text('全部 >', style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground)),
+                child: Text('全部 >', style: TextStyle(fontSize: AppScale.t(15), color: AppColors.mutedForeground)),
               ),
             ],
           ),
@@ -536,7 +528,7 @@ class _MarketSectionState extends State<_MarketSection> {
                           style: TextStyle(
                             fontSize: AppScale.t(13),
                             fontWeight: active ? FontWeight.w600 : FontWeight.w500,
-                            color: active ? AppColors.primary : AppColors.mutedForeground,
+                            color: active ? AppColors.primary : AppColors.foreground,
                           ),
                         ),
                         SizedBox(height: AppScale.s(4)),

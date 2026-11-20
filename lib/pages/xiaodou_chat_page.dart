@@ -24,9 +24,10 @@ import '../widgets/xiaodou_product_card.dart';
 import '../widgets/click_effect/app_icon_button.dart';
 import '../widgets/click_effect/app_buttons.dart';
 import '../widgets/click_effect/app_pressable.dart';
-const _uiScale = 1.5;
-
-double _xs(double value) => AppScale.s(value * _uiScale);
+// 2026-11-20 字体规范化：本页尺寸统一走 AppScale（字号 t = 写几号是几号，
+// 布局 s = 0.8 倍）。旧版 _xs 自带 1.5 倍私自放大（实际渲染 1.2 倍），
+// 与其他页不是一套规矩，已废除；本页整体会比旧版略小一圈，属预期。
+double _xs(double value) => AppScale.t(value);
 
 Map<String, dynamic> _archiveOf(BuildContext context) {
   return context.read<StarwishProfileProvider>().profile.toAgentJson();
