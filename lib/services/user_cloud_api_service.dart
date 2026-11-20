@@ -125,11 +125,18 @@ class UserCloudApiService {
     String? nickname,
     String? avatarPath,
     bool? pushEnabled,
+    // 性别/生日/简介：传 null 表示这次不改；传空字符串表示清空（服务端同口径）。
+    String? gender,
+    String? birthday,
+    String? bio,
   }) async {
     final body = <String, dynamic>{};
     if (nickname != null) body['nickname'] = nickname;
     if (avatarPath != null) body['avatarPath'] = avatarPath;
     if (pushEnabled != null) body['pushEnabled'] = pushEnabled;
+    if (gender != null) body['gender'] = gender;
+    if (birthday != null) body['birthday'] = birthday;
+    if (bio != null) body['bio'] = bio;
     final data = await _client.patch('/api/profile', body: body, auth: true);
     return data['profile'] as Map<String, dynamic>;
   }

@@ -18,5 +18,13 @@ export function serializeProduct(p) {
     stock: p.stock ?? 100,
     isOnShelf: p.isOnShelf ?? true,
     imagePath: p.imagePath,
+    // 多图：老数据没有 imagePaths 时用主图兜底成一张，保证返回永远是数组
+    imagePaths: Array.isArray(p.imagePaths) && p.imagePaths.length > 0 ? p.imagePaths : [p.imagePath],
+    videoPath: p.videoPath ?? null,
+    brand: p.brand ?? null,
+    series: p.series ?? null,
+    rarity: p.rarity ?? null,
+    suitableFor: p.suitableFor ?? null,
+    sellingPoints: Array.isArray(p.sellingPoints) ? p.sellingPoints : [],
   };
 }

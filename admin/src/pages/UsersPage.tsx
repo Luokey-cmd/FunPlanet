@@ -64,7 +64,10 @@ function inDateRange(user: AdminUser, start: string, end: string) {
 }
 
 function statusLabel(status: string) {
-  return status === "active" ? "正常" : status;
+  if (status === "active") return "正常";
+  if (status === "disabled") return "已禁用";
+  if (status === "deleted") return "已注销";
+  return status;
 }
 
 export default function UsersPage() {
@@ -82,7 +85,7 @@ export default function UsersPage() {
     dateEnd: "",
   });
   const [detail, setDetail] = useState<AdminUser | null>(null);
-  const [form, setForm] = useState({ vipLevel: 1, points: 0, funCoins: 0 });
+  const [form, setForm] = useState({ vipLevel: 1, points: 0, funCoins: 0, growthPoints: 0, status: "active" });
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-users"],
@@ -95,6 +98,8 @@ export default function UsersPage() {
         vipLevel: form.vipLevel,
         points: form.points,
         funCoins: form.funCoins,
+        growthPoints: form.growthPoints,
+        status: form.status,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
@@ -133,7 +138,13 @@ export default function UsersPage() {
 
   const openDetail = (u: AdminUser) => {
     setDetail(u);
-    setForm({ vipLevel: u.vipLevel, points: u.points, funCoins: u.funCoins });
+    setForm({
+      vipLevel: u.vipLevel,
+      points: u.points,
+      funCoins: u.funCoins,
+      growthPoints: u.growthPoints ?? 0,
+      status: u.status ?? "active",
+    });
   };
 
   return (
@@ -284,6 +295,8 @@ export default function UsersPage() {
               <span>累计消费 ¥{detail.totalSpend.toLocaleString()}</span>
               <span>注册时间 {detail.joinDateTime ?? detail.joinDate}</span>
               <span>状态 {statusLabel(detail.status)}</span>
+              <span>成长值 {detail.growthPoints ?? 0}</span>
+              <span>最后登录 {detail.lastLoginAt ? detail.lastLoginAt.slice(0, 10) : "—"}</span>
             </div>
             <form
               className="flex flex-col gap-3"
@@ -296,6 +309,7 @@ export default function UsersPage() {
                 { key: "vipLevel" as const, label: "VIP等级", min: 1 },
                 { key: "points" as const, label: "积分", min: 0 },
                 { key: "funCoins" as const, label: "趣玩币", min: 0 },
+                { key: "growthPoints" as const, label: "成长值", min: 0 },
               ].map(({ key, label, min }) => (
                 <label key={key} className="flex flex-col gap-1 text-sm">
                   <span className="text-muted-foreground">{label}</span>
@@ -308,6 +322,17 @@ export default function UsersPage() {
                   />
                 </label>
               ))}
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">账号状态（禁用后该用户无法登录）</span>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value })}
+                  className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="active">正常</option>
+                  <option value="disabled">禁用</option>
+                </select>
+              </label>
               <button
                 type="submit"
                 disabled={saveMutation.isPending}

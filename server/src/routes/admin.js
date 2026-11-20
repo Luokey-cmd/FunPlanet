@@ -73,6 +73,7 @@ function auditActionLabel(method, p) {
   if (head === 'coupons') return `${verb}优惠券`;
   if (head === 'changelog') return `${verb}更新日志`;
   if (head === 'orders') return '更新订单状态';
+  if (head === 'after-sales') return '处理售后申请';
   if (head === 'users') return '编辑用户资料';
   if (head === 'admins') return '调整管理员账号';
   if (head === 'support') return '客服中心操作';
@@ -303,6 +304,7 @@ router.use((req, res, next) => {
   const p = req.path;
   const allowed =
     p.startsWith('/orders/') ||
+    p.startsWith('/after-sales/') ||
     p.startsWith('/support/') ||
     p.startsWith('/settings/profile') ||
     p.startsWith('/settings/password') ||
@@ -481,6 +483,16 @@ router.post('/products', adminAuthRequired, async (req, res) => {
       stock: body.stock != null ? Math.max(0, Math.trunc(Number(body.stock)) || 0) : 100,
       isOnShelf: body.isOnShelf !== false,
       imagePath: String(body.imagePath ?? ''),
+      // 多图与导购结构化字段（2026-11-20 新增）：后台传了才写；多图第一张默认与主图一致由前端保证
+      imagePaths: Array.isArray(body.imagePaths) ? body.imagePaths.map((x) => String(x)).filter(Boolean).slice(0, 9) : [],
+      videoPath: body.videoPath ? String(body.videoPath) : null,
+      brand: body.brand ? String(body.brand) : null,
+      series: body.series ? String(body.series) : null,
+      rarity: body.rarity ? String(body.rarity) : null,
+      suitableFor: body.suitableFor ? String(body.suitableFor) : null,
+      sellingPoints: Array.isArray(body.sellingPoints)
+        ? body.sellingPoints.map((x) => String(x).trim()).filter(Boolean).slice(0, 8)
+        : [],
     },
   });
   ok(res, { product: serializeProduct(product) });
@@ -508,6 +520,17 @@ router.put('/products/:id', adminAuthRequired, async (req, res) => {
         stock: body.stock != null ? Math.max(0, Math.trunc(Number(body.stock)) || 0) : undefined,
         isOnShelf: typeof body.isOnShelf === 'boolean' ? body.isOnShelf : undefined,
         imagePath: body.imagePath,
+        imagePaths: Array.isArray(body.imagePaths)
+          ? body.imagePaths.map((x) => String(x)).filter(Boolean).slice(0, 9)
+          : undefined,
+        videoPath: body.videoPath !== undefined ? (body.videoPath ? String(body.videoPath) : null) : undefined,
+        brand: body.brand !== undefined ? (body.brand ? String(body.brand) : null) : undefined,
+        series: body.series !== undefined ? (body.series ? String(body.series) : null) : undefined,
+        rarity: body.rarity !== undefined ? (body.rarity ? String(body.rarity) : null) : undefined,
+        suitableFor: body.suitableFor !== undefined ? (body.suitableFor ? String(body.suitableFor) : null) : undefined,
+        sellingPoints: Array.isArray(body.sellingPoints)
+          ? body.sellingPoints.map((x) => String(x).trim()).filter(Boolean).slice(0, 8)
+          : undefined,
       },
     });
     ok(res, { product: serializeProduct(product) });
@@ -572,11 +595,17 @@ router.get('/orders', adminAuthRequired, async (req, res) => {
       phone: o.user.phone,
       products: o.items.map((i) => `${i.name} x${i.quantity}`).join('、'),
       amount: Number(o.total),
+      freight: o.freight == null ? 0 : Number(o.freight),
       status: o.status,
       statusLabel: orderStatusLabel(o.status),
       paymentStatus: o.paymentStatus,
       date: formatChinaDateTime(o.createdAt),
       address: o.addressDetail ?? '',
+      remark: o.remark ?? null,
+      shippingCompany: o.shippingCompany ?? null,
+      trackingNo: o.trackingNo ?? null,
+      shippedAt: o.shippedAt ? o.shippedAt.toISOString() : null,
+      receivedAt: o.receivedAt ? o.receivedAt.toISOString() : null,
     })),
   });
 });
@@ -602,12 +631,18 @@ router.patch('/orders/:id/status', adminAuthRequired, async (req, res) => {
       return;
     }
 
+    // 发货时可同时带物流公司和单号（后台发货弹窗传），一起落库并钉上发货时间
+    const shippingCompany = String(req.body?.shippingCompany ?? '').trim() || null;
+    const trackingNo = String(req.body?.trackingNo ?? '').trim() || null;
     const order = await prisma.$transaction(async (tx) => {
       const updated = await tx.order.update({
         where: { id: req.params.id },
         data: {
           status,
-          ...(status === 'completed' ? { paymentStatus: 'paid' } : {}),
+          ...(status === 'completed' ? { paymentStatus: 'paid', receivedAt: new Date() } : {}),
+          ...(status === 'shipping'
+            ? { shippedAt: new Date(), shippingCompany, trackingNo }
+            : {}),
         },
       });
 
@@ -616,8 +651,10 @@ router.patch('/orders/:id/status', adminAuthRequired, async (req, res) => {
           data: {
             userId: updated.userId,
             title: '商品已发货',
-            body: `订单 ${updated.orderNo} 已发货，正在配送中，请留意查收`,
+            body: `订单 ${updated.orderNo} 已发货${trackingNo ? `，快递单号 ${trackingNo}` : ''}，正在配送中，请留意查收`,
             type: 'order',
+            targetType: 'order',
+            targetId: updated.id,
           },
         });
       } else if (status === 'completed') {
@@ -627,6 +664,8 @@ router.patch('/orders/:id/status', adminAuthRequired, async (req, res) => {
             title: '订单已送达',
             body: `订单 ${updated.orderNo} 已送达，感谢您的购买`,
             type: 'order',
+            targetType: 'order',
+            targetId: updated.id,
           },
         });
       }
@@ -671,26 +710,119 @@ router.get('/users', adminAuthRequired, async (req, res) => {
       totalSpend: u.orders.reduce((sum, o) => sum + Number(o.total), 0),
       joinDate: formatChinaDate(u.createdAt),
       joinDateTime: formatChinaDateTime(u.createdAt).replaceAll('-', '/'),
-      status: 'active',
+      // 状态读真实字段（之前这里写死 active，后台禁用了也显示正常）；老数据默认 active
+      status: u.status ?? 'active',
+      lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
+      growthPoints: u.profile?.growthPoints ?? 0,
+      vipExpireAt: u.profile?.vipExpireAt ? u.profile.vipExpireAt.toISOString() : null,
       avatarPath: isDisplayableAvatarPath(u.profile?.avatarPath) ? u.profile.avatarPath : null,
     })),
   });
 });
 
 router.patch('/users/:id/profile', adminAuthRequired, async (req, res) => {
-  const { vipLevel, points, funCoins } = req.body ?? {};
+  const { vipLevel, points, funCoins, status, growthPoints, vipExpireAt } = req.body ?? {};
   try {
+    // 账号状态在 User 表上，和资料分开改；只接受 active / disabled 两个值
+    if (status != null) {
+      if (!['active', 'disabled'].includes(status)) {
+        fail(res, 400, '无效的账号状态');
+        return;
+      }
+      await prisma.user.update({
+        where: { id: req.params.id },
+        data: { status },
+      });
+    }
     const profile = await prisma.userProfile.update({
       where: { userId: req.params.id },
       data: {
         vipLevel: vipLevel != null ? Number(vipLevel) : undefined,
         points: points != null ? Number(points) : undefined,
         funCoins: funCoins != null ? Number(funCoins) : undefined,
+        growthPoints: growthPoints != null ? Number(growthPoints) : undefined,
+        vipExpireAt:
+          vipExpireAt !== undefined ? (vipExpireAt ? new Date(vipExpireAt) : null) : undefined,
       },
     });
     ok(res, { profile });
   } catch {
     fail(res, 404, '用户不存在');
+  }
+});
+
+// 售后处理：列表 + 处理（同意/拒绝/完成）。售后单独立表后，后台不再拿「已取消」冒充售后
+router.get('/after-sales', adminAuthRequired, async (req, res) => {
+  const status = String(req.query.status ?? '').trim();
+  const where = status && status !== 'all' ? { status } : {};
+  const rows = await prisma.afterSaleRequest.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      order: { select: { orderNo: true, total: true, status: true } },
+      user: { select: { nickname: true, phone: true } },
+    },
+  });
+  ok(res, {
+    requests: rows.map((r) => ({
+      id: r.id,
+      orderId: r.orderId,
+      orderNo: r.order.orderNo,
+      orderStatus: r.order.status,
+      orderTotal: Number(r.order.total),
+      user: r.user.nickname,
+      phone: r.user.phone,
+      type: r.type,
+      reason: r.reason,
+      description: r.description,
+      amount: r.amount == null ? null : Number(r.amount),
+      status: r.status,
+      adminNote: r.adminNote ?? null,
+      date: formatChinaDateTime(r.createdAt),
+    })),
+  });
+});
+
+router.patch('/after-sales/:id/status', adminAuthRequired, async (req, res) => {
+  const status = String(req.body?.status ?? '').trim();
+  if (!['approved', 'rejected', 'completed'].includes(status)) {
+    fail(res, 400, '无效的售后状态');
+    return;
+  }
+  const adminNote = String(req.body?.adminNote ?? '').trim().slice(0, 500) || null;
+  try {
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.afterSaleRequest.update({
+        where: { id: req.params.id },
+        data: { status, adminNote },
+        include: { order: true },
+      });
+      // 售后完成且是退款类：把支付流水和订单支付状态标成已退款（模拟支付口径，即时生效）
+      if (status === 'completed') {
+        await tx.paymentTransaction.updateMany({
+          where: { orderId: row.orderId, status: 'paid' },
+          data: { status: 'refunded' },
+        });
+        await tx.order.update({
+          where: { id: row.orderId },
+          data: { paymentStatus: 'refunded' },
+        });
+      }
+      await tx.notification.create({
+        data: {
+          userId: row.userId,
+          title: '售后处理更新',
+          body: `订单 ${row.order.orderNo} 的售后申请状态：${status === 'approved' ? '已同意' : status === 'rejected' ? '已拒绝' : '已完成'}${adminNote ? `。备注：${adminNote}` : ''}`,
+          type: 'order',
+          targetType: 'order',
+          targetId: row.orderId,
+        },
+      });
+      return row;
+    });
+    ok(res, { request: { id: updated.id, status: updated.status } });
+  } catch {
+    fail(res, 404, '售后申请不存在');
   }
 });
 
@@ -707,7 +839,42 @@ function serializeCouponTemplate(c) {
     title: c.title,
     discount: Number(c.discount),
     condition: c.condition,
+    // 门槛金额是数字字段，下单只认它；condition 只给人看
+    minAmount: c.minAmount == null ? 0 : Number(c.minAmount),
+    couponType: c.couponType ?? 'fixed',
+    totalQuantity: c.totalQuantity ?? null,
+    issuedCount: c.issuedCount ?? 0,
+    perUserLimit: c.perUserLimit ?? 1,
+    claimStartAt: c.claimStartAt ? c.claimStartAt.toISOString().slice(0, 10) : null,
+    scope: c.scope ?? 'all',
+    scopeValue: c.scopeValue ?? null,
+    claimType: c.claimType ?? null,
     expireAt: c.expireAt.toISOString().slice(0, 10),
+  };
+}
+
+// 后台保存券时取门槛：传了数字就用数字，没传就从 condition 文字里兜底解析一次（和服务端老兜底同口径）
+function resolveCouponMinAmount(body) {
+  if (body.minAmount != null && body.minAmount !== '') {
+    const value = Number(body.minAmount);
+    return Number.isFinite(value) && value >= 0 ? value : 0;
+  }
+  const match = String(body.condition ?? '').match(/满(\d+(?:\.\d+)?)/);
+  return match ? Number(match[1]) : 0;
+}
+
+function readCouponExtraFields(body) {
+  return {
+    minAmount: resolveCouponMinAmount(body),
+    couponType: body.couponType ? String(body.couponType) : undefined,
+    totalQuantity:
+      body.totalQuantity != null && body.totalQuantity !== '' ? Math.max(0, Math.trunc(Number(body.totalQuantity)) || 0) || null : undefined,
+    perUserLimit:
+      body.perUserLimit != null && body.perUserLimit !== '' ? Math.max(1, Math.trunc(Number(body.perUserLimit)) || 1) : undefined,
+    claimStartAt: body.claimStartAt ? new Date(body.claimStartAt) : undefined,
+    scope: body.scope ? String(body.scope) : undefined,
+    scopeValue: body.scopeValue !== undefined ? (body.scopeValue ? String(body.scopeValue) : null) : undefined,
+    claimType: body.claimType !== undefined ? (body.claimType ? String(body.claimType) : null) : undefined,
   };
 }
 
@@ -738,7 +905,17 @@ router.post('/coupons', adminAuthRequired, async (req, res) => {
 
   try {
     const coupon = await prisma.couponTemplate.create({
-      data: { id, title, discount, condition, expireAt },
+      data: {
+        id,
+        title,
+        discount,
+        condition,
+        expireAt,
+        ...Object.fromEntries(
+          Object.entries(readCouponExtraFields(body)).filter(([, v]) => v !== undefined),
+        ),
+        issuedCount: 0,
+      },
     });
     ok(res, { coupon: serializeCouponTemplate(coupon) });
   } catch (error) {
@@ -760,6 +937,14 @@ router.put('/coupons/:id', adminAuthRequired, async (req, res) => {
         discount: body.discount != null ? Number(body.discount) : undefined,
         condition: body.condition,
         expireAt: body.expireAt ? new Date(body.expireAt) : undefined,
+        // 改门槛时：body 没带 minAmount 且也没改 condition 就不动旧值，避免把门槛误清成解析值
+        ...(body.minAmount != null || body.condition != null
+          ? { minAmount: resolveCouponMinAmount(body) }
+          : {}),
+        ...Object.fromEntries(
+          Object.entries(readCouponExtraFields(body))
+            .filter(([k, v]) => v !== undefined && k !== 'minAmount'),
+        ),
       },
     });
     ok(res, { coupon: serializeCouponTemplate(coupon) });
@@ -780,6 +965,12 @@ router.get('/banners', adminAuthRequired, async (_req, res) => {
       productId: b.productId,
       productName: b.product.name,
       sortOrder: b.sortOrder,
+      title: b.title ?? null,
+      linkType: b.linkType ?? 'product',
+      linkTarget: b.linkTarget ?? null,
+      isActive: b.isActive ?? true,
+      startsAt: b.startsAt ? b.startsAt.toISOString() : null,
+      endsAt: b.endsAt ? b.endsAt.toISOString() : null,
     })),
   });
 });
@@ -790,11 +981,18 @@ router.post('/banners', adminAuthRequired, async (req, res) => {
     fail(res, 400, '轮播图路径与关联商品不能为空');
     return;
   }
+  const body = req.body ?? {};
   const banner = await prisma.banner.create({
     data: {
       imagePath: String(imagePath),
       productId: String(productId),
       sortOrder: Number(sortOrder ?? 0),
+      title: body.title ? String(body.title) : null,
+      linkType: body.linkType ? String(body.linkType) : 'product',
+      linkTarget: body.linkTarget ? String(body.linkTarget) : null,
+      isActive: body.isActive !== false,
+      startsAt: body.startsAt ? new Date(body.startsAt) : null,
+      endsAt: body.endsAt ? new Date(body.endsAt) : null,
     },
     include: { product: true },
   });
@@ -805,6 +1003,10 @@ router.post('/banners', adminAuthRequired, async (req, res) => {
       productId: banner.productId,
       productName: banner.product.name,
       sortOrder: banner.sortOrder,
+      title: banner.title ?? null,
+      linkType: banner.linkType ?? 'product',
+      linkTarget: banner.linkTarget ?? null,
+      isActive: banner.isActive ?? true,
     },
   });
 });
@@ -818,6 +1020,12 @@ router.put('/banners/:id', adminAuthRequired, async (req, res) => {
         imagePath: body.imagePath,
         productId: body.productId,
         sortOrder: body.sortOrder != null ? Number(body.sortOrder) : undefined,
+        title: body.title !== undefined ? (body.title ? String(body.title) : null) : undefined,
+        linkType: body.linkType ? String(body.linkType) : undefined,
+        linkTarget: body.linkTarget !== undefined ? (body.linkTarget ? String(body.linkTarget) : null) : undefined,
+        isActive: typeof body.isActive === 'boolean' ? body.isActive : undefined,
+        startsAt: body.startsAt !== undefined ? (body.startsAt ? new Date(body.startsAt) : null) : undefined,
+        endsAt: body.endsAt !== undefined ? (body.endsAt ? new Date(body.endsAt) : null) : undefined,
       },
       include: { product: true },
     });
@@ -828,6 +1036,10 @@ router.put('/banners/:id', adminAuthRequired, async (req, res) => {
         productId: banner.productId,
         productName: banner.product.name,
         sortOrder: banner.sortOrder,
+        title: banner.title ?? null,
+        linkType: banner.linkType ?? 'product',
+        linkTarget: banner.linkTarget ?? null,
+        isActive: banner.isActive ?? true,
       },
     });
   } catch {

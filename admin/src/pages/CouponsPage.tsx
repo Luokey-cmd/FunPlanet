@@ -9,6 +9,9 @@ const emptyCoupon: AdminCouponCreate = {
   discount: 0,
   condition: "",
   expireAt: "",
+  minAmount: 0,
+  totalQuantity: null,
+  claimStartAt: null,
 };
 
 function nextCouponId(coupons: AdminCoupon[]): string {
@@ -72,6 +75,9 @@ export default function CouponsPage() {
       discount: coupon.discount,
       condition: coupon.condition,
       expireAt: coupon.expireAt,
+      minAmount: coupon.minAmount ?? 0,
+      totalQuantity: coupon.totalQuantity ?? null,
+      claimStartAt: coupon.claimStartAt ? coupon.claimStartAt.slice(0, 10) : null,
     });
   };
 
@@ -135,6 +141,10 @@ export default function CouponsPage() {
               </div>
               <div className="mt-4 pt-4 border-t border-border flex justify-between text-xs text-muted-foreground">
                 <span>到期 {coupon.expireAt}</span>
+                <span>
+                  门槛 ¥{coupon.minAmount ?? 0} · 已领 {coupon.issuedCount ?? 0}
+                  {coupon.totalQuantity != null ? ` / ${coupon.totalQuantity}` : ""}
+                </span>
                 <span>{coupon.id}</span>
               </div>
             </div>
@@ -185,7 +195,7 @@ export default function CouponsPage() {
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-muted-foreground">使用条件</span>
+                <span className="text-muted-foreground">使用条件（只给人看，下单按下面门槛金额算）</span>
                 <input
                   value={editing.condition}
                   onChange={(e) => setEditing({ ...editing, condition: e.target.value })}
@@ -193,6 +203,42 @@ export default function CouponsPage() {
                   className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">门槛金额（满多少可用，0 = 无门槛）</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={editing.minAmount ?? 0}
+                  onChange={(e) => setEditing({ ...editing, minAmount: Number(e.target.value) })}
+                  className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </label>
+              <div className="flex gap-3">
+                <label className="flex flex-col gap-1 text-sm flex-1">
+                  <span className="text-muted-foreground">发行总量（留空 = 不限量）</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editing.totalQuantity ?? ""}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        totalQuantity: e.target.value === "" ? null : Number(e.target.value),
+                      })
+                    }
+                    className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm flex-1">
+                  <span className="text-muted-foreground">开始领取日（可空）</span>
+                  <input
+                    value={editing.claimStartAt ?? ""}
+                    onChange={(e) => setEditing({ ...editing, claimStartAt: e.target.value || null })}
+                    placeholder="YYYY-MM-DD"
+                    className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </label>
+              </div>
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-muted-foreground">到期日 (YYYY-MM-DD)</span>
                 <input

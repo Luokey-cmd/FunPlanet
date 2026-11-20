@@ -1,4 +1,5 @@
 import { prisma } from '../db.js';
+import { currentDailyDate } from './daily-tasks.js';
 
 const DEFAULT_AVATAR = '';
 
@@ -27,6 +28,8 @@ export async function resetUserData(userId) {
         dailyShareDone: false,
         dailyBrowseRewardClaimed: false,
         dailyBrowseCount: 0,
+        dailyDate: currentDailyDate(),
+        memberCouponMonth: '',
         pushEnabled: true,
       },
       update: {
@@ -40,6 +43,8 @@ export async function resetUserData(userId) {
         dailyShareDone: false,
         dailyBrowseRewardClaimed: false,
         dailyBrowseCount: 0,
+        dailyDate: currentDailyDate(),
+        memberCouponMonth: '',
       },
     });
   });

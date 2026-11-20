@@ -259,8 +259,9 @@ export async function scheduleAiReplyToUserComment({
           authorType: 'ai_friend',
           aiFriendId: friend.id,
           // 挂到用户那条评论下面，并标明回复对象，不再变成无头的一级评论
-          parentId: parentCommentId ?? '0',
-          rootId: rootId ?? '0',
+          // 落库用空表示一级（字段已改为可空）；序列化返回时仍会转回 '0' 给 App
+          parentId: parentCommentId ?? null,
+          rootId: rootId ?? null,
           replyToUserId: replyToUserId ?? '',
           replyToUserName: replyToUserName ?? '',
           content: reply.slice(0, 500),

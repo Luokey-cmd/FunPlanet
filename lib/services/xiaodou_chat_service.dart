@@ -46,6 +46,47 @@ class XiaodouStreamEvent {
   final Map<String, String>? vision;
 }
 
+// 云端会话摘要（服务端 AiChatConversation）：和手机本地记录是两套，
+// 本地记录能改能删，云端这份是服务端在聊天时自动存的备份，换手机登录也能看。
+class CloudChatConversation {
+  const CloudChatConversation({
+    required this.id,
+    required this.title,
+    required this.messageCount,
+    required this.updatedAt,
+  });
+
+  final String id;
+  final String title;
+  final int messageCount;
+  final String updatedAt;
+
+  factory CloudChatConversation.fromJson(Map<String, dynamic> json) {
+    return CloudChatConversation(
+      id: json['id'] as String,
+      title: json['title'] as String? ?? '新对话',
+      messageCount: json['messageCount'] as int? ?? 0,
+      updatedAt: json['updatedAt'] as String? ?? '',
+    );
+  }
+}
+
+class CloudChatMessage {
+  const CloudChatMessage({required this.role, required this.content});
+
+  final String role; // user / assistant
+  final String content;
+
+  bool get isUser => role == 'user';
+
+  factory CloudChatMessage.fromJson(Map<String, dynamic> json) {
+    return CloudChatMessage(
+      role: json['role'] as String? ?? 'assistant',
+      content: json['content'] as String? ?? '',
+    );
+  }
+}
+
 class XiaodouChatService {
   XiaodouChatService({http.Client? client, TokenStorage? tokenStorage})
       : _client = client ?? http.Client(),
@@ -53,6 +94,43 @@ class XiaodouChatService {
 
   final http.Client _client;
   final TokenStorage _tokenStorage;
+
+  // 拉云端会话列表（最近 30 个，服务端按最后更新时间倒序）。
+  Future<List<CloudChatConversation>> fetchCloudConversations() async {
+    final json = await _getJson('/api/chat/conversations');
+    final list = json['conversations'] as List<dynamic>? ?? [];
+    return list
+        .map((e) => CloudChatConversation.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // 拉某个云端会话的全部消息（只读展示用）。
+  Future<List<CloudChatMessage>> fetchCloudConversation(String id) async {
+    final json = await _getJson('/api/chat/conversations/$id');
+    final conversation = json['conversation'] as Map<String, dynamic>? ?? {};
+    final list = conversation['messages'] as List<dynamic>? ?? [];
+    return list
+        .map((e) => CloudChatMessage.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // 云端历史接口的统一 GET：带登录 token，拆掉 {code,message,data} 外壳只回 data。
+  Future<Map<String, dynamic>> _getJson(String path) async {
+    final base = await ApiConfig.baseUrl();
+    final token = await _tokenStorage.loadToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('请先登录后再查看云端记录');
+    }
+    final response = await _client.get(
+      Uri.parse('$base$path'),
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(const Duration(seconds: 30));
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      throw Exception(decoded['message'] as String? ?? '加载失败 (${response.statusCode})');
+    }
+    return decoded['data'] as Map<String, dynamic>? ?? {};
+  }
 
   Stream<XiaodouStreamEvent> sendMessageStream(
     List<ChatMessage> history, {

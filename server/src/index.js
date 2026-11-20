@@ -28,6 +28,7 @@ import reviewRoutes from './routes/reviews.js';
 import aiRoutes from './routes/ai.js';
 import aiCommunityRoutes from './routes/ai-community.js';
 import { syncAllProductSales } from './utils/product-sales.js';
+import { persistChatTurn, recordGuideRecommendations } from './utils/chat-history.js';
 import { seedAiCommunityIfNeeded } from './utils/ai-community-seed.js';
 import { assertProductionConfig } from './utils/startup-check.js';
 
@@ -133,6 +134,54 @@ app.use('/api/ai-community', aiCommunityRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/changelog', changelogRoutes);
 
+// 小豆聊天历史：会话列表与某会话的消息（App 以后做「历史会话」页直接读这里；现在先保证数据有存）
+app.get('/api/chat/conversations', authRequired, async (req, res) => {
+  const rows = await prisma.aiChatConversation.findMany({
+    where: { userId: req.user.sub },
+    orderBy: { updatedAt: 'desc' },
+    take: 30,
+    include: { _count: { select: { messages: true } } },
+  });
+  res.json({
+    code: 0,
+    message: 'ok',
+    data: {
+      conversations: rows.map((c) => ({
+        id: c.id,
+        title: c.title,
+        messageCount: c._count.messages,
+        updatedAt: c.updatedAt.toISOString(),
+      })),
+    },
+  });
+});
+
+app.get('/api/chat/conversations/:id', authRequired, async (req, res) => {
+  const conversation = await prisma.aiChatConversation.findFirst({
+    where: { id: req.params.id, userId: req.user.sub },
+    include: { messages: { orderBy: { createdAt: 'asc' } } },
+  });
+  if (!conversation) {
+    res.status(404).json({ code: 404, message: '会话不存在', data: null });
+    return;
+  }
+  res.json({
+    code: 0,
+    message: 'ok',
+    data: {
+      conversation: {
+        id: conversation.id,
+        title: conversation.title,
+        messages: conversation.messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+          createdAt: m.createdAt.toISOString(),
+        })),
+      },
+    },
+  });
+});
+
 app.post('/api/chat', authRequired, async (req, res) => {
   if (!ensureApiKey(res)) return;
 
@@ -156,6 +205,13 @@ app.post('/api/chat', authRequired, async (req, res) => {
       reply = await chatCompletion([systemMessage(), ...sanitized], deepseekConfig);
     }
     res.json({ reply });
+    // 聊完落库：只存本轮一问一答，失败不影响这次响应（persistChatTurn 内部已吞错误）
+    const lastUser = [...sanitized].reverse().find((m) => m.role === 'user');
+    await persistChatTurn({
+      userId: req.user?.sub,
+      userText: lastUser?.content ?? '',
+      assistantText: reply,
+    });
   } catch (error) {
     console.error('[chat]', error);
     res.status(500).json({ code: 500, message: error.message || '对话失败', data: null });
@@ -176,6 +232,11 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
     return;
   }
 
+  // 流式回复边推边攒全文，推完把这一轮落库（聊天记录 + 导购推荐记录）
+  let assistantFullText = '';
+  let recommendedProducts = [];
+  const lastUserText = [...sanitized].reverse().find((m) => m.role === 'user')?.content ?? '';
+
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
@@ -192,12 +253,17 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
       vision: req.body?.vision && typeof req.body.vision === 'object' ? req.body.vision : null,
     })) {
       if (event.type === 'text') {
+        assistantFullText += String(event.content ?? '');
         res.write(`data: ${JSON.stringify({ type: 'text', content: event.content })}\n\n`);
       } else if (event.type === 'products' || event.type === 'fate_cards') {
+        if (Array.isArray(event.products) && event.products.length > 0) {
+          recommendedProducts = event.products;
+        }
         res.write(`data: ${JSON.stringify({ type: event.type, products: event.products, roles: event.roles ?? [] })}\n\n`);
       } else if (event.type === 'cart_confirm') {
         res.write(`data: ${JSON.stringify({ type: 'cart_confirm', products: event.products })}\n\n`);
       } else if (event.type === 'appraisal') {
+        assistantFullText += String(event.content ?? '');
         res.write(`data: ${JSON.stringify({ type: 'appraisal', content: event.content, vision: event.vision ?? null })}\n\n`);
       } else if (event.type === 'gift_note') {
         res.write(`data: ${JSON.stringify({ type: 'gift_note', content: event.content })}\n\n`);
@@ -205,6 +271,21 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
     }
     res.write('data: [DONE]\n\n');
     res.end();
+    // 落库放在响应结束之后做，不拖慢用户看到回复的速度
+    const conversation = await persistChatTurn({
+      userId: req.user?.sub,
+      userText: lastUserText,
+      assistantText: assistantFullText,
+    });
+    if (recommendedProducts.length > 0) {
+      await recordGuideRecommendations({
+        userId: req.user?.sub,
+        conversationId: conversation?.id ?? null,
+        requestText: lastUserText,
+        route: req.body?.starwish?.route ?? req.body?.starwish?.purpose ?? null,
+        products: recommendedProducts,
+      });
+    }
   } catch (error) {
     console.error('[chat/stream]', error);
     res.write(`data: ${JSON.stringify({ error: error.message || '对话失败' })}\n\n`);

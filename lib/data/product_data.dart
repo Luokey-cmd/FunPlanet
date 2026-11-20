@@ -22,6 +22,13 @@ class Product {
     this.series,
     this.imageColor,
     this.imageIcon,
+    // 下面是后端字段整改后新增的商品信息，老商品没有时为空，不影响原有展示。
+    this.imagePaths = const [],
+    this.videoPath,
+    this.brand,
+    this.rarity,
+    this.suitableFor,
+    this.sellingPoints = const [],
   });
 
   final String id;
@@ -43,6 +50,21 @@ class Product {
   final String imagePath;
   final Color? imageColor;
   final IconData? imageIcon;
+  // 多图列表（第一张应与 imagePath 主图一致）；为空时详情页只显示主图。
+  final List<String> imagePaths;
+  final String? videoPath;
+  final String? brand;
+  final String? rarity;
+  final String? suitableFor;
+  // 结构化卖点，一条一句，详情页「商品介绍」里逐条展示。
+  final List<String> sellingPoints;
+
+  // 详情页图集：优先用多图，没有多图就退回主图一张。
+  List<String> get galleryImages {
+    final imgs = imagePaths.where((e) => e.trim().isNotEmpty).toList();
+    if (imgs.isNotEmpty) return imgs;
+    return imagePath.isNotEmpty ? [imagePath] : const [];
+  }
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
@@ -61,7 +83,22 @@ class Product {
       rating: (json['rating'] as num).toDouble(),
       sales: json['sales'] as int,
       spec: json['spec'] as String?,
+      // series 字段模型里一直有，但 fromJson 以前漏读，接口返回了也用不上，这里补上。
+      series: json['series'] as String?,
       imagePath: json['imagePath'] as String,
+      // 新字段全部容忍缺失：老接口/本地缓存没有这些键时按空处理，不能抛错。
+      imagePaths: (json['imagePaths'] as List<dynamic>? ?? [])
+          .map((e) => '$e')
+          .where((e) => e.isNotEmpty)
+          .toList(),
+      videoPath: json['videoPath'] as String?,
+      brand: json['brand'] as String?,
+      rarity: json['rarity'] as String?,
+      suitableFor: json['suitableFor'] as String?,
+      sellingPoints: (json['sellingPoints'] as List<dynamic>? ?? [])
+          .map((e) => '$e')
+          .where((e) => e.isNotEmpty)
+          .toList(),
     );
   }
 }
@@ -84,12 +121,15 @@ class OrderItem {
     required this.quantity,
     this.spec,
     this.productId,
+    this.imagePath,
   });
 
   final String name;
   final int quantity;
   final String? spec;
   final String? productId;
+  // 下单时的商品图快照：商品后来改图/下架，订单里仍显示下单时的图。
+  final String? imagePath;
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
     return OrderItem(
@@ -97,6 +137,7 @@ class OrderItem {
       quantity: json['quantity'] as int,
       spec: json['spec'] as String?,
       productId: json['productId'] as String?,
+      imagePath: json['imagePath'] as String?,
     );
   }
 }
@@ -114,6 +155,14 @@ class Order {
     this.subtotal,
     this.discount = 0,
     this.reviewedProductIds = const [],
+    // 下面是后端字段整改后订单新增的信息，老订单没有时为空。
+    this.freight = 0,
+    this.remark,
+    this.shippingCompany,
+    this.trackingNo,
+    this.shippedAt,
+    this.receivedAt,
+    this.cancelReason,
   });
 
   final String id;
@@ -125,6 +174,16 @@ class Order {
   final double? subtotal;
   final double discount;
   final List<String> reviewedProductIds;
+  final double freight;
+  final String? remark;
+  // 物流：后台发货时填写，App 在订单卡上展示。
+  final String? shippingCompany;
+  final String? trackingNo;
+  final String? shippedAt;
+  final String? receivedAt;
+  final String? cancelReason;
+
+  bool get hasTracking => trackingNo != null && trackingNo!.isNotEmpty;
 
   bool isProductReviewed(String? productId) {
     if (productId == null || productId.isEmpty) return false;
@@ -145,6 +204,14 @@ class Order {
       subtotal: subtotal,
       discount: discount,
       reviewedProductIds: reviewedProductIds ?? this.reviewedProductIds,
+      // copyWith 只换状态/评价记录，物流等字段必须原样带过去，漏一个就丢一个。
+      freight: freight,
+      remark: remark,
+      shippingCompany: shippingCompany,
+      trackingNo: trackingNo,
+      shippedAt: shippedAt,
+      receivedAt: receivedAt,
+      cancelReason: cancelReason,
     );
   }
 
@@ -163,6 +230,66 @@ class Order {
       reviewedProductIds: (json['reviewedProductIds'] as List<dynamic>? ?? [])
           .map((e) => e as String)
           .toList(),
+      freight: (json['freight'] as num?)?.toDouble() ?? 0,
+      remark: json['remark'] as String?,
+      shippingCompany: json['shippingCompany'] as String?,
+      trackingNo: json['trackingNo'] as String?,
+      shippedAt: json['shippedAt'] as String?,
+      receivedAt: json['receivedAt'] as String?,
+      cancelReason: json['cancelReason'] as String?,
+    );
+  }
+}
+
+// 售后申请（对应服务端 AfterSaleRequest 表）：
+// type: refund 仅退款 / return 退货退款；
+// status: pending 待处理 / approved 已同意 / rejected 已拒绝 / completed 已完成。
+class AfterSaleRequest {
+  const AfterSaleRequest({
+    required this.id,
+    required this.orderId,
+    required this.orderNo,
+    required this.type,
+    required this.reason,
+    required this.status,
+    required this.createdAt,
+    this.description,
+    this.amount,
+    this.adminNote,
+  });
+
+  final String id;
+  final String orderId;
+  final String orderNo;
+  final String type;
+  final String reason;
+  final String? description;
+  final double? amount;
+  final String status;
+  final String? adminNote;
+  final String createdAt;
+
+  String get typeLabel => type == 'return' ? '退货退款' : '仅退款';
+
+  String get statusLabel => switch (status) {
+        'approved' => '已同意',
+        'rejected' => '已拒绝',
+        'completed' => '已完成',
+        _ => '待处理',
+      };
+
+  factory AfterSaleRequest.fromJson(Map<String, dynamic> json) {
+    return AfterSaleRequest(
+      id: json['id'] as String,
+      orderId: json['orderId'] as String,
+      orderNo: json['orderNo'] as String? ?? '',
+      type: json['type'] as String? ?? 'refund',
+      reason: json['reason'] as String? ?? '',
+      description: json['description'] as String?,
+      amount: (json['amount'] as num?)?.toDouble(),
+      status: json['status'] as String? ?? 'pending',
+      adminNote: json['adminNote'] as String?,
+      createdAt: json['createdAt'] as String? ?? '',
     );
   }
 }

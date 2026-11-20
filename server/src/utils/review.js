@@ -24,6 +24,7 @@ export function serializeReview(review, user, comments = []) {
     content: review.content,
     rating: review.rating,
     imagePaths: review.imagePaths ?? [],
+    moderationStatus: review.moderationStatus ?? 'visible',
     createdAt: formatChinaDateTime(review.createdAt),
     userNickname: user?.nickname ?? '趣玩用户',
     userAvatarPath: user?.profile?.avatarPath ?? '',
@@ -34,7 +35,8 @@ export function serializeReview(review, user, comments = []) {
 
 export async function refreshProductRating(prisma, productId) {
   const agg = await prisma.productReview.aggregate({
-    where: { productId },
+    // 评分只统计可见评价，隐藏的不算
+    where: { productId, moderationStatus: 'visible' },
     _avg: { rating: true },
     _count: { rating: true },
   });

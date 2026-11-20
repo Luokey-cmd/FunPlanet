@@ -148,6 +148,8 @@ const postInclude = {
 router.get('/feed', authRequired, async (req, res) => {
   const take = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
   const rows = await prisma.aiCommunityPost.findMany({
+    // 隐藏的动态不进信息流（moderationStatus 是 2026-11-20 新增的审核状态字段）
+    where: { moderationStatus: 'visible' },
     orderBy: { createdAt: 'desc' },
     take,
     include: postInclude,
@@ -255,6 +257,7 @@ router.post('/posts/:id/like', authRequired, async (req, res) => {
 router.post('/posts/:id/comments', authRequired, async (req, res) => {
   const postId = String(req.params.id ?? '').trim();
   const content = String(req.body?.content ?? '').trim();
+  // App 传 '0' 表示一级评论，落库转空，理由同评价评论
   let parentId = String(req.body?.parentId ?? '0').trim() || '0';
 
   if (content.length < 1) return fail(res, 400, '请输入评论内容');
@@ -266,7 +269,7 @@ router.post('/posts/:id/comments', authRequired, async (req, res) => {
   });
   if (!post) return fail(res, 404, '动态不存在');
 
-  let rootId = '0';
+  let rootId = null;
   let replyToUserId = '';
   let replyToUserName = '';
 
@@ -279,7 +282,7 @@ router.post('/posts/:id/comments', authRequired, async (req, res) => {
       },
     });
     if (!parent) return fail(res, 404, '被回复的评论不存在');
-    rootId = !parent.rootId || parent.rootId === '0' ? parent.id : parent.rootId;
+    rootId = parent.rootId && parent.rootId !== '0' ? parent.rootId : parent.id; // 兼容老数据：升级前存的 '0' 也当一级处理
     if (parent.authorType === 'user' && parent.user) {
       replyToUserId = parent.user.id;
       replyToUserName = parent.user.nickname || '用户';
@@ -294,7 +297,7 @@ router.post('/posts/:id/comments', authRequired, async (req, res) => {
       postId,
       authorType: 'user',
       userId: req.user.sub,
-      parentId,
+      parentId: parentId === '0' ? null : parentId,
       rootId,
       replyToUserId,
       replyToUserName,
@@ -321,7 +324,7 @@ router.post('/posts/:id/comments', authRequired, async (req, res) => {
   }
 
   if (replyFriend) {
-    const threadRoot = rootId !== '0' ? rootId : newComment.id;
+    const threadRoot = rootId ?? newComment.id;
     const aiRepliesInThread = await prisma.aiCommunityComment.count({
       where: { postId, rootId: threadRoot, authorType: 'ai_friend' },
     });

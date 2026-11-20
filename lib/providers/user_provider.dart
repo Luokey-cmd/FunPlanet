@@ -24,6 +24,10 @@ class UserProvider extends ChangeNotifier {
   String nickname = 'Luca123';
   String userId = '1000';
   String avatarPath = profileAvatarPath;
+  // 性别存服务端原值（male/female，空 = 未设置），生日为 yyyy-MM-dd，简介纯文本。
+  String gender = '';
+  String birthday = '';
+  String bio = '';
   int vipLevel = 1;
   int points = 0;
   int funCoins = 0;
@@ -83,6 +87,9 @@ class UserProvider extends ChangeNotifier {
         json['dailyBrowseRewardClaimed'] as bool? ?? dailyBrowseRewardClaimed;
     dailyBrowseCount = json['dailyBrowseCount'] as int? ?? dailyBrowseCount;
     pushEnabled = json['pushEnabled'] as bool? ?? pushEnabled;
+    gender = json['gender'] as String? ?? gender;
+    birthday = json['birthday'] as String? ?? birthday;
+    bio = json['bio'] as String? ?? bio;
     if (avatarPath.trim().isNotEmpty) {
       unawaited(_persistAvatar(avatarPath));
     }
@@ -147,6 +154,9 @@ class UserProvider extends ChangeNotifier {
     dailyBrowseRewardClaimed = false;
     dailyBrowseCount = 0;
     memberMonthlyCouponClaimed = false;
+    gender = '';
+    birthday = '';
+    bio = '';
     _favoriteIds.clear();
     _browseHistory.clear();
     _coupons.clear();
@@ -212,6 +222,10 @@ class UserProvider extends ChangeNotifier {
     String? avatarPath,
     List<int>? avatarBytes,
     String? avatarMimeType,
+    // 性别/生日/简介：不传就不动，传了就一起存（空字符串 = 清空）。
+    String? gender,
+    String? birthday,
+    String? bio,
   }) async {
     if (_cloudSync) {
       try {
@@ -242,6 +256,9 @@ class UserProvider extends ChangeNotifier {
         final profile = await _cloudApi.updateProfile(
           nickname: nickname,
           avatarPath: patchAvatar,
+          gender: gender,
+          birthday: birthday,
+          bio: bio,
         );
         _applyProfileJson(profile);
         notifyListeners();
@@ -252,6 +269,9 @@ class UserProvider extends ChangeNotifier {
     }
     if (nickname != null) updateNickname(nickname);
     if (avatarPath != null) updateAvatar(avatarPath);
+    if (gender != null) this.gender = gender;
+    if (birthday != null) this.birthday = birthday;
+    if (bio != null) this.bio = bio;
     return null;
   }
 

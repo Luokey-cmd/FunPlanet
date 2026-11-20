@@ -13,6 +13,8 @@ class ProductThumbnail extends StatelessWidget {
     this.borderRadius,
     this.showIcon = true,
     this.fit = BoxFit.contain,
+    // 详情页图集翻页时传当前图；不传就用商品主图，其他页面行为不变。
+    this.imagePathOverride,
   });
 
   final Product product;
@@ -21,6 +23,7 @@ class ProductThumbnail extends StatelessWidget {
   final double? borderRadius;
   final bool showIcon;
   final BoxFit fit;
+  final String? imagePathOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -28,8 +31,9 @@ class ProductThumbnail extends StatelessWidget {
     final h = height ?? AppScale.s(120);
     final radius = borderRadius ?? AppScale.s(12);
     final bgColor = product.imageColor ?? AppColors.secondary;
+    final displayPath = imagePathOverride ?? product.imagePath;
 
-    if (product.imagePath.isNotEmpty) {
+    if (displayPath.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(radius),
         child: Container(
@@ -38,7 +42,7 @@ class ProductThumbnail extends StatelessWidget {
           color: Colors.white,
           alignment: Alignment.center,
           child: ProductImage(
-            image: product.imagePath,
+            image: displayPath,
             width: w == double.infinity ? null : w,
             height: h,
             fit: fit,

@@ -17,6 +17,7 @@ function serializeArtwork(row) {
     style: row.style || '',
     imagePath: row.imagePath,
     model: row.model,
+    moderationStatus: row.moderationStatus ?? 'visible',
     createdAt: row.createdAt.toISOString(),
   };
 }

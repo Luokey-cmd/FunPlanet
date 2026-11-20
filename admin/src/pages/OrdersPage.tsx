@@ -117,7 +117,17 @@ export default function OrdersPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => adminApi.updateOrderStatus(id, status),
+    mutationFn: ({
+      id,
+      status,
+      shippingCompany,
+      trackingNo,
+    }: {
+      id: string;
+      status: string;
+      shippingCompany?: string;
+      trackingNo?: string;
+    }) => adminApi.updateOrderStatus(id, status, { shippingCompany, trackingNo }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-all"] });
@@ -141,6 +151,18 @@ export default function OrdersPage() {
   const handleAction = (orderId: string, nextStatus: string, confirmMessage: string) => {
     if (updateMutation.isPending) return;
     if (!window.confirm(confirmMessage)) return;
+    // 发货时顺手把物流公司和单号填了，一起存进订单（用户在 App 里能查到包裹）
+    if (nextStatus === "shipping") {
+      const shippingCompany = window.prompt("物流公司（可留空）：", "") ?? "";
+      const trackingNo = window.prompt("快递单号（可留空）：", "") ?? "";
+      updateMutation.mutate({
+        id: orderId,
+        status: nextStatus,
+        shippingCompany: shippingCompany || undefined,
+        trackingNo: trackingNo || undefined,
+      });
+      return;
+    }
     updateMutation.mutate({ id: orderId, status: nextStatus });
   };
 
@@ -225,6 +247,16 @@ export default function OrdersPage() {
                       </td>
                       <td className="px-5 py-4">
                         <p className="text-xs text-muted-foreground max-w-48 truncate">{order.products}</p>
+                        {order.trackingNo && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {order.shippingCompany ? `${order.shippingCompany} ` : ""}{order.trackingNo}
+                          </p>
+                        )}
+                        {order.remark && (
+                          <p className="text-xs text-muted-foreground mt-0.5 max-w-48 truncate" title={order.remark}>
+                            备注：{order.remark}
+                          </p>
+                        )}
                       </td>
                       <td className="px-5 py-4 text-sm font-semibold text-foreground">¥{order.amount}</td>
                       <td className="px-5 py-4">

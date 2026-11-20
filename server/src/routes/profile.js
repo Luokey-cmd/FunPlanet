@@ -4,6 +4,12 @@ import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
 import { resetUserData } from '../utils/reset-user.js';
 import { recordWalletLedger, serializeLedger } from '../utils/wallet-ledger.js';
+import {
+  currentDailyDate,
+  currentMonthKey,
+  ensureProfileFresh,
+  isMemberCouponClaimedThisMonth,
+} from '../utils/daily-tasks.js';
 import { isDisplayableAvatarPath, saveUserAvatar } from '../utils/avatar-media.js';
 
 const router = Router();
@@ -33,19 +39,29 @@ function serializeProfile(user, profile) {
     vipLevel: profile.vipLevel,
     avatarPath: profile.avatarPath,
     newcomerClaimed: profile.newcomerClaimed,
-    memberMonthlyCouponClaimed: profile.memberMonthlyCouponClaimed,
+    // 会员月券是否已领：一律按「本月口径」输出，不能直接透传数据库布尔值（跨月它还是上个月的真）
+    memberMonthlyCouponClaimed: isMemberCouponClaimedThisMonth(profile),
     dailyCheckInDone: profile.dailyCheckInDone,
     dailyShareDone: profile.dailyShareDone,
     dailyBrowseRewardClaimed: profile.dailyBrowseRewardClaimed,
     dailyBrowseCount: profile.dailyBrowseCount,
     pushEnabled: profile.pushEnabled,
+    // 新增资料字段：性别 / 生日 / 简介 / 成长值 / 会员到期 / 每日日期，老 App 不读这些键、不受影响
+    gender: profile.gender ?? null,
+    birthday: profile.birthday ? profile.birthday.toISOString().slice(0, 10) : null,
+    bio: profile.bio ?? null,
+    growthPoints: profile.growthPoints ?? 0,
+    vipExpireAt: profile.vipExpireAt ? profile.vipExpireAt.toISOString() : null,
+    dailyDate: profile.dailyDate ?? '',
+    memberCouponMonth: profile.memberCouponMonth ?? '',
   };
 }
 
 async function loadProfileBundle(userId) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return null;
-  const profile = await ensureUserProfile(userId);
+  // 每次读资料先过新鲜度：跨天/跨月时先把每日与月券状态清零，调用方拿到的永远是今天的口径
+  const profile = await ensureProfileFresh(userId);
   return { user, profile };
 }
 
@@ -74,6 +90,9 @@ router.patch('/', authRequired, async (req, res) => {
   const nickname = req.body?.nickname != null ? String(req.body.nickname).trim() : null;
   const avatarPath = req.body?.avatarPath != null ? String(req.body.avatarPath).trim() : null;
   const pushEnabled = req.body?.pushEnabled;
+  const gender = req.body?.gender != null ? String(req.body.gender).trim() : null;
+  const bio = req.body?.bio != null ? String(req.body.bio).trim() : null;
+  const birthdayRaw = req.body?.birthday != null ? String(req.body.birthday).trim() : null;
 
   const bundle = await loadProfileBundle(req.user.sub);
   if (!bundle) return fail(res, 404, '用户不存在');
@@ -96,6 +115,17 @@ router.patch('/', authRequired, async (req, res) => {
     }
   }
   if (typeof pushEnabled === 'boolean') profileData.pushEnabled = pushEnabled;
+  if (gender != null) profileData.gender = gender || null;
+  if (bio != null) profileData.bio = bio ? bio.slice(0, 200) : null;
+  if (birthdayRaw != null) {
+    if (!birthdayRaw) {
+      profileData.birthday = null;
+    } else {
+      const parsed = new Date(birthdayRaw);
+      if (Number.isNaN(parsed.getTime())) return fail(res, 400, '生日格式不正确');
+      profileData.birthday = parsed;
+    }
+  }
 
   const profile = Object.keys(profileData).length
     ? await prisma.userProfile.update({ where: { userId: req.user.sub }, data: profileData })
@@ -143,6 +173,8 @@ router.post('/actions/:action', authRequired, async (req, res) => {
           walletType: 'points',
           amount: 50,
           title: '每日签到',
+          refType: 'checkin',
+          refId: currentDailyDate(),
         });
         return next;
       });
@@ -160,6 +192,8 @@ router.post('/actions/:action', authRequired, async (req, res) => {
           walletType: 'coins',
           amount: 20,
           title: '分享奖励',
+          refType: 'daily_share',
+          refId: currentDailyDate(),
         });
         return next;
       });
@@ -178,6 +212,8 @@ router.post('/actions/:action', authRequired, async (req, res) => {
           walletType: 'coins',
           amount: 30,
           title: '每日任务',
+          refType: 'daily_browse',
+          refId: currentDailyDate(),
         });
         return next;
       });
@@ -204,13 +240,15 @@ router.post('/actions/:action', authRequired, async (req, res) => {
         await tx.userCoupon.upsert({
           where: { userId_templateId: { userId: req.user.sub, templateId } },
           create: { userId: req.user.sub, templateId, used: false },
-          update: { used: false, claimedAt: new Date() },
+          update: { used: false, usedAt: null, orderId: null, claimedAt: new Date() },
         });
         await recordWalletLedger(tx, {
           userId: req.user.sub,
           walletType: 'points',
           amount: -cost,
           title: '积分兑换优惠券',
+          refType: 'coupon_template',
+          refId: templateId,
         });
         return next;
       });
@@ -233,6 +271,8 @@ router.post('/actions/:action', authRequired, async (req, res) => {
           walletType: 'coins',
           amount: -cost,
           title: '开通趣玩会员',
+          refType: 'vip',
+          refId: `level_${targetLevel}`,
         });
         return next;
       });

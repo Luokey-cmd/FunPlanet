@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../data/product_data.dart';
 import '../providers/order_provider.dart';
@@ -8,6 +9,7 @@ import '../theme/app_scale.dart';
 import '../utils/snackbar_utils.dart';
 import '../widgets/notification_sheet.dart';
 import '../widgets/product_image.dart';
+import '../widgets/starwish_dossier_sheet.dart';
 import '../widgets/sparkle_background.dart';
 import '../widgets/user_avatar_image.dart';
 import 'orders_sheet.dart';
@@ -38,9 +40,9 @@ class ProfilePage extends StatelessWidget {
           SliverToBoxAdapter(child: SizedBox(height: _ps(16))),
           SliverToBoxAdapter(child: _ServiceSection()),
           SliverToBoxAdapter(child: SizedBox(height: _ps(16))),
+          SliverToBoxAdapter(child: _ContentSection()),
+          SliverToBoxAdapter(child: SizedBox(height: _ps(16))),
           SliverToBoxAdapter(child: _InviteBanner()),
-          SliverToBoxAdapter(child: SizedBox(height: _ps(12))),
-          SliverToBoxAdapter(child: _AiFeatureEntries()),
           SliverToBoxAdapter(child: SizedBox(height: _ps(24))),
         ],
       ),
@@ -88,9 +90,51 @@ class _ProfileHeader extends StatelessWidget {
             },
           ),
           SizedBox(width: _ps(10)),
-          _HexIcon(
-            icon: Icons.notifications_outlined,
-            onTap: () => NotificationSheet.show(context),
+          // 消息铃铛带未读角标：数的是 UserProvider 里的未读通知数，
+          // 与首页顶栏用的是同一个数；0 条不显示，避免空角标占位。
+          Consumer<UserProvider>(
+            builder: (context, user, _) {
+              final unread = user.unreadNotificationCount;
+              return Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  _HexIcon(
+                    icon: Icons.notifications_outlined,
+                    onTap: () => NotificationSheet.show(context),
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      top: _ps(-4),
+                      right: _ps(-4),
+                      child: Container(
+                        constraints: BoxConstraints(
+                          minWidth: _ps(16),
+                          minHeight: _ps(16),
+                        ),
+                        padding: EdgeInsets.symmetric(horizontal: _ps(4)),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE53935),
+                          borderRadius: BorderRadius.circular(_ps(999)),
+                          border: Border.all(
+                            color: Colors.white,
+                            width: _ps(1.2),
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          unread > 99 ? '99+' : '$unread',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: _ps(9) + AppScale.fontBump,
+                            fontWeight: FontWeight.bold,
+                            height: 1.1,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -256,7 +300,45 @@ class _UserCard extends StatelessWidget {
                                         color: Colors.white70,
                                       ),
                                     ),
-                                    SizedBox(width: _ps(4)),
+                                    // 点小图标复制 ID（加好友/联系客服时常用），
+                                    // 不走整行的编辑资料跳转，所以单独给个点击区。
+                                    AppGestureDetector(
+                                      onTap: () {
+                                        Clipboard.setData(
+                                          ClipboardData(
+                                            text: '${user.userId}',
+                                          ),
+                                        );
+                                        showTopSnackBar(
+                                          context,
+                                          content: Text(
+                                            'ID 已复制',
+                                            style: TextStyle(
+                                              fontSize:
+                                                  _ps(12) + AppScale.fontBump,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      child: Padding(
+                                        padding: EdgeInsets.all(_ps(3)),
+                                        child: Icon(
+                                          Icons.copy_outlined,
+                                          size: _ps(11),
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: _ps(2)),
+                                    // 原来只有一个箭头，用户看不出点进去是编辑资料，补明文
+                                    Text(
+                                      '编辑资料',
+                                      style: TextStyle(
+                                        fontSize: _ps(11) + AppScale.fontBump,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
                                     Icon(
                                       Icons.chevron_right,
                                       size: _ps(14),
@@ -301,6 +383,8 @@ class _UserCard extends StatelessWidget {
                           label: '积分',
                           value: _fmt(user.points),
                           iconPath: profileStatIconPaths['points'],
+                          // 数字下面带下一步：0 分时告诉用户去哪赚，别只摆个 0
+                          subLabel: user.points == 0 ? '签到得积分' : '查看明细',
                           onTap: () =>
                               UserFeatureSheets.handleStatBar(context, '积分'),
                         ),
@@ -308,6 +392,7 @@ class _UserCard extends StatelessWidget {
                           label: '趣玩币',
                           value: _fmt(user.funCoins),
                           iconPath: profileStatIconPaths['coins'],
+                          subLabel: '查看明细',
                           onTap: () =>
                               UserFeatureSheets.handleStatBar(context, '趣玩币'),
                         ),
@@ -316,6 +401,8 @@ class _UserCard extends StatelessWidget {
                           value: _fmt(user.couponCount),
                           iconPath: profileStatIconPaths['coupon'],
                           showBorder: false,
+                          subLabel: _couponHint(user).$1,
+                          subLabelWarn: _couponHint(user).$2,
                           onTap: () =>
                               UserFeatureSheets.handleStatBar(context, '优惠券'),
                         ),
@@ -335,6 +422,28 @@ class _UserCard extends StatelessWidget {
     if (n >= 10000) return '${(n / 10000).toStringAsFixed(0)}万+';
     return '$n';
   }
+
+  // 优惠券格子的小字：优先提醒快到期的券（7 天内到期标橙色），没有临期券就报可用张数。
+  // 输入是当前用户，输出 (文案, 是否警示色)。expire 是 '2025-12-31' 这样的字符串，
+  // 解析不了就退回只报张数——这里绝不能因为一条脏数据让整个卡片报错。
+  (String, bool) _couponHint(UserProvider user) {
+    final avail = user.coupons.where((c) => !c.used).toList();
+    if (avail.isEmpty) return ('暂无可用券', false);
+    DateTime? nearest;
+    for (final c in avail) {
+      final d = DateTime.tryParse(c.expire);
+      if (d != null && (nearest == null || d.isBefore(nearest))) {
+        nearest = d;
+      }
+    }
+    if (nearest != null) {
+      final days = nearest.difference(DateTime.now()).inDays;
+      if (days < 0) return ('有券已过期', true);
+      if (days == 0) return ('今天有券到期', true);
+      if (days <= 7) return ('$days 天后有券到期', true);
+    }
+    return ('共 ${avail.length} 张可用', false);
+  }
 }
 
 class _StatCell extends StatelessWidget {
@@ -344,6 +453,8 @@ class _StatCell extends StatelessWidget {
     this.iconPath,
     this.showBorder = true,
     this.onTap,
+    this.subLabel,
+    this.subLabelWarn = false,
   });
 
   final String label;
@@ -351,6 +462,12 @@ class _StatCell extends StatelessWidget {
   final String? iconPath;
   final bool showBorder;
   final VoidCallback? onTap;
+
+  // 数字下方的小字（下一步提示，如「签到得积分」「3 天后有券到期」），可空
+  final String? subLabel;
+
+  // 小字是否用警示色（快过期这类需要用户注意的才用）
+  final bool subLabelWarn;
 
   @override
   Widget build(BuildContext context) {
@@ -408,6 +525,18 @@ class _StatCell extends StatelessWidget {
                     fontSize: _ps(11) + AppScale.fontBump,
                   ),
                 ),
+                if (subLabel != null) ...[
+                  SizedBox(height: _ps(1)),
+                  Text(
+                    subLabel!,
+                    style: TextStyle(
+                      color: subLabelWarn
+                          ? const Color(0xFFEA580C)
+                          : AppColors.foreground.withValues(alpha: 0.45),
+                      fontSize: _ps(9) + AppScale.fontBump,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -418,12 +547,14 @@ class _StatCell extends StatelessWidget {
 }
 
 class _MemberSection extends StatelessWidget {
+  // 第三个元素是权益的数值小字：只写名字用户感知不到值不值，
+  // 数值与会员权益说明页（showMemberBenefits）里的文案保持一致，改一处要同步改另一处。
   static const _benefits = [
-    ('assets/images/icon_pf_monthly_coupon.png', '每月赠券'),
-    ('assets/images/icon_pf_points_boost.png', '积分加成'),
-    ('assets/images/icon_pf_discount.png', '专属折扣'),
-    ('assets/images/icon_pf_birthday_gift.png', '生日礼包'),
-    ('assets/images/icon_pf_priority_shipping.png', '优先发货'),
+    ('assets/images/icon_pf_monthly_coupon.png', '每月赠券', '满99减20'),
+    ('assets/images/icon_pf_points_boost.png', '积分加成', '购物×1.5'),
+    ('assets/images/icon_pf_discount.png', '专属折扣', '指定95折'),
+    ('assets/images/icon_pf_birthday_gift.png', '生日礼包', '+50趣玩币'),
+    ('assets/images/icon_pf_priority_shipping.png', '优先发货', '24h内发出'),
   ];
 
   @override
@@ -513,12 +644,22 @@ class _MemberSection extends StatelessWidget {
                               ),
                             ),
                             SizedBox(height: _ps(2)),
-                            Text(
-                              '尊享专属权益，解锁更多惊喜福利',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.75),
-                                fontSize: _ps(10) + AppScale.fontBump,
-                              ),
+                            // 副标题不再放空话：没开通的直接报价格，已开通的报状态。
+                            // 会员门槛是 VIP2（memberTargetVipLevel），价格 memberSubscribeCoinPrice 趣玩币/月。
+                            Consumer<UserProvider>(
+                              builder: (context, user, _) {
+                                final isMember =
+                                    user.vipLevel >= memberTargetVipLevel;
+                                return Text(
+                                  isMember
+                                      ? '会员生效中 · 5 项权益已解锁'
+                                      : '$memberSubscribeCoinPrice 趣玩币/月 · 开通即享 5 项权益',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.75),
+                                    fontSize: _ps(10) + AppScale.fontBump,
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -599,6 +740,15 @@ class _MemberSection extends StatelessWidget {
                                       color: AppColors.foreground,
                                     ),
                                   ),
+                                  SizedBox(height: _ps(1)),
+                                  Text(
+                                    _benefits[i].$3,
+                                    style: TextStyle(
+                                      fontSize: _ps(9) + AppScale.fontBump,
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -638,16 +788,20 @@ class _SparkleStar extends StatelessWidget {
 }
 
 class _ServiceSection extends StatelessWidget {
+  // 上面 5 个是订单状态：补上了原来缺的待付款、待评价；
+  // 「我的订单」升到卡头当「全部订单」入口，「已完成」在全部订单里看，不再占格子。
   static const _row1 = [
-    ('assets/images/icon_pf_my_orders.png', '我的订单'),
+    ('assets/images/icon_pf_to_pay.png', '待付款'),
     ('assets/images/icon_pf_to_ship.png', '待发货'),
     ('assets/images/icon_pf_to_receive.png', '待收货'),
-    ('assets/images/icon_pf_completed.png', '已完成'),
+    ('assets/images/icon_pf_to_review.png', '待评价'),
     ('assets/images/icon_pf_after_sales.png', '售后/退款'),
   ];
+
+  // 下面 5 个是工具：去掉与资产栏重复的优惠券、趣玩币，换进「我的钱包」，
+  // 正好 5+5（hz 2026-11-20 拍板）。钱包是三种资产的总入口，见 UserFeatureSheets.showWallet。
   static const _row2 = [
-    ('assets/images/icon_pf_coupons.png', '优惠券'),
-    ('assets/images/icon_pf_coin_details.png', '趣玩币'),
+    ('assets/images/icon_pf_wallet.png', '我的钱包'),
     ('assets/images/icon_pf_address.png', '地址管理'),
     ('assets/images/icon_pf_favorites.png', '收藏夹'),
     ('assets/images/icon_pf_history.png', '浏览记录'),
@@ -686,16 +840,55 @@ class _ServiceSection extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const Spacer(),
+                // 「我的订单」的新位置：卡头右侧的全部订单入口，点开是不过滤的订单列表
+                AppInkWell(
+                  onTap: () => OrdersSheet.show(context),
+                  borderRadius: BorderRadius.circular(_ps(6)),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: _ps(4),
+                      vertical: _ps(2),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '全部订单',
+                          style: TextStyle(
+                            fontSize: _ps(11) + AppScale.fontBump,
+                            color: AppColors.mutedForeground,
+                          ),
+                        ),
+                        Icon(
+                          Icons.chevron_right,
+                          size: _ps(13),
+                          color: AppColors.mutedForeground,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
             SizedBox(height: _ps(14)),
             Consumer<OrderProvider>(
               builder: (context, orders, _) {
+                // 角标只数各自状态：待付款数 pending、待发货数 paid，
+                // 别再用旧的混合数（待付款会被误算进待发货）。
                 final badgeCounts = <String, int>{};
-                final pendingCount = orders.pendingCount;
-                final shippingCount = orders.shippingCount;
-                if (pendingCount > 0) badgeCounts['待发货'] = pendingCount;
-                if (shippingCount > 0) badgeCounts['待收货'] = shippingCount;
+                if (orders.unpaidCount > 0) {
+                  badgeCounts['待付款'] = orders.unpaidCount;
+                }
+                if (orders.toShipCount > 0) {
+                  badgeCounts['待发货'] = orders.toShipCount;
+                }
+                if (orders.shippingCount > 0) {
+                  badgeCounts['待收货'] = orders.shippingCount;
+                }
+                if (orders.reviewCount > 0) {
+                  badgeCounts['待评价'] = orders.reviewCount;
+                }
                 return _ServiceRow(
                   items: _row1,
                   badgeCounts: badgeCounts,
@@ -714,6 +907,91 @@ class _ServiceSection extends StatelessWidget {
             _ServiceRow(
               items: _row2,
               onTap: (label) => UserFeatureSheets.handleService(context, label),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// 「我的内容」栏（2026-11-20 定稿新加）：放用户自己产生的内容——
+// 社区帖子、AI 绘画、小豆的星愿档案、买到手的盒柜、写过的评价。
+// 以前 AI 社区/绘画只有页面最底下两张大图卡，进了社区也找不到「我的」东西；
+// 现在收成一行 5 个入口，大图卡已删除（一处入口只出现一次）。
+class _ContentSection extends StatelessWidget {
+  static const _items = [
+    ('assets/images/icon_pf_community.png', '我的社区'),
+    ('assets/images/icon_pf_ai_paint.png', 'AI绘画'),
+    ('assets/images/icon_pf_starwish.png', '星愿档案'),
+    ('assets/images/icon_pf_cabinet.png', '我的盒柜'),
+    ('assets/images/icon_pf_my_reviews.png', '我的评价'),
+  ];
+
+  // 每个入口都落到已有的页面/弹层，不新建页面：
+  // 社区和绘画是现成整页；星愿档案复用小豆聊天页同款档案弹层；
+  // 盒柜是按订单汇藏品的弹层；我的评价复用订单列表（只看已评价订单）。
+  void _handleTap(BuildContext context, String label) {
+    switch (label) {
+      case '我的社区':
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AiCommunityPage()),
+        );
+      case 'AI绘画':
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AiPaintPage()),
+        );
+      case '星愿档案':
+        showStarwishDossierSheet(context);
+      case '我的盒柜':
+        UserFeatureSheets.showCollectionCabinet(context);
+      case '我的评价':
+        OrdersSheet.show(context, filterLabel: '我的评价');
+      default:
+        break;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: _ps(16)),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(_ps(16), _ps(14), _ps(16), _ps(16)),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(_ps(16)),
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+          boxShadow: AppColors.cardShadow,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SizedBox(
+                  width: _ps(14),
+                  height: _ps(14),
+                  child: CustomPaint(
+                    painter: _TitleStarPainter(color: AppColors.primary),
+                  ),
+                ),
+                SizedBox(width: _ps(6)),
+                Text(
+                  '我的内容',
+                  style: TextStyle(
+                    fontSize: _ps(15) + AppScale.fontBump,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: _ps(14)),
+            _ServiceRow(
+              items: _items,
+              onTap: (label) => _handleTap(context, label),
             ),
           ],
         ),
@@ -960,81 +1238,3 @@ class _InviteBanner extends StatelessWidget {
   }
 }
 
-class _AiFeatureEntries extends StatelessWidget {
-  static const _entryAspectRatio = 16 / 9;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: _ps(16)),
-      child: Row(
-        children: [
-          Expanded(
-            child: _AiEntryCard(
-              imagePath: aiPaintEntryPath,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AiPaintPage()),
-              ),
-            ),
-          ),
-          SizedBox(width: _ps(10)),
-          Expanded(
-            child: _AiEntryCard(
-              imagePath: aiCommunityEntryPath,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AiCommunityPage()),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AiEntryCard extends StatelessWidget {
-  const _AiEntryCard({required this.imagePath, required this.onTap});
-
-  final String imagePath;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: AppInkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(_ps(12)),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(_ps(12)),
-            border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
-            boxShadow: AppColors.cardShadow,
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(_ps(12)),
-            child: AspectRatio(
-              aspectRatio: _AiFeatureEntries._entryAspectRatio,
-              child: Image.asset(
-                imagePath,
-                fit: BoxFit.cover,
-                filterQuality: FilterQuality.high,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  color: AppColors.muted,
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.image_not_supported_outlined,
-                    size: _ps(28),
-                    color: AppColors.mutedForeground,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

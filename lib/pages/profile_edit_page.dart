@@ -24,7 +24,11 @@ class ProfileEditPage extends StatefulWidget {
 
 class _ProfileEditPageState extends State<ProfileEditPage> {
   late final TextEditingController _nameController;
+  late final TextEditingController _bioController;
   late String _selectedAvatar;
+  // 性别存服务端原值：'' 未设置 / 'male' 男 / 'female' 女；生日为 yyyy-MM-dd，空 = 未设置。
+  late String _gender;
+  late String _birthday;
   Uint8List? _pendingAvatarBytes;
   String? _pendingAvatarMime;
 
@@ -33,13 +37,31 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     super.initState();
     final user = context.read<UserProvider>();
     _nameController = TextEditingController(text: user.nickname);
+    _bioController = TextEditingController(text: user.bio);
     _selectedAvatar = user.avatarPath;
+    _gender = user.gender;
+    _birthday = user.birthday;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _bioController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickBirthday() async {
+    final now = DateTime.now();
+    final initial = DateTime.tryParse(_birthday) ?? DateTime(2000, 1, 1);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isAfter(now) ? now : initial,
+      firstDate: DateTime(1950, 1, 1),
+      lastDate: now,
+    );
+    if (picked == null) return;
+    String two(int v) => v.toString().padLeft(2, '0');
+    setState(() => _birthday = '${picked.year}-${two(picked.month)}-${two(picked.day)}');
   }
 
   Future<void> _pickAvatar() async {
@@ -137,6 +159,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       avatarPath: _selectedAvatar,
       avatarBytes: _pendingAvatarBytes,
       avatarMimeType: _pendingAvatarMime,
+      gender: _gender,
+      birthday: _birthday,
+      bio: _bioController.text.trim(),
     );
     if (!mounted) return;
     if (error != null) {
@@ -158,6 +183,30 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       color: AppColors.card,
       borderRadius: BorderRadius.circular(AppScale.s(12)),
       border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+    );
+  }
+
+  // 性别选项：选中是紫底白字，未选中是卡片底色，和全 App 的小标签风格一致。
+  Widget _genderChip(String value, String label) {
+    final selected = _gender == value;
+    return AppGestureDetector(
+      onTap: () => setState(() => _gender = value),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: AppScale.s(18), vertical: AppScale.s(8)),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.card,
+          borderRadius: BorderRadius.circular(AppScale.s(999)),
+          border: Border.all(color: selected ? AppColors.primary : AppColors.border.withValues(alpha: 0.7)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: AppScale.t(14),
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppColors.foreground,
+          ),
+        ),
+      ),
     );
   }
 
@@ -241,6 +290,81 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                       maxLength: 16,
                       decoration: InputDecoration(
                         hintText: '请输入昵称',
+                        filled: true,
+                        fillColor: AppColors.card,
+                        counterText: '',
+                        contentPadding: EdgeInsets.symmetric(horizontal: AppScale.s(14), vertical: AppScale.s(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppScale.s(12)),
+                          borderSide: BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppScale.s(12)),
+                          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.7)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppScale.s(12)),
+                          borderSide: BorderSide(color: AppColors.primary, width: AppScale.s(1.5)),
+                        ),
+                      ),
+                      style: TextStyle(fontSize: AppScale.t(15)),
+                    ),
+                    SizedBox(height: AppScale.s(24)),
+                    Text('性别', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
+                    SizedBox(height: AppScale.s(10)),
+                    Row(
+                      children: [
+                        _genderChip('', '保密'),
+                        SizedBox(width: AppScale.s(10)),
+                        _genderChip('male', '男'),
+                        SizedBox(width: AppScale.s(10)),
+                        _genderChip('female', '女'),
+                      ],
+                    ),
+                    SizedBox(height: AppScale.s(24)),
+                    Text('生日', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
+                    SizedBox(height: AppScale.s(10)),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: AppScale.s(14), vertical: AppScale.s(12)),
+                      decoration: _fieldBoxDecoration(),
+                      child: Row(
+                        children: [
+                          Text(
+                            _birthday.isEmpty ? '未设置' : _birthday,
+                            style: TextStyle(
+                              fontSize: AppScale.t(14),
+                              color: _birthday.isEmpty ? AppColors.mutedForeground : AppColors.foreground,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (_birthday.isNotEmpty)
+                            AppGestureDetector(
+                              onTap: () => setState(() => _birthday = ''),
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: AppScale.s(6), vertical: AppScale.s(4)),
+                                child: Text('清除', style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground)),
+                              ),
+                            ),
+                          AppGestureDetector(
+                            onTap: _pickBirthday,
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: AppScale.s(4), vertical: AppScale.s(4)),
+                              child: Text('选择日期', style: TextStyle(fontSize: AppScale.t(14), color: AppColors.primary, fontWeight: FontWeight.w600)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: AppScale.s(24)),
+                    Text('简介', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
+                    SizedBox(height: AppScale.s(10)),
+                    AppTextField(
+                      controller: _bioController,
+                      maxLength: 200,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: '介绍一下自己吧（选填）',
                         filled: true,
                         fillColor: AppColors.card,
                         counterText: '',

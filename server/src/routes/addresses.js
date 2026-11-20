@@ -5,14 +5,42 @@ import { fail, ok } from '../utils/response.js';
 
 const router = Router();
 
+// 地址展示文字拼法：省+市+区+detail(街道门牌)。老地址没有省市区字段（空文字），拼出来就是原来的 detail，不变样
+export function composeDetail(row) {
+  const parts = [row.province, row.city, row.district].filter(Boolean).join('');
+  const detail = row.detail ?? '';
+  if (parts && detail && !detail.startsWith(parts)) return parts + detail;
+  return detail || parts;
+}
+
 function serializeAddress(row) {
   return {
     id: row.id,
     name: row.name,
     phone: row.phone,
-    detail: row.detail,
+    // detail 保持整段文字返回（老 App 只读这个）；province/city/district 是拆开的新字段，新页面可直接用
+    detail: composeDetail(row),
+    province: row.province ?? '',
+    city: row.city ?? '',
+    district: row.district ?? '',
+    streetDetail: row.detail ?? '',
     isDefault: row.isDefault,
   };
+}
+
+// 从请求里取地址字段：带省市区时 detail 只存街道段；老 App 只传整段 detail 时原样存、省市区留空
+function readAddressParts(body) {
+  const province = String(body?.province ?? '').trim();
+  const city = String(body?.city ?? '').trim();
+  const district = String(body?.district ?? '').trim();
+  let detail = String(body?.detail ?? '').trim();
+  if (province || city || district) {
+    const prefix = province + city + district;
+    if (detail.startsWith(prefix)) detail = detail.slice(prefix.length);
+    const street = String(body?.streetDetail ?? '').trim();
+    if (street) detail = street;
+  }
+  return { province, city, district, detail };
 }
 
 function validateAddressInput(name, phone, detail) {
@@ -33,7 +61,7 @@ router.get('/', authRequired, async (req, res) => {
 router.post('/', authRequired, async (req, res) => {
   const name = String(req.body?.name ?? '').trim();
   const phone = String(req.body?.phone ?? '').trim();
-  const detail = String(req.body?.detail ?? '').trim();
+  const { province, city, district, detail } = readAddressParts(req.body);
   const isDefault = Boolean(req.body?.isDefault);
 
   const inputError = validateAddressInput(name, phone, detail);
@@ -53,6 +81,9 @@ router.post('/', authRequired, async (req, res) => {
         name,
         phone,
         detail,
+        province,
+        city,
+        district,
         isDefault: isDefault || count === 0,
       },
     });
@@ -86,7 +117,7 @@ router.put('/:id', authRequired, async (req, res) => {
   const id = String(req.params.id ?? '').trim();
   const name = String(req.body?.name ?? '').trim();
   const phone = String(req.body?.phone ?? '').trim();
-  const detail = String(req.body?.detail ?? '').trim();
+  const { province, city, district, detail } = readAddressParts(req.body);
   const isDefault = Boolean(req.body?.isDefault);
 
   const existing = await prisma.address.findFirst({
@@ -106,7 +137,7 @@ router.put('/:id', authRequired, async (req, res) => {
     }
     return tx.address.update({
       where: { id },
-      data: { name, phone, detail, isDefault: isDefault || existing.isDefault },
+      data: { name, phone, detail, province, city, district, isDefault: isDefault || existing.isDefault },
     });
   });
 

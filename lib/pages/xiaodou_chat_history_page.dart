@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../models/xiaodou_chat_session.dart';
 import '../providers/xiaodou_chat_provider.dart';
+import 'xiaodou_cloud_history_page.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../utils/snackbar_utils.dart';
@@ -174,6 +175,11 @@ class _XiaodouChatHistoryPageState extends State<XiaodouChatHistoryPage> {
                         '聊天记录',
                         style: TextStyle(fontSize: _xs(17) + AppScale.fontBump, fontWeight: FontWeight.bold, color: AppColors.foreground),
                       ),
+                    ),
+                    // 云端记录入口：服务端自动存的聊天备份（只读），和下面的本地记录分开。
+                    AppIconButton(
+                      onPressed: () => XiaodouCloudHistoryPage.open(context),
+                      icon: Icon(Icons.cloud_outlined, color: AppColors.foreground, size: _xs(22)),
                     ),
                     if (sessions.isNotEmpty)
                       AppTextButton(

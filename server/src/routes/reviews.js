@@ -12,7 +12,8 @@ router.get('/products/:productId', async (req, res) => {
   if (!productId) return fail(res, 400, '商品 ID 无效');
 
   const reviews = await prisma.productReview.findMany({
-    where: { productId },
+    // 只返回可见评价：被后台隐藏（moderationStatus=hidden）的评价不再出现在商品页
+    where: { productId, moderationStatus: 'visible' },
     orderBy: { createdAt: 'desc' },
     include: {
       user: { include: { profile: true } },
@@ -125,6 +126,7 @@ router.post('/', authRequired, async (req, res) => {
 router.post('/:reviewId/comments', authRequired, async (req, res) => {
   const reviewId = String(req.params.reviewId ?? '').trim();
   const content = String(req.body?.content ?? '').trim();
+  // 入口口径不变（App 传 '0' 表示一级评论），落库时转成空：parentId/rootId 已改为可空字段，不再存假编号 '0'
   let parentId = String(req.body?.parentId ?? '0').trim() || '0';
 
   if (!reviewId) return fail(res, 400, '评价 ID 无效');
@@ -134,17 +136,17 @@ router.post('/:reviewId/comments', authRequired, async (req, res) => {
   const review = await prisma.productReview.findUnique({ where: { id: reviewId } });
   if (!review) return fail(res, 404, '评价不存在');
 
-  let rootId = '0';
+  let rootId = null;
   let replyToUserId = '';
   let replyToUserName = '';
 
   if (parentId === '0') {
-    // 直接回复评价本体：挂在评价楼主下，root 用评价 id 语义由客户端区分；
-    // 这里一级评论 parentId='0'，rootId='0'
+    // 一级评论：parentId / rootId 落库为空，返回给 App 时序列化层会再转回 '0'
+    parentId = null;
   } else if (parentId === reviewId) {
     // 兼容：把评价 id 当作「回复评价」入口，转为一级评论
-    parentId = '0';
-    rootId = '0';
+    parentId = null;
+    rootId = null;
     const owner = await prisma.user.findUnique({ where: { id: review.userId } });
     replyToUserId = review.userId;
     replyToUserName = owner?.nickname || '买家';
@@ -154,7 +156,7 @@ router.post('/:reviewId/comments', authRequired, async (req, res) => {
       include: { user: true },
     });
     if (!parent) return fail(res, 404, '被回复的评论不存在');
-    rootId = !parent.rootId || parent.rootId === '0' ? parent.id : parent.rootId;
+    rootId = parent.rootId && parent.rootId !== '0' ? parent.rootId : parent.id; // 兼容老数据：升级前存的 '0' 也当一级处理
     replyToUserId = parent.userId;
     replyToUserName = parent.user?.nickname || '用户';
   }

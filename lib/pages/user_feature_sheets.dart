@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/product_data.dart';
 import '../providers/app_tab_provider.dart';
+import '../providers/order_provider.dart';
 import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
@@ -23,6 +24,8 @@ class UserFeatureSheets {
         showCoupons(context);
       case '趣玩币':
         showFunCoinLedger(context);
+      case '我的钱包':
+        showWallet(context);
       case '地址管理':
         showAddresses(context);
       case '收藏夹':
@@ -359,6 +362,120 @@ class UserFeatureSheets {
                     },
                   ),
                 ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  // 我的钱包：App 里三种资产（积分 / 趣玩币 / 优惠券）的总入口。
+  // 数据全部走已有的积分中心、趣玩币流水、券包，不新建接口、不新建表；
+  // 这里只做汇总展示和跳转，外加一个赚积分的每日任务入口形成闭环。
+  static void showWallet(BuildContext context) {
+    _showSheet(
+      context,
+      title: '我的钱包',
+      child: Consumer<UserProvider>(
+        builder: (context, user, _) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _actionTile(
+                context,
+                icon: Icons.star_outline,
+                title: '积分',
+                subtitle: '当前 ${user.points} 积分 · 签到、购物都能赚',
+                onTap: () => showPointsCenter(context),
+              ),
+              _actionTile(
+                context,
+                icon: Icons.monetization_on_outlined,
+                title: '趣玩币',
+                subtitle: '当前 ${user.funCoins} · 可开通会员（299/月）',
+                onTap: () => showFunCoinLedger(context),
+              ),
+              _actionTile(
+                context,
+                icon: Icons.local_offer_outlined,
+                title: '优惠券',
+                subtitle: '可用 ${user.availableCouponCount} 张 · 满减券下单自动可选',
+                onTap: () => showCoupons(context),
+              ),
+              _actionTile(
+                context,
+                icon: Icons.calendar_today_outlined,
+                title: '每日任务',
+                subtitle: user.dailyCheckInDone ? '今日已签到' : '签到 +50 积分 · 还有浏览、分享任务',
+                onTap: () => showDailyTasks(context),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // 我的盒柜：把已发货 / 已完成的订单商品汇成藏品陈列。
+  // 只收这两种状态——待付款、待发货的还没到手，不算藏品；已取消的不收。
+  // 商品图通过 productId 回查商品库，查不到（商品已删）就用占位图，不整行丢弃。
+  static void showCollectionCabinet(BuildContext context) {
+    _showSheet(
+      context,
+      title: '我的盒柜',
+      child: Consumer<OrderProvider>(
+        builder: (context, orders, _) {
+          final owned = <(Order, OrderItem)>[];
+          for (final o in orders.orders) {
+            if (o.status == OrderStatus.shipping || o.status == OrderStatus.completed) {
+              for (final it in o.items) {
+                owned.add((o, it));
+              }
+            }
+          }
+          if (owned.isEmpty) return _empty('盒柜还是空的，下单的宝贝发货后会出现在这里');
+          return ListView.separated(
+            shrinkWrap: true,
+            itemCount: owned.length,
+            separatorBuilder: (_, _) => SizedBox(height: AppScale.s(10)),
+            itemBuilder: (context, index) {
+              final (order, item) = owned[index];
+              final product = item.productId == null ? null : productById(item.productId!);
+              final cfg = orderStatusConfig(order.status);
+              return Container(
+                padding: FeaturePageStyle.cardPadding,
+                decoration: BoxDecoration(
+                  color: AppColors.muted,
+                  borderRadius: BorderRadius.circular(FeaturePageStyle.cardRadius),
+                ),
+                child: Row(
+                  children: [
+                    if (product != null)
+                      ProductThumbnail(product: product, width: FeaturePageStyle.thumbSize, height: FeaturePageStyle.thumbSize)
+                    else
+                      Container(
+                        width: FeaturePageStyle.thumbSize,
+                        height: FeaturePageStyle.thumbSize,
+                        decoration: BoxDecoration(
+                          color: AppColors.border.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(AppScale.s(8)),
+                        ),
+                        child: Icon(Icons.inventory_2_outlined, color: AppColors.mutedForeground),
+                      ),
+                    SizedBox(width: AppScale.s(12)),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: FeaturePageStyle.bodyBold()),
+                          SizedBox(height: AppScale.s(6)),
+                          Text('x${item.quantity} · ${cfg.label}', style: FeaturePageStyle.secondary()),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               );
             },
           );

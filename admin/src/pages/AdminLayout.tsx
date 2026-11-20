@@ -21,6 +21,7 @@ import CouponsPage from "./CouponsPage";
 import DashboardPage from "./DashboardPage";
 
 import OrdersPage from "./OrdersPage";
+import AfterSalesPage from "./AfterSalesPage";
 
 import ProductsPage from "./ProductsPage";
 
@@ -170,6 +171,8 @@ export default function AdminLayout() {
           {effectivePage === "categories" && <CategoriesPage />}
 
           {effectivePage === "orders" && <OrdersPage />}
+
+          {effectivePage === "afterSales" && <AfterSalesPage />}
 
           {effectivePage === "users" && <UsersPage />}
 

@@ -18,7 +18,7 @@ import 'support_chat_page.dart';
 
 import '../widgets/click_effect/app_pressable.dart';
 import '../widgets/click_effect/app_buttons.dart';
-const _detailTextScale = 1.3;
+const _detailTextScale = 1.0;
 
 class ProductDetailPage extends StatefulWidget {
   const ProductDetailPage({super.key, required this.product});
@@ -34,8 +34,21 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
   int _detailTab = 0;
   late TabController _tabController;
 
-  static const _imageCount = 1;
   static const _detailTabs = ['商品介绍', '评价', '猜你喜欢', '购买须知'];
+
+  // 图集张数跟着商品多图走：后台给商品填了多图就能左右翻，
+  // 没填多图时仍是 1 张，翻页按钮自动不显示（图集区原本就有这个判断）。
+  int get _imageCount {
+    final count = product.galleryImages.length;
+    return count == 0 ? 1 : count;
+  }
+
+  String get _currentImagePath {
+    final images = product.galleryImages;
+    if (images.isEmpty) return product.imagePath;
+    final index = _imageIndex.clamp(0, images.length - 1);
+    return images[index];
+  }
 
   @override
   void initState() {
@@ -78,7 +91,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
                   SliverToBoxAdapter(child: _DetailTopBar(product: product)),
                   SliverToBoxAdapter(child: _ProductImageSection(
                     product: product,
-                    imageIndex: _imageIndex,
+                    imagePath: _currentImagePath,
+                    imageIndex: _imageIndex.clamp(0, _imageCount - 1),
                     imageCount: _imageCount,
                     onPrev: () => setState(() => _imageIndex = (_imageIndex - 1 + _imageCount) % _imageCount),
                     onNext: () => setState(() => _imageIndex = (_imageIndex + 1) % _imageCount),
@@ -155,6 +169,7 @@ class _DetailTopBar extends StatelessWidget {
 class _ProductImageSection extends StatelessWidget {
   const _ProductImageSection({
     required this.product,
+    required this.imagePath,
     required this.imageIndex,
     required this.imageCount,
     required this.onPrev,
@@ -162,19 +177,21 @@ class _ProductImageSection extends StatelessWidget {
   });
 
   final Product product;
+  // 当前显示的那一张（多图翻页后会变），全屏预览也看这一张。
+  final String imagePath;
   final int imageIndex;
   final int imageCount;
   final VoidCallback onPrev;
   final VoidCallback onNext;
 
   void _openFullScreenImage(BuildContext context) {
-    if (product.imagePath.isEmpty) return;
+    if (imagePath.isEmpty) return;
     Navigator.push<void>(
       context,
       MaterialPageRoute(
         builder: (_) => ImagePreviewPage(
           child: ProductImage(
-            image: product.imagePath,
+            image: imagePath,
             width: MediaQuery.sizeOf(context).width,
             height: MediaQuery.sizeOf(context).height * 0.75,
             fit: BoxFit.contain,
@@ -248,6 +265,7 @@ class _ProductImageSection extends StatelessWidget {
                         children: [
                           ProductThumbnail(
                             product: product,
+                            imagePathOverride: imagePath,
                             height: imageHeight,
                             borderRadius: imageRadius,
                           ),
@@ -389,7 +407,15 @@ class _InfoCard extends StatelessWidget {
             Wrap(
               spacing: AppScale.s(8),
               runSpacing: AppScale.s(6),
-              children: [product.majorCategory, product.subCategory, '广州发货'].map((tag) {
+              // 品牌 / 系列 / 稀有度是后台新字段，有值才多一个小标签，没填就不显示。
+              children: [
+                product.majorCategory,
+                product.subCategory,
+                '广州发货',
+                if (product.brand != null && product.brand!.isNotEmpty) product.brand!,
+                if (product.series != null && product.series!.isNotEmpty) product.series!,
+                if (product.rarity != null && product.rarity!.isNotEmpty) product.rarity!,
+              ].map((tag) {
                 return Container(
                   padding: EdgeInsets.symmetric(horizontal: AppScale.s(10), vertical: AppScale.s(4)),
                   decoration: BoxDecoration(
@@ -471,7 +497,38 @@ class _DetailContent extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.all(AppScale.s(16)),
       child: switch (tabIndex) {
-        0 => Text(product.description, style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground, height: 1.6)),
+        // 「商品介绍」先列结构化卖点和适合场景（后台填了才有），再放原来的介绍文字。
+        0 => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (product.sellingPoints.isNotEmpty) ...[
+                ...product.sellingPoints.map(
+                  (point) => Padding(
+                    padding: EdgeInsets.only(bottom: AppScale.s(6)),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.check_circle_outline, size: AppScale.s(15), color: AppColors.primary),
+                        SizedBox(width: AppScale.s(6)),
+                        Expanded(
+                          child: Text(point, style: TextStyle(fontSize: AppScale.t(13), color: AppColors.foreground, height: 1.5)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: AppScale.s(8)),
+              ],
+              if (product.suitableFor != null && product.suitableFor!.isNotEmpty) ...[
+                Text(
+                  '适合：${product.suitableFor}',
+                  style: TextStyle(fontSize: AppScale.t(13), color: AppColors.foreground, height: 1.5),
+                ),
+                SizedBox(height: AppScale.s(8)),
+              ],
+              Text(product.description, style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground, height: 1.6)),
+            ],
+          ),
         1 => _ProductReviewsSection(productId: product.id),
         2 => StaggeredProductGrid(
             products: products

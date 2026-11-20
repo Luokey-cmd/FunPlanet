@@ -29,6 +29,7 @@ const navItems: { key: NavPage; label: string; icon: React.ReactNode }[] = [
   { key: "products", label: "商品管理", icon: <PackageIcon size={15} /> },
   { key: "categories", label: "分类管理", icon: <FolderTreeIcon size={15} /> },
   { key: "orders", label: "订单管理", icon: <ShoppingCartIcon size={15} /> },
+  { key: "afterSales", label: "售后处理", icon: <HistoryIcon size={15} /> },
   { key: "users", label: "用户管理", icon: <UsersIcon size={15} /> },
   { key: "coupons", label: "优惠券管理", icon: <TicketIcon size={15} /> },
   { key: "banners", label: "轮播图管理", icon: <ImageIcon size={15} /> },

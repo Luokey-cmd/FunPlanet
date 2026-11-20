@@ -12,6 +12,10 @@ function serializeNotification(row) {
     body: row.body,
     type: row.type,
     read: row.read,
+    // 跳转目标：点通知时前端按 targetType + targetId 跳页；老通知为空就是不跳
+    targetType: row.targetType ?? null,
+    targetId: row.targetId ?? null,
+    readAt: row.readAt ? row.readAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -27,7 +31,7 @@ router.get('/', authRequired, async (req, res) => {
 router.put('/read-all', authRequired, async (req, res) => {
   await prisma.notification.updateMany({
     where: { userId: req.user.sub, read: false },
-    data: { read: true },
+    data: { read: true, readAt: new Date() },
   });
   ok(res, { updated: true });
 });
@@ -41,7 +45,7 @@ router.put('/:id/read', authRequired, async (req, res) => {
 
   const updated = await prisma.notification.update({
     where: { id },
-    data: { read: true },
+    data: { read: true, readAt: row.read ? row.readAt : new Date() },
   });
   ok(res, { notification: serializeNotification(updated) });
 });

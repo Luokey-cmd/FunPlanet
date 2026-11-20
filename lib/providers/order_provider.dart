@@ -7,7 +7,10 @@ import '../services/order_api_service.dart';
 import '../utils/page_memory_cache.dart';
 import 'cart_provider.dart';
 
-enum OrderFilter { all, pending, shipping, completed, cancelled }
+// 订单过滤器。注意 pending 是旧过滤器（待付款+待发货混在一起，保留兼容旧调用），
+// 新入口请用 unpaid（待付款）/ toShip（待发货）分开数，服务端状态 pending 本身就是待付款、paid 才是待发货。
+// review = 待评价（已完成且有未评价商品）；reviewed = 我的评价（已完成且有已评价商品）。
+enum OrderFilter { all, pending, shipping, completed, cancelled, unpaid, toShip, review, reviewed }
 
 class OrderProvider extends ChangeNotifier {
   OrderProvider({OrderApiService? api}) : _api = api ?? OrderApiService();
@@ -23,6 +26,13 @@ class OrderProvider extends ChangeNotifier {
   int get shippingCount => filtered(OrderFilter.shipping).length;
 
   int get pendingCount => filtered(OrderFilter.pending).length;
+
+  // 「我的」页订单行角标用：待付款 / 待发货 / 待评价各自的笔数（0 时页面不显示角标）。
+  int get unpaidCount => filtered(OrderFilter.unpaid).length;
+
+  int get toShipCount => filtered(OrderFilter.toShip).length;
+
+  int get reviewCount => filtered(OrderFilter.review).length;
 
   bool get isCloudSync => _cloudSync;
 
@@ -69,6 +79,18 @@ class OrderProvider extends ChangeNotifier {
         return orders.where((o) => o.status == OrderStatus.completed).toList();
       case OrderFilter.cancelled:
         return orders.where((o) => o.status == OrderStatus.cancelled).toList();
+      case OrderFilter.unpaid:
+        // 待付款：只认 pending（服务端下单未付款就是这个状态）
+        return orders.where((o) => o.status == OrderStatus.pending).toList();
+      case OrderFilter.toShip:
+        // 待发货：已付款、商家还没发货，只认 paid
+        return orders.where((o) => o.status == OrderStatus.paid).toList();
+      case OrderFilter.review:
+        // 待评价：订单已完成，且还有商品没写评价
+        return orders.where((o) => o.status == OrderStatus.completed && o.unreviewedItems.isNotEmpty).toList();
+      case OrderFilter.reviewed:
+        // 我的评价：订单已完成，且至少有一件商品已评价
+        return orders.where((o) => o.status == OrderStatus.completed && o.reviewedProductIds.isNotEmpty).toList();
     }
   }
 
@@ -144,6 +166,18 @@ class OrderProvider extends ChangeNotifier {
       return;
     }
     _updateStatus(id, OrderStatus.cancelled);
+  }
+
+  // 待付款订单去支付：云端走服务端支付接口（支付成功服务端才扣库存），
+  // 用返回的订单整条替换本地记录（状态变待发货）；本地模式直接置为 paid。
+  // 支付失败会抛异常，调用方（订单列表的去支付按钮）负责提示用户。
+  Future<void> payOrder(String id) async {
+    if (_cloudSync) {
+      final updated = await _api.payOrder(id);
+      _replaceOrder(updated);
+      return;
+    }
+    _updateStatus(id, OrderStatus.paid);
   }
 
   Future<void> confirmReceive(String id) async {

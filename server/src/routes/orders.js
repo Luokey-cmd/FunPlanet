@@ -4,6 +4,55 @@ import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
 import { generateOrderNo, parseCouponMinAmount, serializeOrder } from '../utils/order.js';
 import { recordWalletLedger } from '../utils/wallet-ledger.js';
+import { AFTER_SALE_TYPES } from '../utils/status-values.js';
+
+// 库存与销量联动（付款时扣、取消已付订单时回）
+// 输入：tx 事务、items（带 productId / quantity）、direction（pay 付款扣库存 / restore 取消回补）
+// 坑：销量回补时不能减成负数，先读现值再算；库存扣减前必须先查够不够，不够整单失败、不能先扣一半
+async function adjustStockAndSales(tx, items, direction) {
+  for (const item of items) {
+    const product = await tx.product.findUnique({ where: { id: item.productId } });
+    if (!product) continue;
+    if (direction === 'pay') {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: {
+          stock: Math.max(0, product.stock - item.quantity),
+          sales: product.sales + item.quantity,
+        },
+      });
+    } else {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: {
+          stock: product.stock + item.quantity,
+          sales: Math.max(0, product.sales - item.quantity),
+        },
+      });
+    }
+  }
+}
+
+// 下单前的库存检查：返回第一件不满足的商品错误信息，全满足返回 null
+async function checkStockAndShelf(products, items) {
+  const map = new Map(products.map((x) => [x.id, x]));
+  for (const item of items) {
+    const product = map.get(item.productId);
+    if (!product) return '商品不存在';
+    if (product.isOnShelf === false) return `商品「${product.name}」已下架`;
+    if ((product.stock ?? 0) < item.quantity) return `商品「${product.name}」库存不足`;
+  }
+  return null;
+}
+
+// 拼收货地址展示文字：新地址拆了省市区，订单快照仍存一整段文字，老 App 和后台都按整段读
+function composeAddressDetail(address) {
+  if (!address) return null;
+  const parts = [address.province, address.city, address.district].filter(Boolean).join('');
+  const detail = address.detail ?? '';
+  if (parts && detail && !detail.startsWith(parts)) return parts + detail;
+  return detail || parts || null;
+}
 
 const router = Router();
 
@@ -28,14 +77,23 @@ async function buildLineItemsFromRequest(requestedItems) {
   for (const item of normalized) {
     const product = productMap.get(item.productId);
     if (!product) {
-      return { error: { status: 400, message: '商品不存在或已下架' } };
+      return { error: { status: 400, message: '商品不存在' } };
+    }
+    // 直接下单也要查上架和库存（旧 bug：这条路径只查存不存在，下架和无库存都能买走）
+    if (product.isOnShelf === false) {
+      return { error: { status: 400, message: `商品「${product.name}」已下架` } };
+    }
+    if ((product.stock ?? 0) < item.quantity) {
+      return { error: { status: 400, message: `商品「${product.name}」库存不足` } };
     }
     const unitPrice = Number(product.price);
     lineItems.push({
       productId: product.id,
       name: product.name,
       quantity: item.quantity,
-      spec: product.spec,
+      spec: product.spec ?? '',
+      imagePath: product.imagePath,
+      majorCategory: product.majorCategory,
       unitPrice,
       subtotal: unitPrice * item.quantity,
     });
@@ -54,7 +112,7 @@ async function resolveAddress(userId, addressId) {
   });
 }
 
-async function resolveDiscount(userId, couponTemplateId, subtotal) {
+async function resolveDiscount(userId, couponTemplateId, subtotal, lineItems = []) {
   if (!couponTemplateId) return { discount: 0, templateId: null };
 
   const userCoupon = await prisma.userCoupon.findUnique({
@@ -64,10 +122,33 @@ async function resolveDiscount(userId, couponTemplateId, subtotal) {
   if (!userCoupon || userCoupon.used) {
     return { error: { status: 400, message: '优惠券不可用' } };
   }
+  if (userCoupon.template.expireAt && new Date() > userCoupon.template.expireAt) {
+    return { error: { status: 400, message: '优惠券已过期' } };
+  }
 
-  const minAmount = parseCouponMinAmount(userCoupon.template.condition);
+  // 门槛只认数字字段 minAmount；只有老数据 minAmount 还是 0 时，才兜底解析一次 condition 文字
+  const fieldMin = userCoupon.template.minAmount == null ? 0 : Number(userCoupon.template.minAmount);
+  const minAmount = fieldMin > 0 ? fieldMin : parseCouponMinAmount(userCoupon.template.condition);
   const discount = Number(userCoupon.template.discount);
-  if (subtotal < minAmount) {
+
+  // 适用范围：scope 为 category / product 时，门槛按命中的那部分商品小计算，不再按整单算
+  const scope = userCoupon.template.scope ?? 'all';
+  let effectiveSubtotal = subtotal;
+  if (scope === 'category' || scope === 'product') {
+    const targets = String(userCoupon.template.scopeValue ?? '')
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    const matched = lineItems.filter((item) =>
+      scope === 'category' ? targets.includes(item.majorCategory) : targets.includes(item.productId),
+    );
+    if (matched.length === 0) {
+      return { error: { status: 400, message: '优惠券不适用于所选商品' } };
+    }
+    effectiveSubtotal = matched.reduce((sum, item) => sum + item.subtotal, 0);
+  }
+
+  if (effectiveSubtotal < minAmount) {
     return { error: { status: 400, message: `未满 ${minAmount} 元，无法使用该优惠券` } };
   }
 
@@ -81,6 +162,68 @@ router.get('/', authRequired, async (req, res) => {
     orderBy: { createdAt: 'desc' },
   });
   ok(res, { orders: orders.map(serializeOrder) });
+});
+
+// 我的售后申请列表（必须写在 /:id 前面，不然 after-sales 会被当成订单 id）
+router.get('/after-sales', authRequired, async (req, res) => {
+  const rows = await prisma.afterSaleRequest.findMany({
+    where: { userId: req.user.sub },
+    orderBy: { createdAt: 'desc' },
+    include: { order: { select: { orderNo: true, total: true } } },
+  });
+  ok(res, {
+    requests: rows.map((r) => ({
+      id: r.id,
+      orderId: r.orderId,
+      orderNo: r.order.orderNo,
+      type: r.type,
+      reason: r.reason,
+      description: r.description,
+      amount: r.amount == null ? null : Number(r.amount),
+      status: r.status,
+      adminNote: r.adminNote ?? null,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  });
+});
+
+// 申请售后：仅退款 refund / 退货退款 return；同一订单同时只能有一条待处理的
+router.post('/:id/after-sale', authRequired, async (req, res) => {
+  const order = await prisma.order.findFirst({
+    where: { id: req.params.id, userId: req.user.sub },
+  });
+  if (!order) return fail(res, 404, '订单不存在');
+  if (!['paid', 'shipping', 'completed'].includes(order.status)) {
+    return fail(res, 400, '当前订单状态不能申请售后');
+  }
+  const type = AFTER_SALE_TYPES.includes(req.body?.type) ? req.body.type : 'refund';
+  const reason = String(req.body?.reason ?? '').trim();
+  if (!reason) return fail(res, 400, '请填写售后原因');
+  const description = String(req.body?.description ?? '').trim().slice(0, 500);
+  const amountRaw = req.body?.amount;
+  const amount = amountRaw == null || amountRaw === '' ? null : Number(amountRaw);
+  if (amount != null && (!Number.isFinite(amount) || amount <= 0)) {
+    return fail(res, 400, '退款金额不正确');
+  }
+  const pending = await prisma.afterSaleRequest.findFirst({
+    where: { orderId: order.id, userId: req.user.sub, status: 'pending' },
+  });
+  if (pending) return fail(res, 409, '该订单已有待处理的售后申请');
+
+  const row = await prisma.afterSaleRequest.create({
+    data: { orderId: order.id, userId: req.user.sub, type, reason, description, amount },
+  });
+  await prisma.notification.create({
+    data: {
+      userId: req.user.sub,
+      title: '售后申请已提交',
+      body: `订单 ${order.orderNo} 的售后申请已提交，等待处理`,
+      type: 'order',
+      targetType: 'order',
+      targetId: order.id,
+    },
+  });
+  ok(res, { request: { id: row.id, status: row.status, type: row.type } });
 });
 
 router.get('/:id', authRequired, async (req, res) => {
@@ -111,6 +254,11 @@ router.post('/', authRequired, async (req, res) => {
     });
     if (cartItems.length === 0) return fail(res, 400, '购物车为空');
 
+    const stockError = await checkStockAndShelf(
+      cartItems.map((item) => item.product),
+      cartItems.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+    );
+    if (stockError) return fail(res, 400, stockError);
     lineItems = cartItems.map((item) => {
       const unitPrice = Number(item.product.price);
       const subtotal = unitPrice * item.quantity;
@@ -118,7 +266,9 @@ router.post('/', authRequired, async (req, res) => {
         productId: item.productId,
         name: item.product.name,
         quantity: item.quantity,
-        spec: item.spec ?? item.product.spec,
+        spec: item.spec || (item.product.spec ?? ''),
+        imagePath: item.product.imagePath,
+        majorCategory: item.product.majorCategory,
         unitPrice,
         subtotal,
       };
@@ -126,12 +276,15 @@ router.post('/', authRequired, async (req, res) => {
   }
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const discountResult = await resolveDiscount(req.user.sub, couponTemplateId, subtotal);
+  const discountResult = await resolveDiscount(req.user.sub, couponTemplateId, subtotal, lineItems);
   if (discountResult.error) {
     return fail(res, discountResult.error.status, discountResult.error.message);
   }
   const discount = discountResult?.discount ?? 0;
-  const total = Math.max(0, subtotal - discount);
+  // 运费：前端不传就是 0（包邮）；total 保持「最终实付」口径 = 小计 - 优惠 + 运费
+  const freight = Math.max(0, Number(req.body?.freight) || 0);
+  const remark = String(req.body?.remark ?? '').trim().slice(0, 200) || null;
+  const total = Math.max(0, subtotal - discount + freight);
 
   const address = await resolveAddress(req.user.sub, addressId);
   if (!address) return fail(res, 400, '请先添加收货地址');
@@ -150,17 +303,20 @@ router.post('/', authRequired, async (req, res) => {
         total,
         addressName: address.name,
         addressPhone: address.phone,
-        addressDetail: address.detail,
+        addressDetail: composeAddressDetail(address),
         couponTemplateId: discountResult?.templateId ?? null,
         paymentMethod: payNow ? 'mock' : null,
         paymentStatus: payNow ? 'paid' : 'pending',
         paidAt: payNow ? now : null,
+        freight,
+        remark,
         items: {
           create: lineItems.map((item) => ({
             productId: item.productId,
             name: item.name,
             quantity: item.quantity,
-            spec: item.spec,
+            spec: item.spec ?? '',
+            imagePath: item.imagePath ?? null,
             unitPrice: item.unitPrice,
             subtotal: item.subtotal,
           })),
@@ -188,17 +344,41 @@ router.post('/', authRequired, async (req, res) => {
             templateId: discountResult.templateId,
           },
         },
-        data: { used: true },
+        // 用券要留下使用时间和订单号，客服查账靠它
+        data: { used: true, usedAt: now, orderId: created.id },
       });
     }
 
-    for (const item of lineItems) {
-      if (payNow) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { sales: { increment: item.quantity } },
-        });
-      }
+    // 付款才动库存和销量：创建时已付款就立刻扣；待付款的等支付接口里再扣
+    if (payNow) {
+      await adjustStockAndSales(tx, lineItems, 'pay');
+    }
+
+    // 支付流水：每笔订单的支付动作单独落表，不再只靠订单上的 paymentMethod 文字
+    await tx.paymentTransaction.create({
+      data: {
+        orderId: created.id,
+        userId: req.user.sub,
+        method: 'mock',
+        transactionNo: `MOCK${now.getTime()}${created.orderNo}`,
+        amount: total,
+        status: payNow ? 'paid' : 'pending',
+        paidAt: payNow ? now : null,
+      },
+    });
+
+    // 导购推荐结果回填：买了小豆推荐过的商品，把那条推荐记录标成 ordered（失败不挡下单）
+    try {
+      await tx.guideRecommendation.updateMany({
+        where: {
+          userId: req.user.sub,
+          productId: { in: lineItems.map((item) => item.productId) },
+          outcome: { in: ['recommended', 'clicked'] },
+        },
+        data: { outcome: 'ordered' },
+      });
+    } catch {
+      // 推荐记录是统计用途，写不上不回滚订单
     }
 
     await tx.notification.create({
@@ -209,6 +389,8 @@ router.post('/', authRequired, async (req, res) => {
           ? `订单 ${orderNo} 已支付，预计 2-3 天送达`
           : `订单 ${orderNo} 待支付，请尽快完成付款`,
         type: 'order',
+        targetType: 'order',
+        targetId: created.id,
       },
     });
 
@@ -233,12 +415,16 @@ router.post('/', authRequired, async (req, res) => {
         walletType: 'points',
         amount: earned,
         title: '购物返积分',
+        refType: 'order',
+        refId: created.id,
       });
       await recordWalletLedger(tx, {
         userId: req.user.sub,
         walletType: 'coins',
         amount: coinEarned,
         title: '购物返币',
+        refType: 'order',
+        refId: created.id,
       });
     }
 
@@ -256,6 +442,13 @@ router.post('/:id/pay', authRequired, async (req, res) => {
   if (!order) return fail(res, 404, '订单不存在');
   if (order.status !== 'pending') return fail(res, 409, '订单状态不可支付');
 
+  // 支付前再查一次库存：下单到付款之间可能被买空，查不过就整笔支付失败、不要扣一半
+  const payProducts = await prisma.product.findMany({
+    where: { id: { in: order.items.map((item) => item.productId) } },
+  });
+  const payStockError = await checkStockAndShelf(payProducts, order.items);
+  if (payStockError) return fail(res, 400, payStockError);
+
   const updated = await prisma.$transaction(async (tx) => {
     const next = await tx.order.update({
       where: { id: order.id },
@@ -266,6 +459,18 @@ router.post('/:id/pay', authRequired, async (req, res) => {
         paidAt: new Date(),
       },
       include: { items: true },
+    });
+
+    await tx.paymentTransaction.create({
+      data: {
+        orderId: order.id,
+        userId: req.user.sub,
+        method: 'mock',
+        transactionNo: `MOCK${Date.now()}${order.orderNo}`,
+        amount: order.total,
+        status: 'paid',
+        paidAt: new Date(),
+      },
     });
 
     const earned = Math.min(100, Math.max(1, Math.floor(Number(order.total))));
@@ -280,20 +485,19 @@ router.post('/:id/pay', authRequired, async (req, res) => {
       walletType: 'points',
       amount: earned,
       title: '购物返积分',
+      refType: 'order',
+      refId: order.id,
     });
     await recordWalletLedger(tx, {
       userId: req.user.sub,
       walletType: 'coins',
       amount: coinEarned,
       title: '购物返币',
+      refType: 'order',
+      refId: order.id,
     });
 
-    for (const item of order.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { sales: { increment: item.quantity } },
-      });
-    }
+    await adjustStockAndSales(tx, order.items, 'pay');
 
     return next;
   });
@@ -311,10 +515,29 @@ router.put('/:id/cancel', authRequired, async (req, res) => {
     return fail(res, 409, '当前状态不可取消');
   }
 
-  const updated = await prisma.order.update({
-    where: { id: order.id },
-    data: { status: 'cancelled' },
-    include: { items: true },
+  const cancelReason = String(req.body?.reason ?? '').trim().slice(0, 200) || null;
+  const wasPaid = order.paymentStatus === 'paid';
+  const updated = await prisma.$transaction(async (tx) => {
+    const next = await tx.order.update({
+      where: { id: order.id },
+      data: {
+        status: 'cancelled',
+        cancelledAt: new Date(),
+        cancelReason,
+        // 已付款订单取消后支付状态标成 refunded（模拟支付即时退回）；未付款的不动
+        paymentStatus: wasPaid ? 'refunded' : order.paymentStatus,
+      },
+      include: { items: true },
+    });
+    // 已付款才回补库存和销量；待付款订单没扣过，不能回补（会把库存越加越多）
+    if (wasPaid) {
+      await adjustStockAndSales(tx, order.items, 'restore');
+      await tx.paymentTransaction.updateMany({
+        where: { orderId: order.id, status: 'paid' },
+        data: { status: 'refunded' },
+      });
+    }
+    return next;
   });
   ok(res, { order: serializeOrder(updated) });
 });
@@ -329,7 +552,7 @@ router.put('/:id/confirm', authRequired, async (req, res) => {
 
   const updated = await prisma.order.update({
     where: { id: order.id },
-    data: { status: 'completed' },
+    data: { status: 'completed', receivedAt: new Date() },
     include: { items: true },
   });
   ok(res, { order: serializeOrder(updated) });

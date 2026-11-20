@@ -58,7 +58,8 @@ router.post('/', authRequired, async (req, res) => {
         userId: req.user.sub,
         productId,
         quantity: delta,
-        spec: product.spec,
+        // CartItem.spec 已改为必填：商品没规格时存空文字，不许传 null
+        spec: product.spec ?? '',
       },
       include: { product: true },
     });

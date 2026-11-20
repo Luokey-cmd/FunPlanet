@@ -31,6 +31,7 @@ function serializeUser(user) {
     phone: user.phone,
     nickname: user.nickname,
     userId: user.userId,
+    status: user.status ?? 'active',
   };
 }
 
@@ -78,9 +79,17 @@ router.post('/login', async (req, res) => {
 
   const user = await prisma.user.findUnique({ where: { phone } });
   if (!user) return fail(res, 404, '账号不存在，请先注册');
+  // 账号状态：被禁用或已注销的账号不许登录（status 是 2026-11-20 新增字段，老数据默认 active）
+  if (user.status === 'disabled') return fail(res, 403, '该账号已被禁用，请联系客服');
+  if (user.status === 'deleted' || user.deletedAt) return fail(res, 403, '该账号已注销');
 
   const match = await bcrypt.compare(password, user.password);
   if (!match) return fail(res, 401, '密码错误');
+
+  // 登录成功记一次最后登录时间；写失败不挡登录
+  await prisma.user
+    .update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+    .catch(() => {});
 
   const token = signToken({ sub: user.id, phone: user.phone });
   ok(res, { token, user: serializeUser(user) });

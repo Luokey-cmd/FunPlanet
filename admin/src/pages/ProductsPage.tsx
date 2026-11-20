@@ -27,6 +27,13 @@ const emptyForm: Partial<AdminProduct> & { id: string; name: string } = {
   purchaseNotes: "",
   rating: 5,
   imagePath: "",
+  imagePaths: [],
+  videoPath: null,
+  brand: null,
+  series: null,
+  rarity: null,
+  suitableFor: null,
+  sellingPoints: [],
 };
 
 export default function ProductsPage() {
@@ -348,13 +355,85 @@ export default function ProductsPage() {
                 </label>
               </div>
               <AdminImagePicker
-                label="商品图片"
+                label="商品图片（主图）"
                 imagePath={editing.imagePath ?? ""}
                 onImagePathChange={(path) => setEditing({ ...editing, imagePath: path })}
                 onUpload={adminApi.uploadProductImage}
                 previewAlt={editing.name || "商品预览"}
                 previewClassName="h-36 w-full object-contain rounded-xl border border-border bg-muted/30"
               />
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">多图路径（一行一张，第一张应与主图一致；详情页轮播用）</span>
+                <textarea
+                  rows={3}
+                  value={(editing.imagePaths ?? []).join("\n")}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      imagePaths: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean),
+                    })
+                  }
+                  className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </label>
+              <div className="flex gap-3">
+                <label className="flex flex-col gap-1 text-sm flex-1">
+                  <span className="text-muted-foreground">品牌</span>
+                  <input
+                    value={editing.brand ?? ""}
+                    onChange={(e) => setEditing({ ...editing, brand: e.target.value || null })}
+                    className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm flex-1">
+                  <span className="text-muted-foreground">IP / 系列</span>
+                  <input
+                    value={editing.series ?? ""}
+                    onChange={(e) => setEditing({ ...editing, series: e.target.value || null })}
+                    className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm flex-1">
+                  <span className="text-muted-foreground">稀有度</span>
+                  <input
+                    placeholder="如 普通 / 稀有 / 限量"
+                    value={editing.rarity ?? ""}
+                    onChange={(e) => setEditing({ ...editing, rarity: e.target.value || null })}
+                    className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </label>
+              </div>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">适合谁 / 什么场景（小豆导购优先读这里写推荐理由）</span>
+                <textarea
+                  rows={2}
+                  value={editing.suitableFor ?? ""}
+                  onChange={(e) => setEditing({ ...editing, suitableFor: e.target.value || null })}
+                  className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">结构化卖点（一行一条，如「亚克力高透」）</span>
+                <textarea
+                  rows={3}
+                  value={(editing.sellingPoints ?? []).join("\n")}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      sellingPoints: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean),
+                    })
+                  }
+                  className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">商品视频路径（可空）</span>
+                <input
+                  value={editing.videoPath ?? ""}
+                  onChange={(e) => setEditing({ ...editing, videoPath: e.target.value || null })}
+                  className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </label>
               <div className="flex gap-3 mt-2">
                 <button
                   type="submit"

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
+import { ensureProfileFresh } from '../utils/daily-tasks.js';
 
 const router = Router();
 const MAX_HISTORY = 20;
@@ -30,10 +31,11 @@ router.post('/', authRequired, async (req, res) => {
     data: { userId: req.user.sub, productId },
   });
 
-  await prisma.userProfile.upsert({
+  // 先过每日新鲜度：跨天后浏览计数要从 0 重新算，不然昨天的次数会带进今天的任务
+  await ensureProfileFresh(req.user.sub);
+  await prisma.userProfile.update({
     where: { userId: req.user.sub },
-    create: { userId: req.user.sub, dailyBrowseCount: 1 },
-    update: { dailyBrowseCount: { increment: 1 } },
+    data: { dailyBrowseCount: { increment: 1 } },
   });
 
   const overflow = await prisma.browseHistoryItem.findMany({

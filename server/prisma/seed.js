@@ -18,14 +18,15 @@ function readJson(name) {
   return JSON.parse(fs.readFileSync(file, 'utf-8'));
 }
 
+// minAmount 是数字门槛（下单只认它），condition 只是给人看的文字，两边数值必须一致，改券时两个一起改
 const couponTemplates = [
-  { id: 'c1', title: '新人满30减5', discount: 5, condition: '满30可用', expireAt: '2026-12-31' },
-  { id: 'c2', title: '满140减30', discount: 30, condition: '满140可用', expireAt: '2026-12-31' },
-  { id: 'c3', title: '满300减80', discount: 80, condition: '满300可用', expireAt: '2026-12-31' },
-  { id: 'c4', title: '新人满50减10', discount: 10, condition: '满50可用', expireAt: '2026-12-31' },
-  { id: 'c5', title: '会员每月赠券', discount: 20, condition: '满99可用', expireAt: '2026-12-31' },
-  { id: 'c6', title: '领券中心满120减25', discount: 25, condition: '满120可用', expireAt: '2026-12-31' },
-  { id: 'c7', title: '积分兑换满66减10', discount: 10, condition: '满66可用', expireAt: '2026-12-31' },
+  { id: 'c1', title: '新人满30减5', discount: 5, condition: '满30可用', minAmount: 30, claimType: 'newcomer', expireAt: '2026-12-31' },
+  { id: 'c2', title: '满140减30', discount: 30, condition: '满140可用', minAmount: 140, expireAt: '2026-12-31' },
+  { id: 'c3', title: '满300减80', discount: 80, condition: '满300可用', minAmount: 300, expireAt: '2026-12-31' },
+  { id: 'c4', title: '新人满50减10', discount: 10, condition: '满50可用', minAmount: 50, claimType: 'newcomer', expireAt: '2026-12-31' },
+  { id: 'c5', title: '会员每月赠券', discount: 20, condition: '满99可用', minAmount: 99, claimType: 'member_monthly', expireAt: '2026-12-31' },
+  { id: 'c6', title: '领券中心满120减25', discount: 25, condition: '满120可用', minAmount: 120, claimType: 'center', expireAt: '2026-12-31' },
+  { id: 'c7', title: '积分兑换满66减10', discount: 10, condition: '满66可用', minAmount: 66, claimType: 'points', expireAt: '2026-12-31' },
 ];
 
 async function seedDemoUserData(userId) {
@@ -56,6 +57,8 @@ async function main() {
         rating: p.rating,
         sales: 0,
         imagePath: p.imagePath,
+        // 多图先用主图兜底成一张，后台补图后自然变多
+        imagePaths: [p.imagePath],
       },
       update: {
         name: p.name,
@@ -72,6 +75,7 @@ async function main() {
         purchaseNotes: p.purchaseNotes,
         rating: p.rating,
         imagePath: p.imagePath,
+        imagePaths: [p.imagePath],
       },
     });
   }
@@ -95,14 +99,17 @@ async function main() {
         title: c.title,
         discount: c.discount,
         condition: c.condition,
+        minAmount: c.minAmount,
         expireAt: new Date(c.expireAt),
+        claimType: c.claimType ?? null,
       },
       update: {
         title: c.title,
         discount: c.discount,
         condition: c.condition,
+        minAmount: c.minAmount,
         expireAt: new Date(c.expireAt),
-        claimType: null,
+        claimType: c.claimType ?? null,
       },
     });
   }

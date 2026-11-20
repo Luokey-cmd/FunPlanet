@@ -60,4 +60,26 @@ class OrderApiService {
     final data = await _client.put('/api/orders/$orderId/confirm', auth: true);
     return Order.fromJson(data['order'] as Map<String, dynamic>);
   }
+
+  // 申请售后：type 为 refund（仅退款）或 return（退货退款），reason 必填。
+  // 同一订单有一条待处理申请时服务端会报错，错误信息由 ApiClient 原样带出。
+  Future<void> applyAfterSale(
+    String orderId, {
+    required String type,
+    required String reason,
+    String? description,
+  }) async {
+    await _client.post('/api/orders/$orderId/after-sale', {
+      'type': type,
+      'reason': reason,
+      if (description != null && description.isNotEmpty) 'description': description,
+    }, auth: true);
+  }
+
+  Future<List<AfterSaleRequest>> fetchMyAfterSales() async {
+    final data = await _client.get('/api/orders/after-sales', auth: true);
+    return (data['requests'] as List<dynamic>)
+        .map((e) => AfterSaleRequest.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 }

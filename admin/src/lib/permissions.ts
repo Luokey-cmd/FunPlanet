@@ -10,6 +10,7 @@ export const PAGE_PERMISSIONS: Record<AdminRole, NavPage[]> = {
     "products",
     "categories",
     "orders",
+    "afterSales",
     "users",
     "coupons",
     "banners",
@@ -25,6 +26,7 @@ export const PAGE_PERMISSIONS: Record<AdminRole, NavPage[]> = {
     "products",
     "categories",
     "orders",
+    "afterSales",
     "users",
     "coupons",
     "banners",
@@ -32,7 +34,7 @@ export const PAGE_PERMISSIONS: Record<AdminRole, NavPage[]> = {
     "changelog",
     "settings",
   ],
-  support: ["dashboard", "orders", "users", "support", "settings"],
+  support: ["dashboard", "orders", "afterSales", "users", "support", "settings"],
 };
 
 export function canAccess(role: AdminRole | undefined, page: NavPage): boolean {

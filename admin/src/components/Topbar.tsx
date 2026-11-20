@@ -18,6 +18,7 @@ const pageTitles: Record<NavPage, string> = {
   products: "商品管理",
   categories: "分类管理",
   orders: "订单管理",
+  afterSales: "售后处理",
   users: "用户管理",
   coupons: "优惠券管理",
   banners: "轮播图管理",

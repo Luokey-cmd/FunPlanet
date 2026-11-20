@@ -74,21 +74,53 @@ export const adminApi = {
     const qs = q.toString();
     return request<{ orders: AdminOrder[] }>(`/orders${qs ? `?${qs}` : ""}`);
   },
-  updateOrderStatus: (id: string, status: string) =>
-    request(`/orders/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  updateOrderStatus: (
+    id: string,
+    status: string,
+    extra?: { shippingCompany?: string; trackingNo?: string },
+  ) =>
+    request(`/orders/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, ...(extra ?? {}) }),
+    }),
+  afterSales: (status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    return request<{ requests: AdminAfterSale[] }>(`/after-sales${qs}`);
+  },
+  updateAfterSaleStatus: (id: string, body: { status: string; adminNote?: string }) =>
+    request(`/after-sales/${id}/status`, { method: "PATCH", body: JSON.stringify(body) }),
   users: (keyword?: string) => {
     const qs = keyword ? `?keyword=${encodeURIComponent(keyword)}` : "";
     return request<{ users: AdminUser[] }>(`/users${qs}`);
   },
-  updateUserProfile: (id: string, body: { vipLevel?: number; points?: number; funCoins?: number }) =>
-    request(`/users/${id}/profile`, { method: "PATCH", body: JSON.stringify(body) }),
+  updateUserProfile: (
+    id: string,
+    body: {
+      vipLevel?: number;
+      points?: number;
+      funCoins?: number;
+      status?: string;
+      growthPoints?: number;
+      vipExpireAt?: string | null;
+    },
+  ) => request(`/users/${id}/profile`, { method: "PATCH", body: JSON.stringify(body) }),
   coupons: () => request<{ coupons: AdminCoupon[] }>("/coupons"),
   createCoupon: (body: AdminCouponCreate) =>
     request<{ coupon: AdminCoupon }>("/coupons", { method: "POST", body: JSON.stringify(body) }),
   updateCoupon: (id: string, body: AdminCouponCreate) =>
     request<{ coupon: AdminCoupon }>(`/coupons/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   banners: () => request<{ banners: AdminBanner[] }>("/banners"),
-  createBanner: (body: { imagePath: string; productId: string; sortOrder?: number }) =>
+  createBanner: (
+    body: {
+      imagePath: string;
+      productId: string;
+      sortOrder?: number;
+      title?: string;
+      linkType?: string;
+      linkTarget?: string;
+      isActive?: boolean;
+    },
+  ) =>
     request<{ banner: AdminBanner }>("/banners", { method: "POST", body: JSON.stringify(body) }),
   updateBanner: (id: string, body: Partial<AdminBanner>) =>
     request<{ banner: AdminBanner }>(`/banners/${id}`, { method: "PUT", body: JSON.stringify(body) }),
@@ -319,6 +351,14 @@ export interface AdminProduct {
   stock: number;
   isOnShelf: boolean;
   imagePath: string;
+  // 2026-11-20 后端新增：多图、视频、品牌/系列、稀有度、导购结构化卖点
+  imagePaths?: string[];
+  videoPath?: string | null;
+  brand?: string | null;
+  series?: string | null;
+  rarity?: string | null;
+  suitableFor?: string | null;
+  sellingPoints?: string[];
   favoriteCount?: number;
 }
 
@@ -334,6 +374,12 @@ export interface AdminOrder {
   paymentStatus: string;
   date: string;
   address: string;
+  freight?: number;
+  remark?: string | null;
+  shippingCompany?: string | null;
+  trackingNo?: string | null;
+  shippedAt?: string | null;
+  receivedAt?: string | null;
 }
 
 export interface AdminUser {
@@ -350,6 +396,9 @@ export interface AdminUser {
   joinDateTime?: string;
   status: string;
   avatarPath?: string | null;
+  lastLoginAt?: string | null;
+  growthPoints?: number;
+  vipExpireAt?: string | null;
 }
 
 export interface AdminCoupon {
@@ -358,6 +407,16 @@ export interface AdminCoupon {
   discount: number;
   condition: string;
   expireAt: string;
+  // 2026-11-20 后端新增：数字门槛（下单只认它）、发行量与已领数、适用范围
+  minAmount?: number;
+  couponType?: string;
+  totalQuantity?: number | null;
+  issuedCount?: number;
+  perUserLimit?: number;
+  claimStartAt?: string | null;
+  scope?: string;
+  scopeValue?: string | null;
+  claimType?: string | null;
 }
 
 export interface AdminCouponCreate {
@@ -365,6 +424,26 @@ export interface AdminCouponCreate {
   discount: number;
   condition: string;
   expireAt: string;
+  minAmount?: number;
+  totalQuantity?: number | null;
+  claimStartAt?: string | null;
+}
+
+export interface AdminAfterSale {
+  id: string;
+  orderId: string;
+  orderNo: string;
+  orderStatus: string;
+  orderTotal: number;
+  user: string;
+  phone: string;
+  type: string;
+  reason: string;
+  description: string;
+  amount: number | null;
+  status: string;
+  adminNote: string | null;
+  date: string;
 }
 
 export interface AdminBanner {
@@ -373,6 +452,12 @@ export interface AdminBanner {
   productId: string;
   productName: string;
   sortOrder: number;
+  title?: string | null;
+  linkType?: string;
+  linkTarget?: string | null;
+  isActive?: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
 }
 
 export interface DashboardData {

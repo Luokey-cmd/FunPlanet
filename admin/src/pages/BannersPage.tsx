@@ -7,7 +7,15 @@ import BannerImage from "../components/BannerImage";
 import { adminApi, type AdminBanner } from "../lib/api";
 import { resolveAssetUrl } from "../lib/assets";
 
-const emptyBanner = { imagePath: "", productId: "", sortOrder: 0 };
+const emptyBanner = {
+  imagePath: "",
+  productId: "",
+  sortOrder: 0,
+  title: null as string | null,
+  linkType: "product",
+  linkTarget: null as string | null,
+  isActive: true,
+};
 
 export default function BannersPage() {
   const queryClient = useQueryClient();
@@ -40,6 +48,10 @@ export default function BannersPage() {
           imagePath: form.imagePath,
           productId: form.productId,
           sortOrder: form.sortOrder ?? 0,
+          title: form.title ?? undefined,
+          linkType: form.linkType ?? "product",
+          linkTarget: form.linkTarget ?? undefined,
+          isActive: form.isActive !== false,
         });
       }
       return adminApi.updateBanner(form.id!, form);
@@ -126,7 +138,11 @@ export default function BannersPage() {
               <div className="p-4">
                 <p className="text-sm font-medium text-foreground truncate">{banner.productName}</p>
                 <p className="text-xs text-muted-foreground mt-1 truncate">{banner.imagePath}</p>
-                <p className="text-xs text-muted-foreground">排序 {banner.sortOrder} · 商品 {banner.productId}</p>
+                <p className="text-xs text-muted-foreground">
+                  排序 {banner.sortOrder} · 商品 {banner.productId}
+                  {banner.isActive === false ? " · 已停用（App 不显示）" : ""}
+                  {banner.title ? ` · ${banner.title}` : ""}
+                </p>
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => {
@@ -236,6 +252,49 @@ export default function BannersPage() {
                   className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">标题（可空）</span>
+                <input
+                  value={editing.title ?? ""}
+                  onChange={(e) => setEditing({ ...editing, title: e.target.value || null })}
+                  className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </label>
+              <div className="flex gap-3">
+                <label className="flex flex-col gap-1 text-sm flex-1">
+                  <span className="text-muted-foreground">跳转类型</span>
+                  <select
+                    value={editing.linkType ?? "product"}
+                    onChange={(e) => setEditing({ ...editing, linkType: e.target.value })}
+                    className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="product">跳商品</option>
+                    <option value="category">跳分类</option>
+                    <option value="url">跳外链</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm flex-1">
+                  <span className="text-muted-foreground">是否启用</span>
+                  <select
+                    value={editing.isActive === false ? "off" : "on"}
+                    onChange={(e) => setEditing({ ...editing, isActive: e.target.value === "on" })}
+                    className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="on">启用（App 显示）</option>
+                    <option value="off">停用</option>
+                  </select>
+                </label>
+              </div>
+              {(editing.linkType ?? "product") !== "product" && (
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-muted-foreground">跳转目标（分类名或链接）</span>
+                  <input
+                    value={editing.linkTarget ?? ""}
+                    onChange={(e) => setEditing({ ...editing, linkTarget: e.target.value || null })}
+                    className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </label>
+              )}
               <button
                 type="submit"
                 disabled={saveMutation.isPending}
