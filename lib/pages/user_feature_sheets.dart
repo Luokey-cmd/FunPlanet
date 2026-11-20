@@ -12,6 +12,7 @@ import '../widgets/app_tab_bar.dart';
 import '../widgets/product_thumbnail.dart';
 import '../widgets/feature_page_scaffold.dart';
 import 'address_edit_page.dart';
+import 'member_benefit_page.dart';
 import 'product_detail_page.dart';
 import 'support_chat_page.dart';
 
@@ -55,7 +56,9 @@ class UserFeatureSheets {
   }
 
   static void handleMemberBenefit(BuildContext context, String label) {
-    showMemberBenefits(context, highlight: label);
+    // 2026-11-20 改：5 项权益各开自己的详情页（member_benefit_page），
+    // 不再全部挤进同一个「办理会员」弹层；弹层只留给「会员专享/开通会员」入口。
+    MemberBenefitPage.openByLabel(context, label);
   }
 
   static void handleStatBar(BuildContext context, String label) {

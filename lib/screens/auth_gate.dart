@@ -69,24 +69,8 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
 
-    // 初始化未完成、或开屏最短展示时间未到。
+    // 初始化未完成、或开屏最短展示时间未到：继续贴开屏图，避免黑屏转圈。
     if (!auth.isInitialized || !_minSplashElapsed) {
-      // 上游已播过开屏：只等鉴权，不再重复贴开屏图。
-      if (widget.skipSplash) {
-        return const Scaffold(
-          backgroundColor: Colors.black,
-          body: Center(
-            child: SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: Colors.white70,
-              ),
-            ),
-          ),
-        );
-      }
       return Scaffold(
         body: SizedBox.expand(
           child: Image.asset(

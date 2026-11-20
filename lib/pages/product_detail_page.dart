@@ -19,6 +19,8 @@ import 'support_chat_page.dart';
 import '../widgets/click_effect/app_pressable.dart';
 import '../widgets/click_effect/app_buttons.dart';
 const _detailTextScale = 1.0;
+/// 详情页单独压字号（不影响图片/间距布局缩放）
+const _detailFontScale = 0.93;
 
 class ProductDetailPage extends StatefulWidget {
   const ProductDetailPage({super.key, required this.product});
@@ -79,7 +81,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> with SingleTicker
     final isFavorite = context.watch<UserProvider>().isFavorite(product.id);
 
     return MediaQuery(
-      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(_detailTextScale)),
+      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(_detailFontScale)),
       child: Scaffold(
       backgroundColor: AppColors.background,
       body: SparkleBackground(
@@ -135,7 +137,7 @@ class _DetailTopBar extends StatelessWidget {
             child: Text(
               '商品详情',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: AppScale.t(16), fontWeight: FontWeight.w600, color: AppColors.foreground),
+              style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.w600, color: AppColors.foreground),
             ),
           ),
           _CircleBtn(
@@ -383,7 +385,7 @@ class _InfoCard extends StatelessWidget {
                       Text(
                         product.name,
                         style: TextStyle(
-                          fontSize: AppScale.t(17),
+                          fontSize: AppScale.t(16),
                           fontWeight: FontWeight.bold,
                           color: AppColors.foreground,
                           height: 1.3,
@@ -399,7 +401,7 @@ class _InfoCard extends StatelessWidget {
                 ),
                 Text(
                   '¥${product.price.toStringAsFixed(0)}',
-                  style: TextStyle(fontSize: AppScale.t(20), fontWeight: FontWeight.bold, color: AppColors.primary),
+                  style: TextStyle(fontSize: AppScale.t(18), fontWeight: FontWeight.bold, color: AppColors.primary),
                 ),
               ],
             ),
@@ -451,7 +453,7 @@ class _DescriptionSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('折叠式产品介绍', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+          Text('折叠式产品介绍', style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600)),
           SizedBox(height: AppScale.s(8)),
           Text(
             product.description,
@@ -511,7 +513,7 @@ class _DetailContent extends StatelessWidget {
                         Icon(Icons.check_circle_outline, size: AppScale.s(15), color: AppColors.primary),
                         SizedBox(width: AppScale.s(6)),
                         Expanded(
-                          child: Text(point, style: TextStyle(fontSize: AppScale.t(13), color: AppColors.foreground, height: 1.5)),
+                          child: Text(point, style: TextStyle(fontSize: AppScale.t(12), color: AppColors.foreground, height: 1.5)),
                         ),
                       ],
                     ),
@@ -522,11 +524,11 @@ class _DetailContent extends StatelessWidget {
               if (product.suitableFor != null && product.suitableFor!.isNotEmpty) ...[
                 Text(
                   '适合：${product.suitableFor}',
-                  style: TextStyle(fontSize: AppScale.t(13), color: AppColors.foreground, height: 1.5),
+                  style: TextStyle(fontSize: AppScale.t(12), color: AppColors.foreground, height: 1.5),
                 ),
                 SizedBox(height: AppScale.s(8)),
               ],
-              Text(product.description, style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground, height: 1.6)),
+              Text(product.description, style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground, height: 1.6)),
             ],
           ),
         1 => _ProductReviewsSection(productId: product.id),
@@ -538,7 +540,7 @@ class _DetailContent extends StatelessWidget {
           ),
         _ => Text(
             product.purchaseNotes.replaceAll('；', '。\n'),
-            style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground, height: 1.6),
+            style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground, height: 1.6),
           ),
       },
     );
