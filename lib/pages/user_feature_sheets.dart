@@ -664,9 +664,10 @@ class UserFeatureSheets {
   }
 
   static void showBrowseHistory(BuildContext context) {
-    _showSheet(
+    openFeaturePage(
       context,
       title: '浏览记录',
+      scrollable: false,
       child: Consumer<UserProvider>(
         builder: (context, user, _) {
           final items = user.browseHistory
@@ -675,7 +676,7 @@ class UserFeatureSheets {
               .toList();
           if (items.isEmpty) return _empty('暂无浏览记录');
           return ListView.separated(
-            shrinkWrap: true,
+            padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
             itemCount: items.length,
             separatorBuilder: (_, _) => SizedBox(height: AppScale.s(10)),
             itemBuilder: (context, index) {

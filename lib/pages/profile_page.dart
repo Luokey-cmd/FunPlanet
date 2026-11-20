@@ -921,7 +921,7 @@ class _ServiceSection extends StatelessWidget {
 // 现在收成一行 5 个入口，大图卡已删除（一处入口只出现一次）。
 class _ContentSection extends StatelessWidget {
   static const _items = [
-    ('assets/images/icon_pf_community.png', '我的社区'),
+    ('assets/images/icon_pf_community.png', 'AI 社区'),
     ('assets/images/icon_pf_ai_paint.png', 'AI绘画'),
     ('assets/images/icon_pf_starwish.png', '星愿档案'),
     ('assets/images/icon_pf_cabinet.png', '我的盒柜'),
@@ -933,7 +933,7 @@ class _ContentSection extends StatelessWidget {
   // 盒柜是按订单汇藏品的弹层；我的评价复用订单列表（只看已评价订单）。
   void _handleTap(BuildContext context, String label) {
     switch (label) {
-      case '我的社区':
+      case 'AI 社区':
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const AiCommunityPage()),

@@ -519,20 +519,20 @@ class _MarketSectionState extends State<_MarketSection> {
           SizedBox(height: AppScale.s(12)),
           SizedBox(
             height: AppScale.s(32),
-            child: ListView(
-              scrollDirection: Axis.horizontal,
+            child: Row(
               children: marketTabs.map((t) {
                 final active = _tab == t.$1;
-                return AppGestureDetector(
-                  onTap: () => setState(() => _tab = t.$1),
-                  enablePressScale: false,
-                  enableParticle: false,
-                  child: Container(
-                    margin: EdgeInsets.only(right: AppScale.s(16)),
+                return Expanded(
+                  child: AppGestureDetector(
+                    onTap: () => setState(() => _tab = t.$1),
+                    behavior: HitTestBehavior.opaque,
+                    enablePressScale: false,
+                    enableParticle: false,
                     child: Column(
                       children: [
                         Text(
                           t.$2,
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: AppScale.t(13),
                             fontWeight: active ? FontWeight.w600 : FontWeight.w500,

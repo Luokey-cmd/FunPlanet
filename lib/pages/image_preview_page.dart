@@ -5,7 +5,6 @@ import '../theme/app_scale.dart';
 import '../utils/media_url.dart';
 import '../utils/save_artwork_image.dart';
 import '../utils/snackbar_utils.dart';
-import '../widgets/ai_generated_badge.dart';
 import '../widgets/app_network_image.dart';
 import '../widgets/click_effect/app_icon_button.dart';
 import '../widgets/click_effect/app_pressable.dart';
@@ -19,7 +18,6 @@ class ImagePreviewPage extends StatefulWidget {
     this.backgroundColor = Colors.white,
     this.closeIconColor,
     this.saveImagePath,
-    this.showAiBadge = false,
   }) : assert(child != null || imageUrls.length > 0, 'child 与 imageUrls 至少提供一个');
 
   final Widget? child;
@@ -28,14 +26,12 @@ class ImagePreviewPage extends StatefulWidget {
   final Color backgroundColor;
   final Color? closeIconColor;
   final String? saveImagePath;
-  final bool showAiBadge;
 
   static Future<void> openNetwork(
     BuildContext context, {
     required List<String> urls,
     int initialIndex = 0,
     String? saveImagePath,
-    bool showAiBadge = false,
     Color backgroundColor = Colors.black,
   }) {
     return Navigator.push<void>(
@@ -45,7 +41,6 @@ class ImagePreviewPage extends StatefulWidget {
           imageUrls: urls,
           initialIndex: initialIndex,
           saveImagePath: saveImagePath,
-          showAiBadge: showAiBadge,
           backgroundColor: backgroundColor,
           closeIconColor: Colors.white,
         ),
@@ -124,12 +119,6 @@ class _ImagePreviewPageState extends State<ImagePreviewPage> {
                 );
               },
             ),
-          if (widget.showAiBadge)
-            Positioned(
-              top: top + AppScale.s(18),
-              right: AppScale.s(56),
-              child: const AiGeneratedBadge(),
-            ),
           Positioned(
             top: top + AppScale.s(8),
             left: AppScale.s(4),
@@ -141,7 +130,7 @@ class _ImagePreviewPageState extends State<ImagePreviewPage> {
           if (_currentSavePath != null && _currentSavePath!.isNotEmpty)
             Positioned(
               top: top + AppScale.s(8),
-              right: AppScale.s(4),
+              right: AppScale.s(8),
               child: _SaveImageButton(imagePath: _currentSavePath!),
             ),
           if (multi)

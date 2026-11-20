@@ -4,14 +4,17 @@ import 'package:flutter/services.dart';
 import '../../theme/app_colors.dart';
 import 'click_effect_host.dart';
 
-/// 按下缩放 + 可选粒子。
+/// 按下缩放 + 松手回弹 + 可选粒子。
 /// 通栏矮按钮/列表行允许动效；大卡片/整页热区跳过。
+/// 手感对齐参考项目 QuickClipboard：按下只轻缩到 0.95，松手时跑一遍
+/// 0.5 秒的弹簧回弹（先弹出 1.08 再衰减振荡回 1），粒子也在松手时才爆。
 class AppPressable extends StatefulWidget {
   const AppPressable({
     super.key,
     required this.child,
     this.enabled = true,
-    this.scale = 0.86,
+    // 参考实现按下是 0.95（开关）~0.98（侧栏按钮）；旧默认 0.86 缩得太狠，像被压扁。
+    this.scale = 0.95,
     this.includeSemantics = true,
     this.enableParticle = true,
     this.enableHaptic = false,
@@ -28,13 +31,35 @@ class AppPressable extends StatefulWidget {
   State<AppPressable> createState() => _AppPressableState();
 }
 
-class _AppPressableState extends State<AppPressable> {
+class _AppPressableState extends State<AppPressable>
+    with SingleTickerProviderStateMixin {
   bool _pressed = false;
   Offset? _downPos;
+
+  // 松手回弹的动画控制器：500ms 一遍，曲线见 _ButtonBounceCurve。
+  late final AnimationController _bounce = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 500),
+  );
+
+  @override
+  void dispose() {
+    _bounce.dispose();
+    super.dispose();
+  }
 
   void _setPressed(bool value) {
     if (!widget.enabled || _pressed == value) return;
     setState(() => _pressed = value);
+  }
+
+  // 松手时播回弹：与粒子同一时刻触发，眼睛看到的是「弹一下 + 星星散开」一整套。
+  // 大卡片/整页热区不播（与缩放同一道闸门 _shouldScale）。
+  void _playBounce() {
+    if (!ClickEffectController.effectsEnabled) return;
+    final box = context.findRenderObject() as RenderBox?;
+    if (!_shouldScale(box?.size)) return;
+    _bounce.forward(from: 0);
   }
 
   bool _shouldScale(Size? size) {
@@ -73,7 +98,8 @@ class _AppPressableState extends State<AppPressable> {
         if (!_shouldScale(box?.size)) return;
         _downPos = event.position;
         _setPressed(true);
-        _burstFromCenter();
+        // 注意：粒子不在这里爆。按下时手指还压在控件上，爆了也被挡住；
+        // 参考实现是桌面端 click（≈松手）触发，搬到触屏必须跟着改到松手。
         if (widget.enableHaptic) {
           HapticFeedback.selectionClick();
         }
@@ -86,19 +112,71 @@ class _AppPressableState extends State<AppPressable> {
         }
       },
       onPointerUp: (_) {
+        // 只有「在控件内按下、没滑出去取消」的松手才算一次完整点击，爆粒子+回弹。
+        final wasPressed = _downPos != null;
         _downPos = null;
         _setPressed(false);
+        if (wasPressed && widget.enabled) {
+          _burstFromCenter();
+          _playBounce();
+        }
       },
       onPointerCancel: (_) {
         _downPos = null;
         _setPressed(false);
       },
-      // 瞬时缩放，避免 AnimatedScale 与粒子同帧抢预算。
-      child: Transform.scale(
+      // 两层缩放相乘：外层管按下轻缩（110ms 平滑进出，不再瞬时跳变），
+      // 内层管松手回弹（500ms 关键帧振荡）。旧版是瞬时 1↔0.86 硬切，所以显得廉价。
+      child: AnimatedScale(
         scale: _pressed ? widget.scale : 1.0,
-        child: widget.child,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: AnimatedBuilder(
+          animation: _bounce,
+          builder: (context, child) {
+            final t = _bounce.value;
+            // 教训（2026-11-20 登录按钮文字消失）：Flutter 的 Curve.transform(0)
+            // 有端点捷径、直接返回 0，不走 transformInternal。静止时控制器值就是 0，
+            // 拿它当缩放会把内容缩成 0。所以端点必须手动归 1，只在动画中段用曲线值。
+            final scale = (t <= 0.0 || t >= 1.0)
+                ? 1.0
+                : const _ButtonBounceCurve().transform(t);
+            return Transform.scale(scale: scale, child: child);
+          },
+          child: widget.child,
+        ),
       ),
     );
+  }
+}
+
+// 松手回弹曲线：逐点照搬参考项目 QuickClipboard 的 buttonBounce 关键帧
+// （0.5s：先弹大到 1.08，再 0.96 → 1.04 → 0.98 → 1，像果冻一样衰减振荡两下停住）。
+// 输入是动画进度 0~1，输出是缩放倍数；首尾都是 1.0，静止时不影响布局。
+class _ButtonBounceCurve extends Curve {
+  const _ButtonBounceCurve();
+
+  static const _points = <(double, double)>[
+    (0.0, 1.0),
+    (0.30, 1.08),
+    (0.50, 0.96),
+    (0.70, 1.04),
+    (0.85, 0.98),
+    (1.0, 1.0),
+  ];
+
+  @override
+  double transformInternal(double t) {
+    if (t <= 0 || t >= 1) return 1.0;
+    for (var i = 1; i < _points.length; i++) {
+      final (x1, y1) = _points[i];
+      if (t <= x1) {
+        final (x0, y0) = _points[i - 1];
+        final u = (t - x0) / (x1 - x0);
+        return y0 + (y1 - y0) * u;
+      }
+    }
+    return 1.0;
   }
 }
 
@@ -140,8 +218,11 @@ class _AppFocusableState extends State<AppFocusable> {
           });
         }
       },
-      child: Transform.scale(
+      // 聚焦放大改为 200ms 平滑过渡（旧版瞬时跳变，与按下缩放同一个毛病）。
+      child: AnimatedScale(
         scale: _focused && ClickEffectController.effectsEnabled ? widget.focusedScale : 1.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
         child: widget.child,
       ),
     );

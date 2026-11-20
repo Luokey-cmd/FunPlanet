@@ -190,7 +190,6 @@ class _AiPaintPageState extends State<AiPaintPage> {
         context,
         urls: [artwork.imagePath],
         saveImagePath: artwork.imagePath,
-        showAiBadge: true,
       ),
     );
   }

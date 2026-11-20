@@ -11,7 +11,10 @@ class ClickEffectController extends ChangeNotifier {
   static bool effectsEnabled = true;
 
   static const int maxConcurrentBursts = 3;
-  static const Duration burstDuration = Duration(milliseconds: 280);
+
+  // 爆发时长 600ms：对齐参考项目 QuickClipboard 的 particleExplosion（0.6s）。
+  // 旧版只有 280ms，粒子一闪而过，眼睛还没看清形状就结束了，是「不像」的主因之一。
+  static const Duration burstDuration = Duration(milliseconds: 600);
   static const int particleCount = 8;
   static const double burstRadius = 56;
 
@@ -60,7 +63,9 @@ class ClickBurst {
           return ClickParticle(
             dirX: math.cos(angle),
             dirY: math.sin(angle),
-            distance: 18.0 + rand.nextDouble() * 16.0,
+            // 基础距离 14~26px（参考实现是 15~25px）；飞行后半段还会再漂到 1.5 倍，
+            // 实际散开范围约 21~39px，紧凑不散漫。
+            distance: 14.0 + rand.nextDouble() * 12.0,
             size: 4.5 + rand.nextDouble() * 2.5,
           );
         });
@@ -178,7 +183,9 @@ class _BurstLayerState extends State<_BurstLayer> with SingleTickerProviderState
       vsync: this,
       duration: ClickEffectController.burstDuration,
     );
-    _t = CurvedAnimation(parent: _anim, curve: Curves.easeOutCubic);
+    // 缓动对齐参考实现：cubic-bezier(0.25, 0.46, 0.45, 0.94)，出得快、收得缓。
+    // 旧版 easeOutCubic 叠加画笔里的分段系数等于双重缓动，粒子前半程就冲完、后半程冻住。
+    _t = CurvedAnimation(parent: _anim, curve: const Cubic(0.25, 0.46, 0.45, 0.94));
     _anim.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         widget.onFinished();
@@ -236,10 +243,24 @@ class _BurstPainter extends CustomPainter {
 
     final origin = Offset(size.width * 0.5, size.height * 0.5);
     final t = progress;
-    // 前半冲出，后半减速淡出；算子保持简单，避免每粒子 Curves 查表。
-    final travelFactor = t < 0.55 ? (t / 0.55) : (1.0 + 0.28 * ((t - 0.55) / 0.45));
-    final scale = t < 0.45 ? (1.0 + 0.25 * (t / 0.45)) : (1.25 * (1.0 - (t - 0.45) / 0.55)).clamp(0.15, 1.25);
-    final opacity = t < 0.4 ? 1.0 : (1.0 - (t - 0.4) / 0.6).clamp(0.0, 1.0);
+    // 逐段照搬参考实现 particleExplosion 的三段关键帧（0% / 50% / 100%）：
+    // 前半段：飞到 1.0 倍距离，个头从 1 长到 1.3，透明度只从 1 降到 0.9（几乎不淡）；
+    // 后半段：继续往外漂到 1.5 倍距离，个头缩到 0.3，透明度才一路淡到 0。
+    // 关键是后半段「还在往外漂、慢慢消失」，旧版后半段几乎原地冻住直接淡没，所以显得急。
+    final double travelFactor;
+    final double scale;
+    final double opacity;
+    if (t < 0.5) {
+      final u = t / 0.5;
+      travelFactor = u;
+      scale = 1.0 + 0.3 * u;
+      opacity = 1.0 - 0.1 * u;
+    } else {
+      final u = (t - 0.5) / 0.5;
+      travelFactor = 1.0 + 0.5 * u;
+      scale = 1.3 - 1.0 * u;
+      opacity = 0.9 * (1.0 - u);
+    }
 
     _paint.color = burst.color.withValues(alpha: opacity);
     for (final p in burst.particles) {

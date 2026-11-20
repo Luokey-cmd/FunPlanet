@@ -778,7 +778,7 @@ class _PostImages extends StatelessWidget {
         imagePath: imagePaths.first,
         height: FeaturePageStyle.s(220),
         onTap: () => unawaited(
-          ImagePreviewPage.openNetwork(context, urls: imagePaths, showAiBadge: true),
+          ImagePreviewPage.openNetwork(context, urls: imagePaths),
         ),
       );
     }
@@ -801,7 +801,6 @@ class _PostImages extends StatelessWidget {
               context,
               urls: imagePaths,
               initialIndex: index,
-              showAiBadge: true,
             ),
           ),
         );

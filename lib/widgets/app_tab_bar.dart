@@ -63,8 +63,8 @@ class AppTabBar extends StatelessWidget {
           return Expanded(
             child: AppInkWell(
               onTap: () => onChange(tab.$1),
-              enablePressScale: false,
-              enableParticle: false,
+              enablePressScale: true,
+              enableParticle: true,
               splashColor: Colors.transparent,
               highlightColor: Colors.transparent,
               child: Padding(
