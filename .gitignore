@@ -114,3 +114,4 @@ migrate_working_dir/
 /tool/apply_click_effect.py
 /scripts/install-honor-profile.ps1
 /server/scripts/remap-public-user-ids.js
+/backups/
