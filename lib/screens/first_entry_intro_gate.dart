@@ -154,22 +154,37 @@ class _FirstEntryIntroGateState extends State<FirstEntryIntroGate> {
         children: [
           if (videoReady)
             // contain：小屏完整显示整段剧情，宁可上下留黑边，不裁画面。
-            Center(
-              child: AspectRatio(
-                aspectRatio: controller.value.aspectRatio == 0
-                    ? (9 / 16)
-                    : controller.value.aspectRatio,
-                child: VideoPlayer(controller),
+            // IgnorePointer：视频层不抢点击，避免盖住右上角「跳过」。
+            IgnorePointer(
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: controller.value.aspectRatio == 0
+                      ? (9 / 16)
+                      : controller.value.aspectRatio,
+                  child: VideoPlayer(controller),
+                ),
               ),
             ),
+          // 右上角真实可点区域：点了写标记并进 AuthGate → 登录页。
           Positioned(
-            top: MediaQuery.of(context).padding.top + 40,
-            right: 10,
-            child: TextButton(
-              onPressed: _finish,
-              child: const Text(
-                '跳过剧情>>',
-                style: TextStyle(color: Colors.white, fontSize: 15),
+            top: MediaQuery.of(context).padding.top + 24,
+            right: 0,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _finish,
+                borderRadius: BorderRadius.circular(8),
+                child: const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 16, 16),
+                  child: Text(
+                    '跳过剧情>>',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
