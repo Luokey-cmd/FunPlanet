@@ -11,6 +11,7 @@ import 'providers/order_provider.dart';
 import 'providers/product_catalog_provider.dart';
 import 'providers/user_provider.dart';
 import 'screens/auth_gate.dart';
+import 'screens/first_entry_intro_gate.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_stability.dart';
 import 'widgets/click_effect/click_effect.dart';
@@ -60,7 +61,7 @@ class FunPlanetApp extends StatelessWidget {
             ),
           );
         },
-        home: const AuthGate(),
+        home: const FirstEntryIntroGate(),
       ),
     );
   }

@@ -9,7 +9,10 @@ import '../pages/login_page.dart';
 import '../utils/user_session_sync.dart';
 
 class AuthGate extends StatefulWidget {
-  const AuthGate({super.key});
+  const AuthGate({super.key, this.skipSplash = false});
+
+  /// 上游已播过开屏图时跳过，避免「开屏 → 剧情 → 再开屏」重复。
+  final bool skipSplash;
 
   @override
   State<AuthGate> createState() => _AuthGateState();
@@ -23,11 +26,15 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    _splashTimer = Timer(const Duration(milliseconds: 1800), () {
-      if (mounted) {
-        setState(() => _minSplashElapsed = true);
-      }
-    });
+    if (widget.skipSplash) {
+      _minSplashElapsed = true;
+    } else {
+      _splashTimer = Timer(const Duration(milliseconds: 1800), () {
+        if (mounted) {
+          setState(() => _minSplashElapsed = true);
+        }
+      });
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final auth = context.read<AuthProvider>();
       final catalog = context.read<ProductCatalogProvider>();
@@ -62,8 +69,24 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
 
-    // 初始化未完成、或开屏最短展示时间未到：全屏开屏图（替换原来的空白转圈页）。
+    // 初始化未完成、或开屏最短展示时间未到。
     if (!auth.isInitialized || !_minSplashElapsed) {
+      // 上游已播过开屏：只等鉴权，不再重复贴开屏图。
+      if (widget.skipSplash) {
+        return const Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+            child: SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Colors.white70,
+              ),
+            ),
+          ),
+        );
+      }
       return Scaffold(
         body: SizedBox.expand(
           child: Image.asset(
