@@ -54,7 +54,7 @@ class _StarwishDossierSheetState extends State<_StarwishDossierSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '星愿档案',
+              '小豆记得你',
               style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
                 fontSize: AppScale.t(18),
@@ -63,7 +63,7 @@ class _StarwishDossierSheetState extends State<_StarwishDossierSheet> {
             ),
             SizedBox(height: AppScale.s(4)),
             Text(
-              '点亮四格，小豆下次就按你的星签揭牌。',
+              '这些是小豆记住的偏好，随时能改；不改也能直接逛，不挡你买东西。',
               style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground, height: 1.4),
             ),
             SizedBox(height: AppScale.s(14)),
@@ -104,11 +104,11 @@ class _StarwishDossierSheetState extends State<_StarwishDossierSheet> {
                 await context.read<StarwishProfileProvider>().update(_draft);
                 if (context.mounted) Navigator.pop(context);
               },
-              child: Text('点亮星签 · ${_draft.signTitle}', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w700)),
+              child: Text('就这么记', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w700)),
             ),
             AppTextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('稍后再点', style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground)),
+              child: Text('先不改', style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground)),
             ),
           ],
         ),

@@ -70,5 +70,9 @@
 	<string>用于更换个人头像</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>用于保存 AI 绘画作品到相册</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>用于把你说的话转成文字，方便向小豆提问</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>用于把你说的话转成文字，方便向小豆提问</string>
 </dict>
 </plist>

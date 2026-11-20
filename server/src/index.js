@@ -27,6 +27,7 @@ import supportRoutes from './routes/support.js';
 import reviewRoutes from './routes/reviews.js';
 import aiRoutes from './routes/ai.js';
 import aiCommunityRoutes from './routes/ai-community.js';
+import voiceRoutes from './routes/voice.js';
 import { syncAllProductSales } from './utils/product-sales.js';
 import { persistChatTurn, recordGuideRecommendations } from './utils/chat-history.js';
 import { seedAiCommunityIfNeeded } from './utils/ai-community-seed.js';
@@ -131,6 +132,7 @@ app.use('/api/support', supportRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/ai-community', aiCommunityRoutes);
+app.use('/api/voice', voiceRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/changelog', changelogRoutes);
 
