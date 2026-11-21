@@ -74,6 +74,9 @@ function auditActionLabel(method, p) {
   if (head === 'changelog') return `${verb}更新日志`;
   if (head === 'orders') return '更新订单状态';
   if (head === 'after-sales') return '处理售后申请';
+  if (head === 'moderation') {
+    return method === 'DELETE' ? '内容审核：删除内容' : '内容审核：调整可见状态';
+  }
   if (head === 'users') return '编辑用户资料';
   if (head === 'admins') return '调整管理员账号';
   if (head === 'support') return '客服中心操作';
@@ -678,6 +681,136 @@ router.patch('/orders/:id/status', adminAuthRequired, async (req, res) => {
   }
 });
 
+// 订单筛选条件：列表、导出共用一处，保证「看到什么就导出什么」
+function buildOrderWhere(req) {
+  const status = String(req.query.status ?? '').trim();
+  const keyword = String(req.query.keyword ?? '').trim();
+  const where = {};
+  if (status && status !== 'all') {
+    where.status = status === 'returned' ? { in: ['returned', 'cancelled'] } : status;
+  }
+  if (keyword) {
+    where.OR = [
+      { orderNo: { contains: keyword } },
+      { user: { nickname: { contains: keyword } } },
+      { user: { phone: { contains: keyword } } },
+    ];
+  }
+  return where;
+}
+
+// 订单导出 CSV：按当前筛选导出，Excel 打开不乱码（加 BOM 头）；
+// 字段带逗号/引号/换行时按 CSV 规则加引号转义
+router.get('/orders/export', adminAuthRequired, async (req, res) => {
+  const orders = await prisma.order.findMany({
+    where: buildOrderWhere(req),
+    include: { user: true, items: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  const esc = (v) => {
+    const s = String(v ?? '');
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const header = [
+    '订单号', '下单时间', '买家', '手机号', '商品明细', '商品总额', '优惠金额',
+    '运费', '实付金额', '状态', '支付状态', '收货人', '收货电话', '收货地址',
+    '物流公司', '快递单号', '发货时间', '买家备注',
+  ];
+  const lines = orders.map((o) =>
+    [
+      o.orderNo,
+      formatChinaDateTime(o.createdAt),
+      o.user.nickname,
+      o.user.phone,
+      o.items.map((i) => `${i.name}${i.spec ? `(${i.spec})` : ''} x${i.quantity}`).join('、'),
+      Number(o.subtotal).toFixed(2),
+      Number(o.discount).toFixed(2),
+      Number(o.freight).toFixed(2),
+      Number(o.total).toFixed(2),
+      orderStatusLabel(o.status),
+      o.paymentStatus,
+      o.addressName ?? '',
+      o.addressPhone ?? '',
+      o.addressDetail ?? '',
+      o.shippingCompany ?? '',
+      o.trackingNo ?? '',
+      o.shippedAt ? formatChinaDateTime(o.shippedAt) : '',
+      o.remark ?? '',
+    ]
+      .map(esc)
+      .join(','),
+  );
+  const stamp = formatChinaDate(new Date()).replace(/\//g, '-');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="funplanet-orders-${stamp}.csv"`);
+  res.send('\uFEFF' + [header.join(','), ...lines].join('\r\n'));
+});
+
+// 订单详情：列表只给概要，详情把金额拆分、收货信息、商品明细快照、
+// 支付与时间线、关联售后一次给全，供后台详情弹窗展示
+router.get('/orders/:id', adminAuthRequired, async (req, res) => {
+  const order = await prisma.order.findUnique({
+    where: { id: req.params.id },
+    include: {
+      user: true,
+      items: true,
+      afterSaleRequests: { orderBy: { createdAt: 'desc' } },
+    },
+  });
+  if (!order) {
+    fail(res, 404, '订单不存在');
+    return;
+  }
+  ok(res, {
+    order: {
+      id: order.id,
+      orderNo: order.orderNo,
+      status: order.status,
+      statusLabel: orderStatusLabel(order.status),
+      paymentStatus: order.paymentStatus,
+      paymentMethod: order.paymentMethod ?? null,
+      user: order.user.nickname,
+      phone: order.user.phone,
+      subtotal: Number(order.subtotal),
+      discount: Number(order.discount),
+      freight: Number(order.freight),
+      amount: Number(order.total),
+      addressName: order.addressName ?? '',
+      addressPhone: order.addressPhone ?? '',
+      address: order.addressDetail ?? '',
+      remark: order.remark ?? null,
+      cancelReason: order.cancelReason ?? null,
+      shippingCompany: order.shippingCompany ?? null,
+      trackingNo: order.trackingNo ?? null,
+      date: formatChinaDateTime(order.createdAt),
+      paidAt: order.paidAt ? formatChinaDateTime(order.paidAt) : null,
+      shippedAt: order.shippedAt ? formatChinaDateTime(order.shippedAt) : null,
+      receivedAt: order.receivedAt ? formatChinaDateTime(order.receivedAt) : null,
+      cancelledAt: order.cancelledAt ? formatChinaDateTime(order.cancelledAt) : null,
+      items: order.items.map((i) => ({
+        id: i.id,
+        productId: i.productId,
+        name: i.name,
+        spec: i.spec,
+        imagePath: i.imagePath ?? '',
+        unitPrice: Number(i.unitPrice),
+        quantity: i.quantity,
+        subtotal: Number(i.subtotal),
+      })),
+      afterSales: order.afterSaleRequests.map((r) => ({
+        id: r.id,
+        type: r.type,
+        reason: r.reason,
+        description: r.description,
+        amount: r.amount == null ? null : Number(r.amount),
+        status: r.status,
+        adminNote: r.adminNote ?? null,
+        date: formatChinaDateTime(r.createdAt),
+      })),
+    },
+  });
+});
+
 router.get('/users', adminAuthRequired, async (req, res) => {
   const keyword = String(req.query.keyword ?? '').trim();
   const where = keyword
@@ -824,6 +957,191 @@ router.patch('/after-sales/:id/status', adminAuthRequired, async (req, res) => {
   } catch {
     fail(res, 404, '售后申请不存在');
   }
+});
+
+// ===== 内容审核 =====
+// 审核状态口径（字段是 2026-11-20 字段批备好的）：visible 可见 / hidden 已隐藏。
+// 社区动态、AI 绘画、商品评价三类有状态字段：隐藏后 App 端不再展示（信息流、
+// 评价列表、绘画列表都已按 visible 过滤），恢复即可见；删除是硬删除、不可恢复。
+// 社区评论没有状态字段，只能删除；删帖会连带其评论与点赞（数据库级联删除）。
+
+// 校验并读取目标审核状态，只接受 visible / hidden
+function readModerationTarget(req, res) {
+  const status = String(req.body?.status ?? '').trim();
+  if (!['visible', 'hidden'].includes(status)) {
+    fail(res, 400, '无效的审核状态');
+    return null;
+  }
+  return status;
+}
+
+// 三类带状态字段的内容共用同一套「改状态 / 删除」逻辑
+async function setModerationStatus(delegate, id, status, res, notFoundMessage) {
+  try {
+    await delegate.update({ where: { id }, data: { moderationStatus: status } });
+    ok(res, { updated: true, status });
+  } catch (error) {
+    if (error?.code === 'P2025') return fail(res, 404, notFoundMessage);
+    console.error('[admin] moderation status failed', error);
+    return fail(res, 500, '操作失败，请看服务端日志');
+  }
+}
+
+async function deleteModerated(delegate, id, res, notFoundMessage) {
+  try {
+    await delegate.delete({ where: { id } });
+    ok(res, { deleted: true });
+  } catch (error) {
+    if (error?.code === 'P2025') return fail(res, 404, notFoundMessage);
+    console.error('[admin] moderation delete failed', error);
+    return fail(res, 500, '删除失败，请看服务端日志');
+  }
+}
+
+// 内容作者展示名：真人用户取昵称，AI 好友取好友名
+function moderationAuthor(row) {
+  if (row.authorType === 'ai_friend') return { name: row.aiFriend?.name ?? 'AI好友', isAi: true };
+  return { name: row.user?.nickname ?? '用户', isAi: false };
+}
+
+function moderationStatusFilter(req) {
+  const s = String(req.query.status ?? '').trim();
+  return ['visible', 'hidden'].includes(s) ? { moderationStatus: s } : {};
+}
+
+router.get('/moderation/posts', adminAuthRequired, async (req, res) => {
+  const keyword = String(req.query.keyword ?? '').trim();
+  const posts = await prisma.aiCommunityPost.findMany({
+    where: {
+      ...moderationStatusFilter(req),
+      ...(keyword ? { content: { contains: keyword } } : {}),
+    },
+    include: {
+      user: true,
+      aiFriend: true,
+      _count: { select: { comments: true, likes: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  });
+  ok(res, {
+    posts: posts.map((p) => ({
+      id: p.id,
+      author: moderationAuthor(p).name,
+      isAi: moderationAuthor(p).isAi,
+      content: p.content,
+      images: p.imagePaths?.length ? p.imagePaths : p.imagePath ? [p.imagePath] : [],
+      commentCount: p._count.comments,
+      likeCount: p._count.likes,
+      status: p.moderationStatus ?? 'visible',
+      date: formatChinaDateTime(p.createdAt),
+    })),
+  });
+});
+
+router.patch('/moderation/posts/:id/status', adminAuthRequired, async (req, res) => {
+  const status = readModerationTarget(req, res);
+  if (!status) return;
+  await setModerationStatus(prisma.aiCommunityPost, req.params.id, status, res, '动态不存在');
+});
+
+router.delete('/moderation/posts/:id', adminAuthRequired, async (req, res) => {
+  await deleteModerated(prisma.aiCommunityPost, req.params.id, res, '动态不存在');
+});
+
+router.get('/moderation/comments', adminAuthRequired, async (req, res) => {
+  const keyword = String(req.query.keyword ?? '').trim();
+  const comments = await prisma.aiCommunityComment.findMany({
+    where: keyword ? { content: { contains: keyword } } : {},
+    include: { user: true, aiFriend: true, post: true },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  });
+  ok(res, {
+    comments: comments.map((c) => ({
+      id: c.id,
+      author: moderationAuthor(c).name,
+      isAi: moderationAuthor(c).isAi,
+      content: c.content,
+      postContent: c.post?.content?.slice(0, 80) ?? '',
+      replyToUserName: c.replyToUserName ?? '',
+      date: formatChinaDateTime(c.createdAt),
+    })),
+  });
+});
+
+router.delete('/moderation/comments/:id', adminAuthRequired, async (req, res) => {
+  await deleteModerated(prisma.aiCommunityComment, req.params.id, res, '评论不存在');
+});
+
+router.get('/moderation/artworks', adminAuthRequired, async (req, res) => {
+  const keyword = String(req.query.keyword ?? '').trim();
+  const rows = await prisma.aiArtwork.findMany({
+    where: {
+      ...moderationStatusFilter(req),
+      ...(keyword ? { prompt: { contains: keyword } } : {}),
+    },
+    include: { user: true },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  });
+  ok(res, {
+    artworks: rows.map((a) => ({
+      id: a.id,
+      author: a.user?.nickname ?? '用户',
+      prompt: a.prompt,
+      style: a.style,
+      image: a.imagePath,
+      status: a.moderationStatus ?? 'visible',
+      date: formatChinaDateTime(a.createdAt),
+    })),
+  });
+});
+
+router.patch('/moderation/artworks/:id/status', adminAuthRequired, async (req, res) => {
+  const status = readModerationTarget(req, res);
+  if (!status) return;
+  await setModerationStatus(prisma.aiArtwork, req.params.id, status, res, '作品不存在');
+});
+
+router.delete('/moderation/artworks/:id', adminAuthRequired, async (req, res) => {
+  await deleteModerated(prisma.aiArtwork, req.params.id, res, '作品不存在');
+});
+
+router.get('/moderation/reviews', adminAuthRequired, async (req, res) => {
+  const keyword = String(req.query.keyword ?? '').trim();
+  const rows = await prisma.productReview.findMany({
+    where: {
+      ...moderationStatusFilter(req),
+      ...(keyword ? { content: { contains: keyword } } : {}),
+    },
+    include: { user: true, product: true },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  });
+  ok(res, {
+    reviews: rows.map((r) => ({
+      id: r.id,
+      author: r.user?.nickname ?? '用户',
+      productName: r.product?.name ?? '',
+      productId: r.productId,
+      rating: r.rating,
+      content: r.content,
+      images: r.imagePaths ?? [],
+      status: r.moderationStatus ?? 'visible',
+      date: formatChinaDateTime(r.createdAt),
+    })),
+  });
+});
+
+router.patch('/moderation/reviews/:id/status', adminAuthRequired, async (req, res) => {
+  const status = readModerationTarget(req, res);
+  if (!status) return;
+  await setModerationStatus(prisma.productReview, req.params.id, status, res, '评价不存在');
+});
+
+router.delete('/moderation/reviews/:id', adminAuthRequired, async (req, res) => {
+  await deleteModerated(prisma.productReview, req.params.id, res, '评价不存在');
 });
 
 router.get('/coupons', adminAuthRequired, async (_req, res) => {

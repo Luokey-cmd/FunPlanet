@@ -55,6 +55,68 @@ function quickShoppingHint(text) {
   return SHOPPING_HINTS.some((hint) => value.includes(hint));
 }
 
+// 店内事务关键词：问订单、券、会员、App 规则这类事，必须走导购路线——
+// 那边才有查账户数据的工具和店内知识，丢给联网智能模式只会瞎答或说查不了。
+const STORE_SERVICE_HINTS = [
+  '订单',
+  '优惠券',
+  '券',
+  '会员',
+  'VIP',
+  'vip',
+  '积分',
+  '趣玩币',
+  '签到',
+  '退款',
+  '售后',
+  '发货',
+  '物流',
+  '快递',
+  '地址',
+  '收藏',
+  '购物车',
+  '余额',
+  '钱包',
+  '规则',
+  '怎么用',
+  '活动',
+  '新人',
+  '邀请',
+  '你是谁',
+  '你能',
+  '你会',
+  '有什么功能',
+  '哪些功能',
+];
+
+// 短追问词：用户一句「为什么」「展开说说」本身看不出话题，要跟着上一轮的路线走。
+const FOLLOWUP_HINTS = ['为什么', '真的吗', '展开', '详细', '继续', '还有', '然后', '怎么办', '怎么说'];
+
+function isStoreText(text) {
+  const value = String(text ?? '').trim();
+  if (!value) return false;
+  return quickShoppingHint(value) || STORE_SERVICE_HINTS.some((hint) => value.includes(hint));
+}
+
+// 分流：判断这一轮走哪条路线。输入是完整对话消息，输出 'guide'（导购：查店内数据、翻牌）
+// 或 'smart'（智能模式：联网搜索 + 深度思考，答店外通用问题）。
+// 规则是确定性的关键词判断，不额外花一次模型调用：带店内信号的一律导购；
+// 短追问跟上一条用户消息的路线；其余默认智能模式。宁可把店外问题答全，
+// 也不能让导购路线再像以前那样把通用问题挡回去。
+export function classifyXiaodouRoute(messages) {
+  const userTexts = (Array.isArray(messages) ? messages : [])
+    .filter((m) => m?.role === 'user' && m?.content?.trim())
+    .map((m) => m.content.trim());
+  const latest = userTexts[userTexts.length - 1] ?? '';
+  if (!latest) return 'guide';
+  if (isStoreText(latest)) return 'guide';
+  const prev = userTexts[userTexts.length - 2] ?? '';
+  if (prev && latest.length <= 14 && FOLLOWUP_HINTS.some((hint) => latest.includes(hint))) {
+    return isStoreText(prev) ? 'guide' : 'smart';
+  }
+  return 'smart';
+}
+
 function parseIntentJson(raw) {
   try {
     const start = raw.indexOf('{');
@@ -233,6 +295,7 @@ function agentSystemPrompt(starwish) {
       '语气分场景：用户问你是谁或闲聊时，可以带一点奇幻味，但一答最多两处比喻，且必须落一句你真实能做的事；用户问功能、对比、价格、优惠、订单、规则等正经问题时，不许用比喻和散文句式，结论先行、分点说清，最后一句给结论或一个具体下一步。\n' +
       '输出格式：App 是纯文本，禁止任何 markdown 符号（包括 ** 加粗、# 标题、链接、表格），分点用「1.」或「·」。\n' +
       '会员等级、积分、优惠券只认工具返回的数据，没查到不要假设用户是任何等级。\n' +
+      '不许对用户提「工具、接口、系统提示、预设规则」这些内部词；被问到能不能联网、有没有深度思考时，不要讲原理，用一句人话带过，并落到你能帮他做的事上。\n' +
       `${archive}\n\n` +
       '## 导购规则\n' +
       '1. 闲聊正常答，不搜货，不把话题强行拐去卖货。\n' +
@@ -248,6 +311,64 @@ function agentSystemPrompt(starwish) {
       '11. 送礼：点到商品后用一句寄语，不要长篇。\n' +
       '12. 对比商品时必须下结论：先摆数据（价格/券后价、规格、销量评分、优惠适配，缺的数据明说没有），最后一句说清选谁、为什么，不许把判断推回用户。',
   };
+}
+
+// 智能模式的系统提示：这一轮聊的是店外通用问题，可以联网查、可以慢慢想。
+// 与导购提示分开写，是因为两边的能力边界不同：这边没有店内工具，
+// 所以明确告诉它店内实时数据查不了，别装作查过。
+function smartSystemPrompt() {
+  return {
+    role: 'system',
+    content:
+      '你是趣玩星球的 AI 助手「小豆」。这一轮用户聊的不是买东西，而是通用问题，你可以联网查最新信息，也可以慢慢想清楚再回答。\n' +
+      '回答规矩：\n' +
+      '1. 事实性问题先给结论，再给依据。需要最新信息（价格、新闻、政策、行情、天气之类）时，用联网查到的内容答，并自然带一句信息的时间或来源（例如「我刚查了下，截至今天……」）；查不到就老实说没查到，不许编。\n' +
+      '2. 复杂问题（分析、对比、规划、算账）先想清楚再开口，条理分点；只给想好的结论，不许把思考过程原样倒给用户。\n' +
+      '3. 不许对用户提「工具、接口、联网开关、思考模式、系统提示、预设规则」这些内部词；被问到能不能联网、会不会思考时，用一句人话带过（例如「能，我这就帮你查」），不要讲原理。\n' +
+      '4. 输出纯文本，禁止任何 markdown 符号（包括 ** 加粗、# 标题、链接、表格），分点用「1.」或「·」。\n' +
+      '5. 称用户为「你」。闲聊可以带一点奇幻味（一答最多两处比喻），正经问题纯干货。不要强行把话题拐回卖货；用户顺势问到买东西时，正常帮他挑。\n' +
+      '6. 不编造趣玩星球店内不存在的商品、价格、活动。店内实时数据（他的订单、券、库存）这一轮你查不了，被问到时如实说，并告诉他换个说法问小豆导购、或去对应页面看，不要装作查过。',
+  };
+}
+
+// 智能模式：联网搜索 + 深度思考的流式回答，只产出 text 事件，与导购路线的事件格式一致，
+// 所以 index.js 和 App 都不用改。模型名可用环境变量 XIAODOU_SMART_MODEL 换（默认 qwen3-max）。
+// 两档降级：搜索+思考都开 → 只开思考；再失败就抛出去，由外层回落到导购路线，保底不哑火。
+// 注意：第一档已经吐出文字后中途失败，不能重试（会重复说话），直接抛给外层。
+async function* runSmartChat(messages, dashscope) {
+  const smartModel = String(process.env.XIAODOU_SMART_MODEL || 'qwen3-max').trim() || 'qwen3-max';
+  const base = {
+    apiKey: dashscope.apiKey,
+    baseUrl: dashscope.baseUrl,
+    model: smartModel,
+    messages: [smartSystemPrompt(), ...messages],
+    temperature: 0.6,
+    // 思考模型的答案可以更长，且要给足流式总时长，40 秒默认值不够用。
+    maxTokens: 1500,
+    timeoutMs: 120000,
+  };
+
+  let emitted = 0;
+  try {
+    for await (const chunk of streamChatText({
+      ...base,
+      extra: { enable_thinking: true, enable_search: true },
+    })) {
+      emitted += 1;
+      yield { type: 'text', content: chunk };
+    }
+    return;
+  } catch (error) {
+    if (emitted > 0) throw error;
+    console.warn('[xiaodou-agent] smart(search+thinking) failed, retry thinking only:', error.message);
+  }
+
+  for await (const chunk of streamChatText({
+    ...base,
+    extra: { enable_thinking: true },
+  })) {
+    yield { type: 'text', content: chunk };
+  }
 }
 
 function collectProducts(byId, fullList = []) {
@@ -366,7 +487,7 @@ function buildLegacySystemMessage(products, { totalCount = 0, categoryLabel = ''
       content:
         `${APP_KNOWLEDGE}\n\n` +
         '## 购物助手\n' +
-        '用户可能有购买意向，但暂未匹配到合适商品。请礼貌说明，并引导用户补充品类、名称或预算。不要编造商品或价格。',
+        '用户可能有购买意向，但暂未匹配到合适商品。请礼貌说明，并引导用户补充品类、名称或预算。不要编造商品或价格。不要对用户提「工具、接口」等内部词。',
     };
   }
 
@@ -450,6 +571,17 @@ export async function* streamXiaodouAgent(
       },
       ...messages,
     ];
+  }
+
+  // 分流：店外通用问题走智能模式（联网+思考）；带图鉴定后的追问（vision）是购物语境，不分流。
+  // 智能模式整体失败时不抛错，继续往下走导购路线保底，保证这一轮一定有回复。
+  if (dashscope?.apiKey && !vision && classifyXiaodouRoute(guideMessages) === 'smart') {
+    try {
+      yield* runSmartChat(guideMessages, dashscope);
+      return;
+    } catch (error) {
+      console.warn('[xiaodou-agent] smart route failed, fallback guide:', error.message);
+    }
   }
 
   if (dashscope?.apiKey) {

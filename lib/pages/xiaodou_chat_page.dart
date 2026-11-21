@@ -714,7 +714,7 @@ class _GuideChips extends StatelessWidget {
     return Container(
       width: double.infinity,
       color: AppColors.card,
-      padding: EdgeInsets.fromLTRB(_xs(12), _xs(8), _xs(12), 0),
+      padding: EdgeInsets.fromLTRB(_xs(12), _xs(8), _xs(12), _xs(12)),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(

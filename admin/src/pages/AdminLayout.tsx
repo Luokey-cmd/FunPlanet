@@ -22,6 +22,7 @@ import DashboardPage from "./DashboardPage";
 
 import OrdersPage from "./OrdersPage";
 import AfterSalesPage from "./AfterSalesPage";
+import ModerationPage from "./ModerationPage";
 
 import ProductsPage from "./ProductsPage";
 
@@ -173,6 +174,7 @@ export default function AdminLayout() {
           {effectivePage === "orders" && <OrdersPage />}
 
           {effectivePage === "afterSales" && <AfterSalesPage />}
+          {effectivePage === "moderation" && <ModerationPage />}
 
           {effectivePage === "users" && <UsersPage />}
 

@@ -37,6 +37,29 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return json.data as T;
 }
 
+// 订单导出走文件下载（响应是 CSV 不是 JSON），单独用 fetch 拿 blob 再触发浏览器下载
+async function downloadOrdersCsv(params?: { status?: string; keyword?: string }): Promise<void> {
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  if (params?.keyword) q.set("keyword", params.keyword);
+  const qs = q.toString();
+  const token = getToken();
+  const res = await fetch(`/api/admin/orders/export${qs ? `?${qs}` : ""}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new ApiError(json.message || "导出失败", res.status);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `funplanet-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export const adminApi = {
   login: (username: string, password: string) =>
     request<{ token: string; admin: AdminInfo }>("/auth/login", {
@@ -83,10 +106,48 @@ export const adminApi = {
       method: "PATCH",
       body: JSON.stringify({ status, ...(extra ?? {}) }),
     }),
+  orderDetail: (id: string) => request<{ order: AdminOrderDetail }>(`/orders/${id}`),
+  exportOrders: downloadOrdersCsv,
   afterSales: (status?: string) => {
     const qs = status ? `?status=${encodeURIComponent(status)}` : "";
     return request<{ requests: AdminAfterSale[] }>(`/after-sales${qs}`);
   },
+  moderationPosts: (params?: { status?: string; keyword?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.set("status", params.status);
+    if (params?.keyword) q.set("keyword", params.keyword);
+    const qs = q.toString();
+    return request<{ posts: ModerationPost[] }>(`/moderation/posts${qs ? `?${qs}` : ""}`);
+  },
+  moderationComments: (keyword?: string) => {
+    const qs = keyword ? `?keyword=${encodeURIComponent(keyword)}` : "";
+    return request<{ comments: ModerationComment[] }>(`/moderation/comments${qs}`);
+  },
+  moderationArtworks: (params?: { status?: string; keyword?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.set("status", params.status);
+    if (params?.keyword) q.set("keyword", params.keyword);
+    const qs = q.toString();
+    return request<{ artworks: ModerationArtwork[] }>(`/moderation/artworks${qs ? `?${qs}` : ""}`);
+  },
+  moderationReviews: (params?: { status?: string; keyword?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.status) q.set("status", params.status);
+    if (params?.keyword) q.set("keyword", params.keyword);
+    const qs = q.toString();
+    return request<{ reviews: ModerationReview[] }>(`/moderation/reviews${qs ? `?${qs}` : ""}`);
+  },
+  setModerationStatus: (
+    kind: "posts" | "artworks" | "reviews",
+    id: string,
+    status: "visible" | "hidden",
+  ) =>
+    request<{ updated: boolean }>(`/moderation/${kind}/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+  deleteModeration: (kind: "posts" | "comments" | "artworks" | "reviews", id: string) =>
+    request<{ deleted: boolean }>(`/moderation/${kind}/${id}`, { method: "DELETE" }),
   updateAfterSaleStatus: (id: string, body: { status: string; adminNote?: string }) =>
     request(`/after-sales/${id}/status`, { method: "PATCH", body: JSON.stringify(body) }),
   users: (keyword?: string) => {
@@ -380,6 +441,97 @@ export interface AdminOrder {
   trackingNo?: string | null;
   shippedAt?: string | null;
   receivedAt?: string | null;
+}
+
+export interface AdminOrderDetail {
+  id: string;
+  orderNo: string;
+  status: string;
+  statusLabel: string;
+  paymentStatus: string;
+  paymentMethod: string | null;
+  user: string;
+  phone: string;
+  subtotal: number;
+  discount: number;
+  freight: number;
+  amount: number;
+  addressName: string;
+  addressPhone: string;
+  address: string;
+  remark: string | null;
+  cancelReason: string | null;
+  shippingCompany: string | null;
+  trackingNo: string | null;
+  date: string;
+  paidAt: string | null;
+  shippedAt: string | null;
+  receivedAt: string | null;
+  cancelledAt: string | null;
+  items: {
+    id: string;
+    productId: string;
+    name: string;
+    spec: string;
+    imagePath: string;
+    unitPrice: number;
+    quantity: number;
+    subtotal: number;
+  }[];
+  afterSales: {
+    id: string;
+    type: string;
+    reason: string;
+    description: string;
+    amount: number | null;
+    status: string;
+    adminNote: string | null;
+    date: string;
+  }[];
+}
+
+export interface ModerationPost {
+  id: string;
+  author: string;
+  isAi: boolean;
+  content: string;
+  images: string[];
+  commentCount: number;
+  likeCount: number;
+  status: string;
+  date: string;
+}
+
+export interface ModerationComment {
+  id: string;
+  author: string;
+  isAi: boolean;
+  content: string;
+  postContent: string;
+  replyToUserName: string;
+  date: string;
+}
+
+export interface ModerationArtwork {
+  id: string;
+  author: string;
+  prompt: string;
+  style: string;
+  image: string;
+  status: string;
+  date: string;
+}
+
+export interface ModerationReview {
+  id: string;
+  author: string;
+  productName: string;
+  productId: string;
+  rating: number;
+  content: string;
+  images: string[];
+  status: string;
+  date: string;
 }
 
 export interface AdminUser {

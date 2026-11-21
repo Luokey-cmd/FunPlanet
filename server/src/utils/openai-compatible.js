@@ -54,6 +54,9 @@ export async function* streamChatText({
   temperature = 0.6,
   maxTokens = 800,
   extra = {},
+  // 流式总超时：默认 40 秒；开了深度思考的调用要传更长（想得久、答得也久），
+  // 不放宽会在半路被掐断，用户只看到半句话。
+  timeoutMs = 40000,
 }) {
   const response = await fetch(joinUrl(baseUrl, '/chat/completions'), {
     method: 'POST',
@@ -70,7 +73,7 @@ export async function* streamChatText({
       enable_thinking: false,
       ...extra,
     }),
-    signal: AbortSignal.timeout(40000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
 
   if (!response.ok) {

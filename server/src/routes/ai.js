@@ -48,7 +48,8 @@ router.get('/quota', authRequired, async (req, res) => {
 router.get('/artworks', authRequired, async (req, res) => {
   const take = Math.min(Math.max(Number(req.query.limit) || 30, 1), 50);
   const rows = await prisma.aiArtwork.findMany({
-    where: { userId: req.user.sub },
+    // 被后台隐藏的作品（moderationStatus=hidden）不再出现在列表里
+    where: { userId: req.user.sub, moderationStatus: 'visible' },
     orderBy: { createdAt: 'desc' },
     take,
   });

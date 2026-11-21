@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { SearchIcon } from "lucide-react";
+import { DownloadIcon, SearchIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { adminApi } from "../lib/api";
 
@@ -97,10 +97,142 @@ function OrderActionButton({
   return <span className="text-xs text-muted-foreground">—</span>;
 }
 
+// 订单详情弹窗：金额拆分、收货信息、商品明细快照、物流与时间线、关联售后一屏看全
+function OrderDetailModal({ orderId, onClose }: { orderId: string; onClose: () => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-order-detail", orderId],
+    queryFn: () => adminApi.orderDetail(orderId),
+  });
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const o = data?.order;
+  const row = (label: string, value: React.ReactNode) => (
+    <div className="flex gap-3 py-1.5">
+      <span className="text-xs text-muted-foreground w-20 shrink-0 pt-0.5">{label}</span>
+      <span className="text-sm text-foreground flex-1">{value || "—"}</span>
+    </div>
+  );
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card rounded-2xl shadow-custom w-full max-w-2xl max-h-[88vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-card">
+          <h3 className="text-base font-semibold text-foreground">订单详情</h3>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground"
+            aria-label="关闭"
+          >
+            <XIcon size={16} />
+          </button>
+        </div>
+        {isLoading || !o ? (
+          <p className="p-8 text-center text-muted-foreground">加载中…</p>
+        ) : (
+          <div className="px-6 py-4 flex flex-col gap-5">
+            <div>
+              {row("订单号", <span className="font-mono text-xs">{o.orderNo}</span>)}
+              {row("状态", `${o.statusLabel}（支付：${o.paymentStatus}）`)}
+              {row("买家", `${o.user} · ${o.phone}`)}
+              {row("下单时间", o.date)}
+              {o.paidAt && row("付款时间", o.paidAt)}
+            </div>
+
+            <div className="border-t border-border pt-3">
+              <p className="text-xs font-semibold text-muted-foreground mb-1">商品明细</p>
+              {o.items.map((i) => (
+                <div key={i.id} className="flex items-center gap-3 py-2">
+                  {i.imagePath ? (
+                    <img src={i.imagePath} alt="" className="w-10 h-10 rounded-lg object-cover border border-border" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-lg bg-muted" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground truncate">{i.name}</p>
+                    {i.spec && <p className="text-xs text-muted-foreground">规格：{i.spec}</p>}
+                  </div>
+                  <span className="text-sm text-muted-foreground">¥{i.unitPrice} × {i.quantity}</span>
+                  <span className="text-sm font-medium text-foreground w-20 text-right">¥{i.subtotal}</span>
+                </div>
+              ))}
+              <div className="border-t border-border mt-2 pt-2">
+                {row("商品总额", `¥${o.subtotal}`)}
+                {row("优惠", o.discount > 0 ? `-¥${o.discount}` : "¥0")}
+                {row("运费", o.freight > 0 ? `¥${o.freight}` : "包邮")}
+                {row("实付", <span className="font-semibold">¥{o.amount}</span>)}
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-3">
+              <p className="text-xs font-semibold text-muted-foreground mb-1">收货与物流</p>
+              {row("收货人", `${o.addressName} · ${o.addressPhone}`)}
+              {row("收货地址", o.address)}
+              {o.remark && row("买家备注", o.remark)}
+              {row("物流", o.trackingNo ? `${o.shippingCompany ? `${o.shippingCompany} ` : ""}${o.trackingNo}` : "未发货")}
+              {o.shippedAt && row("发货时间", o.shippedAt)}
+              {o.receivedAt && row("收货时间", o.receivedAt)}
+              {o.cancelReason && row("取消原因", o.cancelReason)}
+            </div>
+
+            {o.afterSales.length > 0 && (
+              <div className="border-t border-border pt-3">
+                <p className="text-xs font-semibold text-muted-foreground mb-1">售后记录</p>
+                {o.afterSales.map((r) => (
+                  <div key={r.id} className="py-1.5">
+                    <p className="text-sm text-foreground">
+                      {r.type === "return" ? "退货退款" : "仅退款"} · {r.reason}
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {r.date} ·{" "}
+                        {{ pending: "待处理", approved: "已同意", rejected: "已拒绝", completed: "已完成" }[r.status] ?? r.status}
+                      </span>
+                    </p>
+                    {r.description && <p className="text-xs text-muted-foreground">{r.description}</p>}
+                    {r.adminNote && <p className="text-xs text-muted-foreground">处理备注：{r.adminNote}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function OrdersPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await adminApi.exportOrders({
+        status: statusFilter || undefined,
+        keyword: search || undefined,
+      });
+      toast.success("订单已导出为 CSV");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "导出失败");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-orders", search, statusFilter],
@@ -211,6 +343,15 @@ export default function OrdersPage() {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={exporting}
+          className="ml-auto inline-flex items-center gap-1.5 text-xs px-3.5 py-2 rounded-xl bg-card border border-border text-foreground font-medium hover:bg-accent disabled:opacity-60"
+        >
+          <DownloadIcon size={14} />
+          {exporting ? "导出中…" : "导出 CSV"}
+        </button>
       </div>
 
       <div className="bg-card rounded-2xl border border-border shadow-custom overflow-hidden">
@@ -269,11 +410,20 @@ export default function OrdersPage() {
                       </td>
                       <td className="px-5 py-4 text-xs text-muted-foreground">{order.date}</td>
                       <td className="px-5 py-4">
-                        <OrderActionButton
-                          status={order.status}
-                          disabled={updateMutation.isPending}
-                          onAction={(nextStatus, message) => handleAction(order.id, nextStatus, message)}
-                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setDetailOrderId(order.id)}
+                            className="text-xs px-3 py-1.5 rounded-lg border border-border text-foreground font-medium hover:bg-accent"
+                          >
+                            详情
+                          </button>
+                          <OrderActionButton
+                            status={order.status}
+                            disabled={updateMutation.isPending}
+                            onAction={(nextStatus, message) => handleAction(order.id, nextStatus, message)}
+                          />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -283,6 +433,10 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
+
+      {detailOrderId && (
+        <OrderDetailModal orderId={detailOrderId} onClose={() => setDetailOrderId(null)} />
+      )}
     </div>
   );
 }

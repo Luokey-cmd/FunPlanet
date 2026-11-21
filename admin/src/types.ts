@@ -3,6 +3,7 @@ export type NavPage =
   | "products"
   | "categories"
   | "afterSales"
+  | "moderation"
   | "orders"
   | "users"
   | "analytics"
