@@ -19,6 +19,7 @@ import '../widgets/sparkle_background.dart';
 import '../widgets/starwish_dossier_sheet.dart';
 import '../widgets/xiaodou_fate_cards.dart';
 import '../widgets/xiaodou_home.dart';
+import '../widgets/xiaodou_icons.dart';
 import '../widgets/xiaodou_product_card.dart';
 
 import '../widgets/click_effect/app_icon_button.dart';
@@ -893,19 +894,16 @@ class _InputBarState extends State<_InputBar> {
               onPressed: chat.sending ? null : widget.onPickImage,
               iconSize: _xs(22),
               tooltip: '拍图找同款',
-              icon: Icon(Icons.photo_outlined, color: AppColors.foreground),
+              icon: XiaodouIcon.image(size: _xs(22), color: AppColors.foreground),
             ),
             SizedBox(width: _xs(4)),
             AppIconButton(
               onPressed: chat.sending ? null : () => startVoiceInput(),
               iconSize: _xs(22),
               tooltip: _listening ? '停止语音输入' : '语音输入',
-              icon: Icon(
-                _listening ? Icons.mic : Icons.mic_none_outlined,
-                // 聆听中换红色实心麦克风，和「正在录」的常识对齐，
-                // 加上输入框提示文案的变化，用户一眼能确认状态。
-                color: _listening ? AppColors.priceRed : AppColors.foreground,
-              ),
+              icon: _listening
+                  ? XiaodouIcon.micOn(size: _xs(22), color: AppColors.priceRed)
+                  : XiaodouIcon.mic(size: _xs(22), color: AppColors.foreground),
             ),
             SizedBox(width: _xs(4)),
             Expanded(
@@ -918,7 +916,7 @@ class _InputBarState extends State<_InputBar> {
                 textInputAction: TextInputAction.send,
                 onSubmitted: chat.sending ? null : (_) => _send(chat),
                 decoration: InputDecoration(
-                  hintText: _listening ? '正在听…说完再点一下麦克风' : '说你想要的，比如送同担的生日礼物…',
+                  hintText: _listening ? '正在听…说完再点一下麦克风' : '说你想要的…',
                   hintStyle: TextStyle(fontSize: _xs(14) + AppScale.fontBump, color: AppColors.mutedForeground),
                   filled: true,
                   fillColor: AppColors.muted,
