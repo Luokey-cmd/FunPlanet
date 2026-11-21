@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -84,13 +86,25 @@ void _sendHomeText(BuildContext context, String text) {
 Future<void> _pickImageForChat(BuildContext context) async {
   final chat = context.read<XiaodouChatProvider>();
   if (chat.sending) return;
+  // 必须关掉 compression：file_picker 8.x 默认会 compressImage，
+  // 在华为/荣耀上往公共相册目录 createTempFile 会 Permission denied，
+  // 异常抛在插件后台线程，直接把整个进程打死（表现为选图确认后退出 App）。
   final result = await FilePicker.platform.pickFiles(
     type: FileType.image,
     withData: true,
+    allowCompression: false,
+    compressionQuality: 0,
   );
   if (result == null || result.files.isEmpty) return;
   final file = result.files.first;
-  final bytes = file.bytes;
+  Uint8List? bytes = file.bytes;
+  if ((bytes == null || bytes.isEmpty) && file.path != null && file.path!.isNotEmpty) {
+    try {
+      bytes = await File(file.path!).readAsBytes();
+    } catch (_) {
+      bytes = null;
+    }
+  }
   if (bytes == null || bytes.isEmpty) return;
   if (!context.mounted) return;
   if (bytes.lengthInBytes > 4 * 1024 * 1024) {
