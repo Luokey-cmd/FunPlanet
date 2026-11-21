@@ -5,7 +5,6 @@ import '../theme/app_scale.dart';
 import 'click_effect/app_pressable.dart';
 import 'floating_ai_assistant.dart';
 import 'product_image.dart';
-import 'xiaodou_icons.dart';
 
 // 缩放与聊天页保持同一套：统一走 AppScale（字号 t = 写几号是几号，
 // 布局 s = 0.8 倍）。2026-11-20 字体规范化时废除了旧版 1.5 倍私自放大，
@@ -184,13 +183,13 @@ class XiaodouHome extends StatelessWidget {
             Row(
               children: [
                 _inputCapsule(
-                  icon: XiaodouIcon.image(size: _hs(14), color: AppColors.secondaryForeground),
+                  icon: Image.asset('assets/images/icon_xd_camera.png', width: _hs(18), height: _hs(18)),
                   label: '拍照找同款',
                   onTap: onPickImage,
                 ),
                 SizedBox(width: _hs(8)),
                 _inputCapsule(
-                  icon: XiaodouIcon.mic(size: _hs(14), color: AppColors.secondaryForeground),
+                  icon: Image.asset('assets/images/icon_xd_mic.png', width: _hs(18), height: _hs(18)),
                   label: '语音',
                   // 语音已接真功能（系统识别）：点击直接开听，识别文字会落进
                   // 底部输入框等用户确认发送；不可用/无权限的提示在输入栏那边给。
@@ -292,28 +291,28 @@ class XiaodouHome extends StatelessWidget {
   Widget _inspirationCards() {
     final cards = <_InspirationCard>[
       _InspirationCard(
-        icon: Icon(Icons.auto_awesome, size: _hs(20), color: AppColors.foreground.withValues(alpha: 0.75)),
+        icon: Image.asset('assets/images/icon_xd_sparkle.png', width: _hs(26), height: _hs(26)),
         title: '今日星签',
         subtitle: '每天一翻，看今日本命是哪件',
         colors: const [Color(0xFFFFF4C9), Color(0xFFFFE9A8)],
         onTap: onDrawFate,
       ),
       _InspirationCard(
-        icon: XiaodouIcon.gift(size: _hs(20), color: AppColors.foreground.withValues(alpha: 0.75)),
+        icon: Image.asset('assets/images/icon_xd_gift.png', width: _hs(26), height: _hs(26)),
         title: '送礼不踩雷',
         subtitle: '告诉我送给谁，我帮你避开雷区',
         colors: const [Color(0xFFFFE8F1), Color(0xFFFFD6E7)],
         onTap: () => onSendText('帮我挑一份送人的礼物，别踩雷'),
       ),
       _InspirationCard(
-        icon: Icon(Icons.sell_outlined, size: _hs(20), color: AppColors.foreground.withValues(alpha: 0.75)),
+        icon: Image.asset('assets/images/icon_xd_tag.png', width: _hs(26), height: _hs(26)),
         title: '平价捡漏',
         subtitle: '同款里挑最值的，有券先提醒你',
         colors: const [Color(0xFFE6FFF2), Color(0xFFCFF7E3)],
         onTap: () => onSendText('帮我找平价又值的，性价比高的'),
       ),
       _InspirationCard(
-        icon: XiaodouIcon.image(size: _hs(20), color: AppColors.foreground.withValues(alpha: 0.75)),
+        icon: Image.asset('assets/images/icon_xd_camera.png', width: _hs(26), height: _hs(26)),
         title: '拍照找同款',
         subtitle: '拍一张图，找同款或同风格',
         colors: const [Color(0xFFEAF4FF), Color(0xFFD6E9FF)],

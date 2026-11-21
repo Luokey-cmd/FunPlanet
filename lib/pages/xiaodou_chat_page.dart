@@ -19,7 +19,6 @@ import '../widgets/sparkle_background.dart';
 import '../widgets/starwish_dossier_sheet.dart';
 import '../widgets/xiaodou_fate_cards.dart';
 import '../widgets/xiaodou_home.dart';
-import '../widgets/xiaodou_icons.dart';
 import '../widgets/xiaodou_product_card.dart';
 
 import '../widgets/click_effect/app_icon_button.dart';
@@ -894,16 +893,20 @@ class _InputBarState extends State<_InputBar> {
               onPressed: chat.sending ? null : widget.onPickImage,
               iconSize: _xs(22),
               tooltip: '拍图找同款',
-              icon: XiaodouIcon.image(size: _xs(22), color: AppColors.foreground),
+              icon: Image.asset('assets/images/icon_xd_image.png', width: _xs(27), height: _xs(27)),
             ),
             SizedBox(width: _xs(4)),
             AppIconButton(
               onPressed: chat.sending ? null : () => startVoiceInput(),
               iconSize: _xs(22),
               tooltip: _listening ? '停止语音输入' : '语音输入',
-              icon: _listening
-                  ? XiaodouIcon.micOn(size: _xs(22), color: AppColors.priceRed)
-                  : XiaodouIcon.mic(size: _xs(22), color: AppColors.foreground),
+              // 定制图标：聆听中用红色声波版，和「正在录」的常识对齐，
+              // 加上输入框提示文案的变化，用户一眼能确认状态。
+              icon: Image.asset(
+                _listening ? 'assets/images/icon_xd_mic_on.png' : 'assets/images/icon_xd_mic.png',
+                width: _xs(27),
+                height: _xs(27),
+              ),
             ),
             SizedBox(width: _xs(4)),
             Expanded(
