@@ -2,8 +2,9 @@ import { prisma } from '../db.js';
 import { chatCompletion, streamChatCompletion } from '../deepseek.js';
 import { APP_KNOWLEDGE } from '../app-knowledge.js';
 import { serializeProduct } from './product.js';
-import { chatCompletionRaw, streamChatText } from './openai-compatible.js';
+import { chatCompletionRaw, streamChatEvents } from './openai-compatible.js';
 import { analyzeShoppingImage, formatVisionHint } from './xiaodou-vision.js';
+import { buildWeatherContext } from './weather.js';
 import {
   executeXiaodouTool,
   MAJOR_CATEGORIES,
@@ -322,7 +323,7 @@ function smartSystemPrompt() {
     content:
       '你是趣玩星球的 AI 助手「小豆」。这一轮用户聊的不是买东西，而是通用问题，你可以联网查最新信息，也可以慢慢想清楚再回答。\n' +
       '回答规矩：\n' +
-      '1. 事实性问题先给结论，再给依据。需要最新信息（价格、新闻、政策、行情、天气之类）时，用联网查到的内容答，并自然带一句信息的时间或来源（例如「我刚查了下，截至今天……」）；查不到就老实说没查到，不许编。\n' +
+      '1. 事实性问题先给结论，再给依据。需要最新信息（价格、新闻、政策、行情、天气之类）时，用联网查到的内容答，并自然带一句信息的时间或来源（例如「我刚查了下，截至今天……」）；查不到就老实说没查到，不许编。搜到的资料不够新（比如是昨天的）也要用，把日期标清楚再给（例如「今天的还没刷出来，昨天的是……」），不要因为不够完美就只说取不到；只有确实什么相关内容都没搜到时，才说没查到。\n' +
       '2. 复杂问题（分析、对比、规划、算账）先想清楚再开口，条理分点；只给想好的结论，不许把思考过程原样倒给用户。\n' +
       '3. 不许对用户提「工具、接口、联网开关、思考模式、系统提示、预设规则」这些内部词；被问到能不能联网、会不会思考时，用一句人话带过（例如「能，我这就帮你查」），不要讲原理。\n' +
       '4. 输出纯文本，禁止任何 markdown 符号（包括 ** 加粗、# 标题、链接、表格），分点用「1.」或「·」。\n' +
@@ -331,31 +332,56 @@ function smartSystemPrompt() {
   };
 }
 
-// 智能模式：联网搜索 + 深度思考的流式回答，只产出 text 事件，与导购路线的事件格式一致，
-// 所以 index.js 和 App 都不用改。模型名可用环境变量 XIAODOU_SMART_MODEL 换（默认 qwen3-max）。
+// 智能模式：联网搜索 + 深度思考的流式回答。事件三种：status（状态提示）、
+// thinking（思考过程，只作进度展示、不落库）、text（正式答案）。
+// 模型名可用环境变量 XIAODOU_SMART_MODEL 换（默认 qwen4-max）。
 // 两档降级：搜索+思考都开 → 只开思考；再失败就抛出去，由外层回落到导购路线，保底不哑火。
-// 注意：第一档已经吐出文字后中途失败，不能重试（会重复说话），直接抛给外层。
+// 注意：第一档已经吐出内容（思考或答案）后中途失败，不能重试（会重复），直接抛给外层。
 async function* runSmartChat(messages, dashscope) {
-  const smartModel = String(process.env.XIAODOU_SMART_MODEL || 'qwen3-max').trim() || 'qwen3-max';
+  const smartModel = String(process.env.XIAODOU_SMART_MODEL || 'qwen4-max').trim() || 'qwen4-max';
+  const chatMessages = [smartSystemPrompt(), ...messages];
+  // 天气问题先问气象服务拿真实数据再交给模型（搜索引擎查天气只会翻到
+  // 过期网页）；拿不到数据就返回 null，照常走下面的联网搜索，不拦路。
+  const weatherContext = await buildWeatherContext(messages);
+  if (weatherContext) {
+    chatMessages.splice(1, 0, { role: 'system', content: weatherContext });
+  }
   const base = {
     apiKey: dashscope.apiKey,
     baseUrl: dashscope.baseUrl,
     model: smartModel,
-    messages: [smartSystemPrompt(), ...messages],
+    messages: chatMessages,
     temperature: 0.6,
     // 思考模型的答案可以更长，且要给足流式总时长，40 秒默认值不够用。
     maxTokens: 1500,
     timeoutMs: 120000,
   };
 
+  // 思考预算：qwen4-max 默认能想 13 万 token，难题会想个没完。给个
+  // 上限（默认 2048，环境变量 XIAODOU_THINKING_BUDGET 可调），想满
+  // 就必须开口答；简单问题自己早早想完，不受这个上限影响。
+  const budgetRaw = Number.parseInt(process.env.XIAODOU_THINKING_BUDGET ?? '', 10);
+  const thinkingBudget = Number.isFinite(budgetRaw) && budgetRaw > 0 ? budgetRaw : 2048;
+
+  // 先报一句状态：搜索与思考都要时间，第一秒就让用户知道在动，
+  // 而不是对着一句干巴巴的「思考中…」干等。
+  yield { type: 'status', content: '联网搜索中…' };
+
+  // 思考与答案分开往外给：思考是进度、答案是正文，App 分开渲染，
+  // index.js 落库时也只收答案，思考不进聊天记录。
+  const forward = (event) =>
+    event.type === 'reasoning'
+      ? { type: 'thinking', content: event.text }
+      : { type: 'text', content: event.text };
+
   let emitted = 0;
   try {
-    for await (const chunk of streamChatText({
+    for await (const event of streamChatEvents({
       ...base,
-      extra: { enable_thinking: true, enable_search: true },
+      extra: { enable_thinking: true, enable_search: true, thinking_budget: thinkingBudget },
     })) {
       emitted += 1;
-      yield { type: 'text', content: chunk };
+      yield forward(event);
     }
     return;
   } catch (error) {
@@ -363,11 +389,14 @@ async function* runSmartChat(messages, dashscope) {
     console.warn('[xiaodou-agent] smart(search+thinking) failed, retry thinking only:', error.message);
   }
 
-  for await (const chunk of streamChatText({
+  // 第二档降级：只开思考，且故意不带搜索与思考预算——预算参数万一
+  // 不被当前模型接受、失败多半就出在第一档，这里不带它，保证降级
+  // 路线永远走得通。
+  for await (const event of streamChatEvents({
     ...base,
     extra: { enable_thinking: true },
   })) {
-    yield { type: 'text', content: chunk };
+    yield forward(event);
   }
 }
 

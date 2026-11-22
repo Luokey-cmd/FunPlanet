@@ -46,7 +46,12 @@ export async function chatCompletionRaw({
   return message;
 }
 
-export async function* streamChatText({
+// 流式输出（分类型）：深度思考时，模型先一段段吐思考过程
+// （delta.reasoning_content）、再吐正式答案（delta.content）。以前这里
+// 只取答案、把思考全丢了，用户在思考期间只能干等一句「思考中…」；
+// 现在两种都往外给，由调用方决定怎么展示。事件形状：
+// { type: 'reasoning' | 'content', text }。
+export async function* streamChatEvents({
   apiKey,
   baseUrl,
   model,
@@ -99,11 +104,22 @@ export async function* streamChatText({
       if (payload === '[DONE]') return;
       try {
         const parsed = JSON.parse(payload);
-        const content = parsed.choices?.[0]?.delta?.content;
-        if (content) yield content;
+        const delta = parsed.choices?.[0]?.delta;
+        const reasoning = delta?.reasoning_content;
+        if (reasoning) yield { type: 'reasoning', text: reasoning };
+        const content = delta?.content;
+        if (content) yield { type: 'content', text: content };
       } catch {
         // ignore malformed SSE chunk
       }
     }
+  }
+}
+
+// 只要答案文本的旧入口（内部转调 streamChatEvents，只挑 content），
+// 已有调用方不用改。
+export async function* streamChatText(params) {
+  for await (const event of streamChatEvents(params)) {
+    if (event.type === 'content') yield event.text;
   }
 }

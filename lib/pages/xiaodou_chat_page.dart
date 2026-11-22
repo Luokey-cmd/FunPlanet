@@ -414,6 +414,14 @@ class _MessageListState extends State<_MessageList> {
   }
 }
 
+// 思考直播只看尾巴：全文可能很长，气泡里滚动显示最后一段即可，
+// 用户要的是「它在动、在想」，不是把思考全文摊开。
+String _thinkingTail(String thinking) {
+  const maxChars = 240;
+  if (thinking.length <= maxChars) return thinking;
+  return '…${thinking.substring(thinking.length - maxChars)}';
+}
+
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({required this.message, this.showRecommendActions = false});
 
@@ -455,27 +463,59 @@ class _MessageBubble extends StatelessWidget {
                 ),
               ),
               child: message.isLoading
-                  ? Row(
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        SizedBox(
-                          width: _xs(14),
-                          height: _xs(14),
-                          child: CircularProgressIndicator(
-                            strokeWidth: _xs(2),
-                            color: isUser ? Colors.white : AppColors.primary,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: _xs(14),
+                              height: _xs(14),
+                              child: CircularProgressIndicator(
+                                strokeWidth: _xs(2),
+                                color: isUser ? Colors.white : AppColors.primary,
+                              ),
+                            ),
+                            SizedBox(width: _xs(8)),
+                            Text(
+                              // 有思考在流时，状态行固定说「思考中…」，
+                              // 具体内容看下面滚动的思考原文。
+                              message.thinking.isNotEmpty ? '思考中…' : message.content,
+                              style: TextStyle(fontSize: _xs(13) + AppScale.fontBump, color: AppColors.mutedForeground),
+                            ),
+                          ],
+                        ),
+                        if (message.thinking.isNotEmpty) ...[
+                          SizedBox(height: _xs(6)),
+                          Text(
+                            _thinkingTail(message.thinking),
+                            style: TextStyle(
+                              fontSize: _xs(12) + AppScale.fontBump,
+                              height: 1.45,
+                              color: AppColors.mutedForeground,
+                            ),
                           ),
-                        ),
-                        SizedBox(width: _xs(8)),
-                        Text(
-                          message.content,
-                          style: TextStyle(fontSize: _xs(13) + AppScale.fontBump, color: AppColors.mutedForeground),
-                        ),
+                        ],
                       ],
                     )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        if (message.thinking.isNotEmpty) ...[
+                          Text(
+                            message.thinking,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: _xs(12) + AppScale.fontBump,
+                              height: 1.45,
+                              color: AppColors.mutedForeground,
+                            ),
+                          ),
+                          if (message.content.trim().isNotEmpty) SizedBox(height: _xs(8)),
+                        ],
                         if (message.hasImage) ...[
                           ClipRRect(
                             borderRadius: BorderRadius.circular(_xs(10)),

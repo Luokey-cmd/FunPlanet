@@ -5,8 +5,12 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognizerIntent
 import android.util.Base64
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,6 +18,7 @@ import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
@@ -28,6 +33,15 @@ class MainActivity : FlutterFragmentActivity() {
 
     private var mediaRecorder: MediaRecorder? = null
     private var recordFile: File? = null
+
+    // 流式识别的 PCM 推流（EventChannel funplanet/voice_stream）
+    private val streamChannelName = "funplanet/voice_stream"
+    private var pcmRecord: AudioRecord? = null
+    private var pcmThread: Thread? = null
+
+    @Volatile
+    private var pcmStreaming = false
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val speechLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { activityResult ->
@@ -78,6 +92,16 @@ class MainActivity : FlutterFragmentActivity() {
                     else -> result.notImplemented()
                 }
             }
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, streamChannelName)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    startPcmStream(events)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    stopPcmStream()
+                }
+            })
     }
 
     private fun ensureMicPermission(result: MethodChannel.Result) {
@@ -209,6 +233,108 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
+    /// 流式识别的录音：AudioRecord 采 PCM 原始片（16kHz 单声道 16bit），
+    /// 每约 100ms 一片经 EventChannel 给 Dart 转发到服务端做实时识别。
+    /// 只采裸音频、不碰任何系统识别服务，不会触发 FakeRecognitionService
+    /// 杀进程的老问题。订阅取消（onCancel）即停采。
+    private fun startPcmStream(events: EventChannel.EventSink?) {
+        if (events == null) return
+        if (pcmStreaming) {
+            events.error("busy", "already streaming", null)
+            return
+        }
+        if (!hasMicPermission()) {
+            events.error("permission", "RECORD_AUDIO denied", null)
+            return
+        }
+        val sampleRate = 16000
+        val minBuffer = AudioRecord.getMinBufferSize(
+            sampleRate,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+        )
+        val chunkBytes = 3200 // 100ms 的数据量：16000 样本/秒 × 2 字节 × 0.1 秒
+        val record = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                sampleRate,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                maxOf(minBuffer, chunkBytes * 4),
+            )
+        } catch (e: Exception) {
+            events.error("record_failed", e.message, null)
+            return
+        }
+        if (record.state != AudioRecord.STATE_INITIALIZED) {
+            try {
+                record.release()
+            } catch (_: Exception) {
+            }
+            events.error("record_failed", "AudioRecord init failed", null)
+            return
+        }
+        pcmRecord = record
+        pcmStreaming = true
+        try {
+            record.startRecording()
+        } catch (e: Exception) {
+            pcmStreaming = false
+            pcmRecord = null
+            try {
+                record.release()
+            } catch (_: Exception) {
+            }
+            events.error("record_failed", e.message, null)
+            return
+        }
+        pcmThread = Thread {
+            val buffer = ByteArray(chunkBytes)
+            while (pcmStreaming) {
+                val read = try {
+                    record.read(buffer, 0, buffer.size)
+                } catch (_: Exception) {
+                    break
+                }
+                if (read > 0) {
+                    val chunk = buffer.copyOf(read)
+                    // EventSink 回调切回主线程，符合平台通道的线程要求；
+                    // 已停流时不再投递，防取消后还往 Dart 塞数据。
+                    mainHandler.post {
+                        if (pcmStreaming) {
+                            try {
+                                events.success(chunk)
+                            } catch (_: Exception) {
+                            }
+                        }
+                    }
+                } else if (read < 0) {
+                    break
+                }
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun stopPcmStream() {
+        pcmStreaming = false
+        val record = pcmRecord
+        pcmRecord = null
+        pcmThread = null
+        if (record != null) {
+            try {
+                record.stop()
+            } catch (_: Exception) {
+            }
+            try {
+                record.release()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     private fun cancelRecord() {
         val recorder = mediaRecorder
         val file = recordFile
@@ -229,6 +355,7 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     override fun onDestroy() {
+        stopPcmStream()
         cancelRecord()
         super.onDestroy()
     }

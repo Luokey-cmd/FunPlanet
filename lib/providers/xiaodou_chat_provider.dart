@@ -85,10 +85,21 @@ class XiaodouChatProvider extends ChangeNotifier {
         switch (event.kind) {
           case XiaodouStreamKind.text:
             if (current.isLoading) {
-              _messages[assistantIndex] = ChatMessage(role: ChatRole.assistant, content: event.content);
+              // 第一片答案：换掉占位文案，但保住已收到的思考过程。
+              _messages[assistantIndex] = current.copyWith(content: event.content, isLoading: false);
             } else {
               _messages[assistantIndex] = current.copyWith(content: current.content + event.content);
             }
+          case XiaodouStreamKind.status:
+            // 状态提示只在还没正式内容时换占位文案（如「联网搜索中…」）。
+            if (current.isLoading) {
+              _messages[assistantIndex] = current.copyWith(content: event.content);
+            }
+          case XiaodouStreamKind.thinking:
+            // 思考过程往本条消息上累计，气泡单独渲染，不混进答案正文。
+            _messages[assistantIndex] = current.copyWith(
+              thinking: current.thinking + event.content,
+            );
           case XiaodouStreamKind.products:
             _messages[assistantIndex] = current.copyWith(
               content: current.isLoading ? XiaodouCopy.pick(XiaodouCopy.moreShelf) : current.content,
@@ -130,6 +141,15 @@ class XiaodouChatProvider extends ChangeNotifier {
         _messages[assistantIndex] = const ChatMessage(
           role: ChatRole.assistant,
           content: '抱歉，我没有想好怎么说…',
+        );
+      } else if (_messages[assistantIndex].isLoading) {
+        // 只收到状态/思考就断了流：不能把转圈占位永远留着，收成一句
+        // 兜底（思考过程保留，用户能看到它刚才在想什么）。
+        final tail = _messages[assistantIndex];
+        _messages[assistantIndex] = ChatMessage(
+          role: ChatRole.assistant,
+          content: '抱歉，我没有想好怎么说…',
+          thinking: tail.thinking,
         );
       }
     } catch (e) {

@@ -8,7 +8,7 @@ import '../data/product_data.dart';
 import '../models/chat_message.dart';
 import 'token_storage.dart';
 
-enum XiaodouStreamKind { text, products, fate, cart, appraisal, giftNote }
+enum XiaodouStreamKind { text, products, fate, cart, appraisal, giftNote, thinking, status }
 
 class XiaodouStreamEvent {
   const XiaodouStreamEvent._({
@@ -37,6 +37,14 @@ class XiaodouStreamEvent {
 
   factory XiaodouStreamEvent.giftNote(String content) =>
       XiaodouStreamEvent._(kind: XiaodouStreamKind.giftNote, content: content);
+
+  // 智能模式的思考过程片段（只作进度展示，不是答案正文）。
+  factory XiaodouStreamEvent.thinking(String content) =>
+      XiaodouStreamEvent._(kind: XiaodouStreamKind.thinking, content: content);
+
+  // 状态提示（如「联网搜索中…」），只用来换等待占位文案。
+  factory XiaodouStreamEvent.status(String content) =>
+      XiaodouStreamEvent._(kind: XiaodouStreamKind.status, content: content);
 
   final XiaodouStreamKind kind;
   final String content;
@@ -222,6 +230,18 @@ class XiaodouChatService {
           if (type == 'gift_note') {
             final note = json['content'] as String? ?? '';
             if (note.isNotEmpty) yield XiaodouStreamEvent.giftNote(note);
+            continue;
+          }
+
+          if (type == 'thinking') {
+            final chunk = json['content'] as String? ?? '';
+            if (chunk.isNotEmpty) yield XiaodouStreamEvent.thinking(chunk);
+            continue;
+          }
+
+          if (type == 'status') {
+            final note = json['content'] as String? ?? '';
+            if (note.isNotEmpty) yield XiaodouStreamEvent.status(note);
             continue;
           }
 

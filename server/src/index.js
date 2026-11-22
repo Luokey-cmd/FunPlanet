@@ -28,6 +28,7 @@ import reviewRoutes from './routes/reviews.js';
 import aiRoutes from './routes/ai.js';
 import aiCommunityRoutes from './routes/ai-community.js';
 import voiceRoutes from './routes/voice.js';
+import { attachVoiceStreamServer } from './utils/voice-stream.js';
 import { syncAllProductSales } from './utils/product-sales.js';
 import { persistChatTurn, recordGuideRecommendations } from './utils/chat-history.js';
 import { seedAiCommunityIfNeeded } from './utils/ai-community-seed.js';
@@ -257,6 +258,9 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
       if (event.type === 'text') {
         assistantFullText += String(event.content ?? '');
         res.write(`data: ${JSON.stringify({ type: 'text', content: event.content })}\n\n`);
+      } else if (event.type === 'thinking' || event.type === 'status') {
+        // 思考过程与状态提示只给用户看进度，不并入落库的答案全文。
+        res.write(`data: ${JSON.stringify({ type: event.type, content: event.content })}\n\n`);
       } else if (event.type === 'products' || event.type === 'fate_cards') {
         if (Array.isArray(event.products) && event.products.length > 0) {
           recommendedProducts = event.products;
@@ -295,7 +299,7 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
   }
 });
 
-app.listen(port, '0.0.0.0', () => {
+const httpServer = app.listen(port, '0.0.0.0', () => {
   console.log(`趣玩星球 API 已启动: http://127.0.0.1:${port}`);
   if (!process.env.DATABASE_URL) console.warn('警告: 未检测到 DATABASE_URL');
   if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'production') {
@@ -311,3 +315,6 @@ app.listen(port, '0.0.0.0', () => {
       .catch((err) => console.warn('商品销量同步失败:', err.message));
   }
 });
+
+// 语音流式识别（WebSocket 中转）与 HTTP 接口共用同一个服务与端口。
+attachVoiceStreamServer(httpServer);

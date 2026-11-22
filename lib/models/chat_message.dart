@@ -16,11 +16,15 @@ class ChatMessage {
     this.giftNote,
     this.isAppraisal = false,
     this.visionPayload,
+    this.thinking = '',
   });
 
   final ChatRole role;
   final String content;
   final bool isLoading;
+
+  // 智能模式的思考过程（只展示进度用，不进发给服务端的历史、不落本地记录）。
+  final String thinking;
   final List<Product> products;
   final List<Product> pendingCart;
   final Uint8List? imageBytes;
@@ -45,6 +49,7 @@ class ChatMessage {
     String? giftNote,
     bool? isAppraisal,
     Map<String, String>? visionPayload,
+    String? thinking,
   }) {
     return ChatMessage(
       role: role,
@@ -57,6 +62,7 @@ class ChatMessage {
       giftNote: giftNote ?? this.giftNote,
       isAppraisal: isAppraisal ?? this.isAppraisal,
       visionPayload: visionPayload ?? this.visionPayload,
+      thinking: thinking ?? this.thinking,
     );
   }
 }
