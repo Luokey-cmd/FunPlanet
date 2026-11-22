@@ -7,16 +7,12 @@ import '../pages/home_page.dart';
 import '../pages/mall_page.dart';
 import '../pages/profile_page.dart';
 import '../pages/xiaodou_chat_page.dart';
-import '../data/product_data.dart';
 import '../providers/app_tab_provider.dart';
 import '../providers/user_provider.dart';
-import '../services/daily_star_sign_picker.dart';
-import '../services/daily_star_sign_storage.dart';
 import '../services/xiaodou_guide_storage.dart';
 import '../theme/app_colors.dart';
 import '../utils/user_session_sync.dart';
 import '../widgets/app_tab_bar.dart';
-import '../widgets/daily_star_sign_sheet.dart';
 import '../widgets/floating_ai_assistant.dart';
 import '../widgets/xiaodou_guide_overlay.dart';
 
@@ -32,7 +28,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   AppTabProvider? _tabProvider;
   bool _showXiaodouGuide = false;
   final _guideStorage = XiaodouGuideStorage();
-  final _starSignStorage = DailyStarSignStorage();
 
   late final List<Widget> _pages = const [
     _KeepAlivePage(key: ValueKey(AppTab.home), child: HomePage()),
@@ -49,7 +44,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       if (!mounted) return;
       _tabProvider = context.read<AppTabProvider>();
       _tabProvider!.attach(_onTabTap);
-      unawaited(_maybeShowGuideThenStarSign());
+      unawaited(_maybeShowGuide());
     });
   }
 
@@ -67,55 +62,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     }
   }
 
-  /// 进门顺序（定死）：先小豆引导，后今日星签，两个层永不叠弹。
-  /// 引导要弹的那天，星签打个 skipped 记号让路，当天不再自动弹，
-  /// 第二天起恢复（首页常驻条当天仍可手动打开）。
-  Future<void> _maybeShowGuideThenStarSign() async {
+  /// 进门引导：没看过小豆引导层时弹一次。
+  /// （今日星签已于 2026-11-23 删除，进门不再有第二层弹层。）
+  Future<void> _maybeShowGuide() async {
     await Future<void>.delayed(const Duration(milliseconds: 420));
     if (!mounted) return;
     final userId = context.read<UserProvider>().userId;
     final seen = await _guideStorage.hasSeen(userId);
-    if (!mounted) return;
-    if (!seen) {
-      await _starSignStorage.markSkippedToday(userId);
-      if (!mounted) return;
-      setState(() => _showXiaodouGuide = true);
-      return;
-    }
-    await _maybeShowStarSign(userId);
-  }
-
-  Future<void> _maybeShowStarSign(String userId) async {
-    final existing = await _starSignStorage.readToday(userId);
-    if (!mounted || existing != null) return;
-    final user = context.read<UserProvider>();
-    final product = DailyStarSignPicker.pick(
-      pool: products,
-      browseHistoryIds: user.browseHistory,
-      favoriteIds: user.favoriteIds,
-      recentProductIds: await _starSignStorage.recentProductIds(userId),
-      userId: userId,
-      dateStr: DailyStarSignStorage.todayString(),
-    );
-    if (!mounted || product == null) return;
-    final record = DailyStarSignRecord(
-      date: DailyStarSignStorage.todayString(),
-      state: DailyStarSignState.popped,
-      productId: product.id,
-    );
-    await _starSignStorage.save(userId, record);
-    // 引导检查已用掉 420ms，这里再补 180ms，凑齐设计稿的约 600ms。
-    await Future<void>.delayed(const Duration(milliseconds: 180));
-    if (!mounted) return;
-    await showDailyStarSignSheet(
-      context,
-      userId: userId,
-      record: record,
-      product: product,
-      onDrawTriple: () {
-        if (mounted) XiaodouChatPage.open(context, autoDraw: true);
-      },
-    );
+    if (!mounted || seen) return;
+    setState(() => _showXiaodouGuide = true);
   }
 
   Future<void> _finishXiaodouGuide({bool openChat = false}) async {

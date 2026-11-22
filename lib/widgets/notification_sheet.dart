@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../theme/feature_page_style.dart';
 import '../widgets/feature_page_scaffold.dart';
+import '../pages/orders_sheet.dart';
 import '../pages/support_chat_page.dart';
 import '../widgets/click_effect/app_pressable.dart';
 import '../widgets/click_effect/app_buttons.dart';
@@ -63,6 +64,12 @@ class _NotificationPageState extends State<_NotificationPage> {
                   if (n.type == NotificationType.support) {
                     Navigator.pop(context);
                     SupportChatPage.openGeneral(context);
+                    return;
+                  }
+                  // 带跳转目标的通知（目前只有订单类）：点开直达订单列表。
+                  if (n.targetType == 'order') {
+                    Navigator.pop(context);
+                    OrdersSheet.show(context);
                   }
                 },
                 child: Row(

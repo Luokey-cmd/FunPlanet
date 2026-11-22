@@ -28,7 +28,7 @@ class XiaodouHome extends StatelessWidget {
     required this.onVoice,
   });
 
-  /// 今日星签卡 → 走聊天页现成的抽三翻逻辑。
+  /// 翻牌推荐卡 → 走聊天页现成的抽三翻逻辑。
   final VoidCallback onDrawFate;
 
   /// 灵感卡 / 示例句 / 路线 / 快捷行 → 以用户身份发一句话。
@@ -292,8 +292,8 @@ class XiaodouHome extends StatelessWidget {
     final cards = <_InspirationCard>[
       _InspirationCard(
         icon: Image.asset('assets/images/icon_xd_sparkle.png', width: _hs(26), height: _hs(26)),
-        title: '今日星签',
-        subtitle: '每天一翻，看今日本命是哪件',
+        title: '翻牌推荐',
+        subtitle: '翻开三张牌，挑一件最合眼缘的',
         colors: const [Color(0xFFFFF4C9), Color(0xFFFFE9A8)],
         onTap: onDrawFate,
       ),

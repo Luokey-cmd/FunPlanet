@@ -533,6 +533,8 @@ class AppNotification {
     required this.time,
     required this.type,
     this.read = false,
+    this.targetType,
+    this.targetId,
   });
 
   final String id;
@@ -542,6 +544,10 @@ class AppNotification {
   final NotificationType type;
   final bool read;
 
+  // 跳转目标：服务端通知自带（targetType 目前只有 'order'）；老通知为空 = 点了不跳。
+  final String? targetType;
+  final String? targetId;
+
   AppNotification copyWith({bool? read}) {
     return AppNotification(
       id: id,
@@ -550,6 +556,8 @@ class AppNotification {
       time: time,
       type: type,
       read: read ?? this.read,
+      targetType: targetType,
+      targetId: targetId,
     );
   }
 
@@ -561,6 +569,8 @@ class AppNotification {
       time: _formatNotificationTime(json['createdAt'] as String?),
       type: _notificationTypeFromString(json['type'] as String),
       read: json['read'] as bool? ?? false,
+      targetType: json['targetType'] as String?,
+      targetId: json['targetId'] as String?,
     );
   }
 }

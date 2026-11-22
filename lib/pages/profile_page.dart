@@ -651,9 +651,17 @@ class _MemberSection extends StatelessWidget {
                               builder: (context, user, _) {
                                 final isMember =
                                     user.vipLevel >= memberTargetVipLevel;
+                                // 已开通且服务端给了到期日（vipExpireAt）就报日期，没给仍报权益数。
+                                final expireDt =
+                                    DateTime.tryParse(user.vipExpireAt)?.toLocal();
+                                final expireDate = expireDt == null
+                                    ? ''
+                                    : '${expireDt.year}-${expireDt.month.toString().padLeft(2, '0')}-${expireDt.day.toString().padLeft(2, '0')}';
                                 return Text(
                                   isMember
-                                      ? '会员生效中 · 5 项权益已解锁'
+                                      ? (expireDate.isNotEmpty
+                                            ? '会员生效中 · 有效期至 $expireDate'
+                                            : '会员生效中 · 5 项权益已解锁')
                                       : '$memberSubscribeCoinPrice 趣玩币/月 · 开通即享 5 项权益',
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.75),

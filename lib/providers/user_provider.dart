@@ -28,6 +28,10 @@ class UserProvider extends ChangeNotifier {
   String gender = '';
   String birthday = '';
   String bio = '';
+  // 成长值与会员到期：服务端资料接口早就返回（growthPoints / vipExpireAt），
+  // App 以前没接；到期存 ISO 原串、空 = 未设置，展示时再格式化成日期。
+  int growthPoints = 0;
+  String vipExpireAt = '';
   int vipLevel = 1;
   int points = 0;
   int funCoins = 0;
@@ -90,6 +94,8 @@ class UserProvider extends ChangeNotifier {
     gender = json['gender'] as String? ?? gender;
     birthday = json['birthday'] as String? ?? birthday;
     bio = json['bio'] as String? ?? bio;
+    growthPoints = json['growthPoints'] as int? ?? growthPoints;
+    vipExpireAt = json['vipExpireAt'] as String? ?? vipExpireAt;
     if (avatarPath.trim().isNotEmpty) {
       unawaited(_persistAvatar(avatarPath));
     }
@@ -157,6 +163,8 @@ class UserProvider extends ChangeNotifier {
     gender = '';
     birthday = '';
     bio = '';
+    growthPoints = 0;
+    vipExpireAt = '';
     _favoriteIds.clear();
     _browseHistory.clear();
     _coupons.clear();

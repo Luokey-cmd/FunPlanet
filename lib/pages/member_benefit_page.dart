@@ -214,6 +214,14 @@ class _MemberBenefitPageState extends State<MemberBenefitPage> {
                 ),
                 SizedBox(height: AppScale.s(4)),
                 Text(_meta.tagline, style: FeaturePageStyle.secondary(color: Colors.white70)),
+                SizedBox(height: AppScale.s(4)),
+                // 成长值与到期日：服务端资料接口已返回，显示真实值，不编造升级门槛。
+                Text(
+                  user.vipExpireAt.isNotEmpty
+                      ? '成长值 ${user.growthPoints} · 有效期至 ${_formatDate(user.vipExpireAt)}'
+                      : '成长值 ${user.growthPoints}',
+                  style: FeaturePageStyle.caption(color: Colors.white70),
+                ),
               ],
             ),
           ),
@@ -612,6 +620,15 @@ class _MemberBenefitPageState extends State<MemberBenefitPage> {
         ),
       ],
     );
+  }
+
+  // 会员到期 ISO 串展示成 yyyy-MM-dd；解析失败就原样返回。
+  String _formatDate(String iso) {
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return iso;
+    final local = dt.toLocal();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)}';
   }
 
   // 服务端 shippedAt 是 ISO 时间串，展示成 MM-dd HH:mm；解析失败就原样返回。
