@@ -35,7 +35,11 @@ export async function analyzeShoppingImage({ dashscope, imageBase64, mimeType })
   });
   const list = catalog.map((p) => `${p.id}｜${p.majorCategory}｜${p.name}`).join('\n');
 
-  const vlModel = process.env.QWEN_VL_MODEL || 'qwen-vl-plus';
+  // 模型名教训（与 qwen3-max 同坑）：qwen-vl-plus 已被百炼下线，
+  // 调用直接 404 model_not_found，看图功能全灭且只剩兜底句（2026-11-22 实锤）。
+  // 现行在架的视觉旗舰是 qwen3-vl-plus；以后换名先查平台在架名单再改。
+  // 注意：.env 里若写了 QWEN_VL_MODEL 会盖掉这里的默认值，那边也要同步改。
+  const vlModel = process.env.QWEN_VL_MODEL || 'qwen3-vl-plus';
   const message = await chatCompletionRaw({
     apiKey: dashscope.apiKey,
     baseUrl: dashscope.baseUrl,

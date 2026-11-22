@@ -69,6 +69,15 @@ const CITY_STRIP_WORDS = [
 '想知道',
 '的',
 '了',
+// 口语填充词：语音输入常带「我在」「呀」「嗯」之类（例：「我在。深圳呀。嗯。」
+// 被断句补了句号），不剥掉城市候选会被糊住、解析失败。这些词不会是
+// 城市名的组成部分，剥掉是安全的。
+'我在',
+'我住在',
+'我是',
+'嗯',
+'哦',
+'吧',
 ];
 
 // 这些短句是时间追问或应答，不是城市名，不能拿去解析。
@@ -172,8 +181,11 @@ const inWeatherContext = recent.some((m) => hasWeatherWord(messageText(m)));
 if (!inWeatherContext) return null;
 
 // 情形 2：本句就是一个城市名（「深圳」）。
+// 长度门槛按去掉标点后的字数算：语音转写会给断句补句号，
+// 「我在。深圳呀。嗯。」原长 9 字、去标点只有 6 字，按原长卡会误杀。
 const asCity = extractCityCandidate(last);
-if (asCity && last.length <= 8) return asCity;
+const cleanedLength = last.replace(/[\s，。！？、,.!?~～·：:；;（）()「」'"]/g, '').length;
+if (asCity && cleanedLength <= 8) return asCity;
 
 // 情形 3：纯时间追问（「明天呢」），沿用上文天气问法里的城市；
 // 其他短句（「好的」「谢谢」）不触发，免得答非所问。

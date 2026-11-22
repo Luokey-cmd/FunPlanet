@@ -78,14 +78,16 @@ void _sendHomeText(BuildContext context, String text) {
   chat.send(text, starwish: _archiveOf(context));
 }
 
-/// 选图找同款：首页区「拍照找同款」卡和输入栏相机按钮共用这一份。
-/// 输入：页面 context。输出：无返回值，选中的图直接作为一条消息发进对话。
-/// 坑：原来这是输入栏的私有方法，首页区也要用才提出来共用——不许再复制一份，
-/// 两份选图逻辑（大小上限、格式判断）漂移后很难查。await 之后用 context 前
-/// 必须先判 mounted，页面已关时直接收手。
-Future<void> _pickImageForChat(BuildContext context) async {
-  final chat = context.read<XiaodouChatProvider>();
-  if (chat.sending) return;
+/// 选图（只选不发）：首页区「拍照找同款」卡和输入栏相机按钮共用这一份。
+/// 输入：页面 context。输出：选中的图片字节 + mime 类型；取消或失败返回 null。
+/// 2026-11-22 改口径：以前选完直接替用户发送、还代写一句「帮我看看店里
+/// 有没有同款或同类」，但用户常常只是先放图、想问的是别的事。现在选完
+/// 只把图挂到输入栏当附件（见 _InputBarState.setPendingImage），用户可以
+/// 继续打字改问题，点发送才连图带字一起走；只有图没字就发，provider
+/// 会补默认的找同款文案。
+/// 坑：不许再复制一份选图逻辑，两份（大小上限、格式判断）漂移后很难查。
+/// await 之后用 context 前必须先判 mounted，页面已关时直接收手。
+Future<({Uint8List bytes, String mimeType})?> _pickImageForChat(BuildContext context) async {
   // 必须关掉 compression：file_picker 8.x 默认会 compressImage，
   // 在华为/荣耀上往公共相册目录 createTempFile 会 Permission denied，
   // 异常抛在插件后台线程，直接把整个进程打死（表现为选图确认后退出 App）。
@@ -95,7 +97,7 @@ Future<void> _pickImageForChat(BuildContext context) async {
     allowCompression: false,
     compressionQuality: 0,
   );
-  if (result == null || result.files.isEmpty) return;
+  if (result == null || result.files.isEmpty) return null;
   final file = result.files.first;
   Uint8List? bytes = file.bytes;
   if ((bytes == null || bytes.isEmpty) && file.path != null && file.path!.isNotEmpty) {
@@ -105,14 +107,14 @@ Future<void> _pickImageForChat(BuildContext context) async {
       bytes = null;
     }
   }
-  if (bytes == null || bytes.isEmpty) return;
-  if (!context.mounted) return;
+  if (bytes == null || bytes.isEmpty) return null;
+  if (!context.mounted) return null;
   if (bytes.lengthInBytes > 4 * 1024 * 1024) {
     showTopSnackBar(
       context,
       content: Text('图片请小于 4MB', style: TextStyle(fontSize: _xs(14) + AppScale.fontBump, fontWeight: FontWeight.w600)),
     );
-    return;
+    return null;
   }
   final ext = (file.extension ?? '').toLowerCase();
   final mimeType = switch (ext) {
@@ -120,8 +122,7 @@ Future<void> _pickImageForChat(BuildContext context) async {
     'webp' => 'image/webp',
     _ => 'image/jpeg',
   };
-  final archive = _archiveOf(context);
-  await chat.send('帮我看看店里有没有同款或同类', imageBytes: Uint8List.fromList(bytes), mimeType: mimeType, starwish: archive);
+  return (bytes: Uint8List.fromList(bytes), mimeType: mimeType);
 }
 
 class _XiaodouChatPageState extends State<XiaodouChatPage> {
@@ -129,6 +130,15 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
   // 点它要把焦点交给这个节点，用户实际打字仍在底部输入栏里完成。
   // 坑：节点必须在 dispose 里释放，且只能挂给一个输入框，别多处共用。
   final _inputFocusNode = FocusNode();
+
+  /// 选图后挂附件：首页区和输入栏的图片入口都走这里——先选图，
+  /// 再经 GlobalKey 交给输入栏挂起来（见 _InputBarState.setPendingImage）。
+  /// 输入：无（图从系统相册选）。输出：无返回值，图挂在输入框上方。
+  Future<void> _attachPickedImage() async {
+    final picked = await _pickImageForChat(context);
+    if (picked == null || !mounted) return;
+    _inputBarKey.currentState?.setPendingImage(picked.bytes, picked.mimeType);
+  }
 
   // 首页语音胶囊借用输入栏语音逻辑的通道：给输入栏挂这个 Key，
   // 首页点语音 → 页面调输入栏 State 的公开方法 startVoiceInput()。
@@ -179,7 +189,7 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
               child: _MessageList(
                 onDrawFate: () => _drawFateCards(context),
                 onSendText: (text) => _sendHomeText(context, text),
-                onPickImage: () => _pickImageForChat(context),
+                onPickImage: _attachPickedImage,
                 onFocusInput: () => _inputFocusNode.requestFocus(),
                 onOpenProfile: () => showStarwishDossierSheet(context),
                 onVoice: () => _inputBarKey.currentState?.startVoiceInput(),
@@ -190,7 +200,7 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
             _InputBar(
               key: _inputBarKey,
               focusNode: _inputFocusNode,
-              onPickImage: () => _pickImageForChat(context),
+              onPickImage: _attachPickedImage,
             ),
           ],
         ),
@@ -230,7 +240,7 @@ void _copyCurrentChat(BuildContext context) {
 
 // 顶栏（第一批瘦身后只剩 4 个元素）：返回、头像、名称区、更多菜单。
 // 命运三翻改走首页区灵感卡、历史和偏好都收进 ⋯ 菜单，不再往顶栏上堆按钮——
-// 旧版 7 个元素挤一行，副行签名还会被截断成「守瓶…」，是 hz 截图里点名的问题。
+// 旧版 7 个元素挤一行，副行签名还会被截断成「守瓶…」，是 hx 截图里点名的问题。
 class _Header extends StatelessWidget {
   const _Header({
     required this.onClose,
@@ -793,6 +803,47 @@ class _GuideChips extends StatelessWidget {
   }
 }
 
+// 聆听中麦克风图标的呼吸脉动：录音时图标若一动不动，用户会怀疑
+// 到底录没录（hx 2026-11-22 真机反馈）。这里让红色声波图标自己
+// 一缩一放地动——不读真实音量，纯循环动画，900ms 一个来回；
+// 停录时本组件直接不在树上，控制器随之释放，不留后台开销。
+class _PulsingMicIcon extends StatefulWidget {
+  const _PulsingMicIcon({required this.size});
+
+  final double size;
+
+  @override
+  State<_PulsingMicIcon> createState() => _PulsingMicIconState();
+}
+
+class _PulsingMicIconState extends State<_PulsingMicIcon> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
+    _scale = Tween<double>(begin: 1.0, end: 1.18).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scale,
+      child: Image.asset('assets/images/icon_xd_mic_on.png', width: widget.size, height: widget.size),
+    );
+  }
+}
+
 class _InputBar extends StatefulWidget {
   const _InputBar({super.key, required this.focusNode, required this.onPickImage});
 
@@ -831,11 +882,41 @@ class _InputBarState extends State<_InputBar> {
     super.dispose();
   }
 
+  // 待发送的图片附件：选图后先挂在这里（输入框上方有预览），
+  // 用户可以继续打字改问题，点发送才连图带字一起发出（2026-11-22 改）。
+  // 只有图没字直接发也行，provider 会补「找同款」的默认文案。
+  Uint8List? _pendingImageBytes;
+  String? _pendingMimeType;
+
+  /// 挂上一张待发送图片（公开方法）：首页区选图经页面 GlobalKey 调进来，
+  /// 和语音的 startVoiceInput 一个路数。挂上后把焦点给输入框，
+  /// 邀请用户补一句想问的——不补也能直接发。
+  void setPendingImage(Uint8List bytes, String mimeType) {
+    if (!mounted) return;
+    setState(() {
+      _pendingImageBytes = bytes;
+      _pendingMimeType = mimeType;
+    });
+    widget.focusNode.requestFocus();
+  }
+
+  void _clearPendingImage() {
+    if (_pendingImageBytes == null) return;
+    setState(() {
+      _pendingImageBytes = null;
+      _pendingMimeType = null;
+    });
+  }
+
   void _send(XiaodouChatProvider chat) {
     final text = _inputController.text;
-    if (text.trim().isEmpty || chat.sending) return;
+    final imageBytes = _pendingImageBytes;
+    final mimeType = _pendingMimeType;
+    // 没字又没图才拦；只有图没字也放行，provider 会补默认文案。
+    if ((text.trim().isEmpty && imageBytes == null) || chat.sending) return;
     _inputController.clear();
-    chat.send(text, starwish: _archiveOf(context));
+    _clearPendingImage();
+    chat.send(text, imageBytes: imageBytes, mimeType: mimeType, starwish: _archiveOf(context));
   }
 
   /// 语音输入开关（公开方法）：本栏麦克风按钮和首页语音胶囊共用这一个入口，
@@ -941,10 +1022,49 @@ class _InputBarState extends State<_InputBar> {
           border: Border(top: BorderSide(color: AppColors.border)),
           color: AppColors.card,
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppIconButton(
-              onPressed: chat.sending ? null : widget.onPickImage,
+            if (_pendingImageBytes != null)
+              Padding(
+                padding: EdgeInsets.only(left: _xs(4), bottom: _xs(8)),
+                child: Row(
+                  children: [
+                    Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(_xs(10)),
+                          child: Image.memory(_pendingImageBytes!, width: _xs(56), height: _xs(56), fit: BoxFit.cover),
+                        ),
+                        Positioned(
+                          top: 0,
+                          right: 0,
+                          child: GestureDetector(
+                            onTap: _clearPendingImage,
+                            child: Container(
+                              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                              padding: EdgeInsets.all(_xs(2)),
+                              child: Icon(Icons.close, size: _xs(12), color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(width: _xs(8)),
+                    Expanded(
+                      child: Text(
+                        '图片先放这儿，想问什么打在下面；什么都不打直接发，就是帮你找同款。',
+                        style: TextStyle(fontSize: _xs(11) + AppScale.fontBump, color: AppColors.mutedForeground),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Row(
+              children: [
+                AppIconButton(
+                  onPressed: chat.sending ? null : widget.onPickImage,
               iconSize: _xs(22),
               tooltip: '拍图找同款',
               icon: Image.asset('assets/images/icon_xd_image.png', width: _xs(27), height: _xs(27)),
@@ -954,13 +1074,12 @@ class _InputBarState extends State<_InputBar> {
               onPressed: chat.sending ? null : () => startVoiceInput(),
               iconSize: _xs(22),
               tooltip: _listening ? '停止语音输入' : '语音输入',
-              // 定制图标：聆听中用红色声波版，和「正在录」的常识对齐，
-              // 加上输入框提示文案的变化，用户一眼能确认状态。
-              icon: Image.asset(
-                _listening ? 'assets/images/icon_xd_mic_on.png' : 'assets/images/icon_xd_mic.png',
-                width: _xs(27),
-                height: _xs(27),
-              ),
+              // 定制图标：聆听中用红色声波版并带呼吸脉动（_PulsingMicIcon），
+              // 和「正在录」的常识对齐；加上输入框提示文案的变化，
+              // 用户一眼能确认状态。
+              icon: _listening
+                  ? _PulsingMicIcon(size: _xs(27))
+                  : Image.asset('assets/images/icon_xd_mic.png', width: _xs(27), height: _xs(27)),
             ),
             SizedBox(width: _xs(4)),
             Expanded(
@@ -995,6 +1114,8 @@ class _InputBarState extends State<_InputBar> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_xs(999))),
               ),
               child: Icon(Icons.send_rounded, size: _xs(18), color: Colors.white),
+            ),
+          ],
             ),
           ],
         ),

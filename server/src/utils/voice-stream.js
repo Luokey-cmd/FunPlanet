@@ -37,8 +37,11 @@ function sendJson(ws, payload) {
   }
 }
 
-// 通义实时识别的会话配置：VAD 自动断句（停顿 400ms 算一句完，聊天场景
-// 要快断句）、中文、PCM 16k 输入。partial 结果由 .text 事件实时下发。
+// 通义实时识别的会话配置：VAD 自动断句（停顿 1000ms 算一句完）、中文、
+// PCM 16k 输入。partial 结果由 .text 事件实时下发。
+// 断句时长别再调回 400ms：真机实测（2026-11-21）人说话的自然停顿
+// 普遍超过 400ms，会被切成好几段、每段还被识别服务补一个句号，
+// 一句话变成「我在。深圳呀。嗯。」；1000ms 下说完后约 1 秒定稿，可接受。
 function buildSessionUpdate() {
   return {
     event_id: nextEventId(),
@@ -48,9 +51,16 @@ function buildSessionUpdate() {
       input_audio_format: 'pcm',
       sample_rate: 16000,
       input_audio_transcription: { language: 'zh' },
-      turn_detection: { type: 'server_vad', threshold: 0.2, silence_duration_ms: 400 },
+      turn_detection: { type: 'server_vad', threshold: 0.2, silence_duration_ms: 1000 },
     },
   };
+}
+
+// 定稿下发前剥掉段末句号：断句把一段话切成几段时，识别服务会给每段
+// 自动补「。」，原样拼进输入框就一句一个句号。这里只剥句号，问号、
+// 感叹号带语气、保留不动；聊天输入末尾没有句号也完全自然。
+export function stripFinalPeriod(text) {
+  return String(text ?? '').replace(/。+$/, '');
 }
 
 // 一次 App 连接 = 一次识别会话。状态都收在本闭包里，连接结束即释放。
@@ -134,7 +144,7 @@ function startRelaySession(appWs) {
       }
       case 'conversation.item.input_audio_transcription.completed': {
         // 这一句的定稿，只发本句（跨句累计由输入栏的底子机制负责）。
-        sendJson(appWs, { type: 'final', text: String(event.transcript ?? '') });
+        sendJson(appWs, { type: 'final', text: stripFinalPeriod(event.transcript) });
         break;
       }
       case 'session.finished':
