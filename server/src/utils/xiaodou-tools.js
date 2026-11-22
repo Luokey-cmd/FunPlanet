@@ -1,5 +1,7 @@
 import { prisma } from '../db.js';
 import { serializeProduct } from './product.js';
+import { buildWeatherContext } from './weather.js';
+import { streamChatEvents } from './openai-compatible.js';
 
 export const MAJOR_CATEGORIES = ['玩具', '文具', '手办', '公仔', '谷子', '小卡', '实用类周边'];
 const SEARCH_LIMIT = 3;
@@ -97,6 +99,41 @@ export const XIAODOU_TOOLS = [
           productId: { type: 'string' },
         },
         required: ['productId'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_weather',
+      description:
+        '查询某个城市的真实天气（今天起三天的温度、降水概率等，来自气象服务）。用户问天气、冷不冷、下不下雨、要不要带伞时调用；天气只信这个工具返回的数据，不要用联网搜索答天气。',
+      parameters: {
+        type: 'object',
+        properties: {
+          city: {
+            type: 'string',
+            description: '城市名，如「深圳」。用户没明说时可省略，系统会从对话历史里提取',
+          },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'web_search',
+      description:
+        '联网搜索最新信息：新闻、行情、政策、流行趋势、网友评价等店外事实。需要最新或店外信息时调用；结果带时间与来源，回答时自然带一句。店内商品、价格、订单、券不要用这个查，那些只认店内工具。',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: '搜索问题，写成一句完整的话，如「2026 年 11 月最近流行的盲盒系列有什么」',
+          },
+        },
+        required: ['query'],
       },
     },
   },
@@ -354,6 +391,76 @@ async function proposeAddToCart(args) {
   };
 }
 
+// 天气工具（合脑新增）：包一层 weather.js 的 buildWeatherContext。
+// 输入：模型给的 city（可省略）+ 调用方从 context 递进来的完整对话。
+// 输出：{ ok: true, weather: '气象数据…' }，或查不到时 ok: false。
+// 坑：城市优先用模型给的；没给时把整段对话交给天气模块提取——
+// 用户追问「明天呢」时城市只在上一轮出现过，靠对话才找得到。
+async function getWeather(args, context) {
+  const city = String(args.city ?? '').trim();
+  const messages = city
+    ? [{ role: 'user', content: `${city}天气怎么样` }]
+    : Array.isArray(context.messages)
+      ? context.messages
+      : [];
+  const brief = await buildWeatherContext(messages);
+  if (!brief) {
+    return {
+      ok: false,
+      error: '这次没查到天气数据。不要编造天气；如实告诉用户没查到，或请他确认城市名。',
+    };
+  }
+  return { ok: true, weather: brief.trim() };
+}
+
+// 联网搜索工具：为什么不直接用模型的 enable_search 开关——实测它
+// 与工具调用同开时，模型会只说「我先帮你查一下」却不真正发出工具
+// 调用、整轮空转（2026-11-22 23:40 实锤）。改成普通工具：内部单独
+// 发一次开了搜索的请求（不带工具、不带思考预算，避开所有冲突），
+// 把整理好的事实清单当工具结果交回主循环，模型再据此回答。
+// 输入：query + context 里的 dashscope 配置与 smartModel。
+// 输出：{ ok: true, findings }；失败或没搜到时 ok: false 并写明
+// 不许编造，让主模型如实告知用户。
+async function webSearch(args, context) {
+  const query = String(args.query ?? '').trim();
+  if (!query) return { ok: false, error: '缺少搜索问题' };
+  const dashscope = context.dashscope;
+  if (!dashscope?.apiKey) {
+    return { ok: false, error: '当前路线用不了联网搜索。不要编造外部信息，如实告诉用户。' };
+  }
+  let findings = '';
+  try {
+    for await (const event of streamChatEvents({
+      apiKey: dashscope.apiKey,
+      baseUrl: dashscope.baseUrl,
+      model: context.smartModel || 'qwen4-max',
+      messages: [
+        {
+          role: 'system',
+          content:
+            '你是检索员，只做一件事：联网搜索与问题相关的最新事实，整理成简明的事实清单。每条事实带上时间或来源；搜不到就直说没搜到，不许编造。只输出事实清单，不要寒暄，不要给建议。',
+        },
+        { role: 'user', content: query },
+      ],
+      temperature: 0.3,
+      maxTokens: 1200,
+      timeoutMs: 60000,
+      idleTimeoutMs: 30000,
+      extra: { enable_search: true },
+    })) {
+      if (event.type === 'content') findings += event.text;
+    }
+  } catch (error) {
+    console.warn('[xiaodou-tools] web_search failed:', error.message);
+    return { ok: false, error: '这次联网搜索失败了。不要编造外部信息，如实告诉用户没查到。' };
+  }
+  const text = findings.trim();
+  if (!text) {
+    return { ok: false, error: '这次没搜到相关信息。不要编造外部信息，如实告诉用户没查到。' };
+  }
+  return { ok: true, findings: text.slice(0, 3000) };
+}
+
 export async function executeXiaodouTool(name, rawArgs, context = {}) {
   const args = parseArgs(rawArgs);
   if (name === 'search_products') return searchProducts(args);
@@ -362,6 +469,8 @@ export async function executeXiaodouTool(name, rawArgs, context = {}) {
   if (name === 'get_promotions') return getPromotions();
   if (name === 'get_user_context') return getUserContext(context.userId);
   if (name === 'propose_add_to_cart') return proposeAddToCart(args);
+  if (name === 'get_weather') return getWeather(args, context);
+  if (name === 'web_search') return webSearch(args, context);
   return { ok: false, error: `未知工具 ${name}` };
 }
 
