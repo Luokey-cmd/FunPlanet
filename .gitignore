@@ -115,3 +115,4 @@ migrate_working_dir/
 /scripts/install-honor-profile.ps1
 /server/scripts/remap-public-user-ids.js
 /backups/
+server/data/admin-audit-log.json
