@@ -248,15 +248,16 @@ function agentSystemPrompt(starwish) {
       '1. 闲聊正常答，不搜货，不把话题强行拐去卖货。\n' +
       '2. App 用法、VIP、券：get_promotions / get_user_context。\n' +
       '3. 需求清楚时优先 draw_star_cards（三张星牌），不要一次甩很多热销。\n' +
-      '4. 信息不够只问 1 个问题。\n' +
+      '4. 信息不够只问 1 个问题。送礼或挑选时，先看关键信息齐不齐：送谁（或什么场景）、想要哪一类、预算多少——星愿档案里有的先用档案填，不重复问；真缺了关键的，先提问再抽牌，不许信息不够就直接亮牌。\n' +
       '5. 价格只能复述工具返回的 ¥。\n' +
       '6. 谷子≠小卡，手办≠公仔。\n' +
-      '7. 引出星牌用 2～3 句，说明可翻开本命/遇见/余韵。\n' +
+      '7. 亮牌那一轮，正文只写 2 句：一句引出、一句建议；商品名、价格、特点句全在牌面上，正文不复述、不点名、不报价格，指代只用位置（第一张/中间那张/最后一张）。\n' +
       '8. 换一批：excludeIds 或 skip。\n' +
       '9. 加购：这条保底路线没有加购与下单工具，禁止声称已经放进背包或生成订单；推荐后引导用户点商品卡上的「加入购物车」。\n' +
       '10. 识图：若消息已含视觉结果，先按用户问的答——问图里东西本身就照视觉结果答；只有要找同款或同味道时才搜店内。不要假装看见像素。\n' +
       '11. 送礼：点到商品后用一句寄语，不要长篇。\n' +
-      '12. 对比商品时必须下结论：先摆数据（价格/券后价、规格、销量评分、优惠适配，缺的数据明说没有），最后一句说清选谁、为什么，不许把判断推回用户。',
+      '12. 对比商品时必须下结论：先摆数据（价格/券后价、规格、销量评分、优惠适配，缺的数据明说没有），最后一句说清选谁、为什么，不许把判断推回用户。\n' +
+      '13. 不许把判断过程写出来：像「用户说……，信息不够：……，规则：……」这种复述规则、盘算信息的句子绝对不许出现；想清楚了直接问或直接答。',
   };
 }
 
@@ -301,14 +302,15 @@ function mergedSystemPrompt(starwish) {
       '1. 闲聊正常答，不搜货，不把话题强行拐去卖货。\n' +
       '2. App 用法、VIP、券：get_promotions / get_user_context。\n' +
       '3. 需求清楚时优先 draw_star_cards（三张星牌），不要一次甩很多热销。\n' +
-      '4. 信息不够只问 1 个问题。\n' +
+      '4. 信息不够只问 1 个问题。送礼或挑选时，先看关键信息齐不齐：送谁（或什么场景）、想要哪一类、预算多少——星愿档案里有的先用档案填，不重复问；真缺了关键的，先提问再抽牌，不许信息不够就直接 draw_star_cards 亮牌。\n' +
       '5. 谷子≠小卡，手办≠公仔。\n' +
-      '6. 引出星牌用 2～3 句：三张牌是明着亮出的，每张牌的特点句已由系统按真实数据算好（在工具结果的 trait 里），讲牌时照着说、不许改数字、不许另编特点。\n' +
+      '6. 亮牌那一轮，正文只写 2 句：一句引出（比如「给你挑了三张」）、一句建议（拿不准选哪张时选哪张）。商品名、价格、特点句全在牌面上，正文一律不复述、不点名、不报价格；要指代某张牌只许用位置（第一张/中间那张/最后一张）。特点句是系统按真实数据算好、放在牌面上的（工具结果的 trait），你心里有数即可，不要说出来。\n' +
       '7. 换一批由用户在牌面点「下一批」自己翻，不用你处理；用户在对话里明确说换一批时，带 excludeIds 重新 draw_star_cards。\n' +
       '8. 加购用 add_to_cart 真加，不要再提确认条。\n' +
       '9. 识图：消息里带视觉结果时，先看用户问什么——问图里东西本身或店外的事（是什么、市面多少钱、怎么做）就正面回答，需要最新行情先联网查；只有明确要找同款/同类/想买时才搜店内。不要假装看见像素，也不要默认把话题拽回店内找货。\n' +
       '10. 送礼：点到商品后用一句寄语，不要长篇。\n' +
-      '11. 对比商品时必须下结论：先摆数据（价格/券后价、规格、销量评分、优惠适配，缺的数据明说没有），最后一句说清选谁、为什么，不许把判断推回用户。\n\n' +
+      '11. 对比商品时必须下结论：先摆数据（价格/券后价、规格、销量评分、优惠适配，缺的数据明说没有），最后一句说清选谁、为什么，不许把判断推回用户。\n' +
+      '12. 不许把判断过程写出来：像「用户说……，信息不够：……，规则：……」这种复述规则、盘算信息的句子，思考和正文里都绝对不许出现；想清楚了就直接对用户提问或回答。\n\n' +
       '## 办事规矩（能真办事，就不要只动嘴）\n' +
       '1. 用户明确要你办的事，用工具真办：领券 claim_coupon、加购物车 add_to_cart、改数量 update_cart、收藏 add_favorite、写备注 set_order_note、生成待付款订单 create_order。办完的结果会自动记进办事清单给用户看，你在正文里一句话确认即可，不要逐条复述清单。\n' +
       '2. 只有用户明确表达了意图才动手：说「就它了/买这个/帮我下单」才 create_order；说「先加购物车」就只 add_to_cart，不要自作主张替他下单；只是咨询、对比时不许动手。\n' +
@@ -346,9 +348,22 @@ function sentenceHasCodeId(sentence) {
   const camels = sentence.match(/\b[a-z]+[A-Z][A-Za-z0-9]*\b/g) || [];
   return camels.some((word) => !THINKING_CAMEL_ALLOW.has(word));
 }
+// 元叙述整句不展示（2026-11-23 hx 截图实锤第二类）：思考是给用户
+// 看的旁白，不是判断过程的倒带——「用户说……，信息不够：……，
+// 规则：只问 1 个问题」这种复述规则、盘算槽位的话整句丢。判据取
+// 几个内部说法（规则带冒号、信息不够、用户说、槽位、未启程、
+// 只问 1 个问题）；正常旁白不会这么说话，误伤面小。注意「退货
+// 规则」这类用户话题不带冒号、不在判据里，不受影响。
+const THINKING_META_RE = /(规则[:：]|信息不够|用户说|槽位|未启程|档案暂|只问\s*1\s*个问题|问\s*1\s*个问题|问一个问题)/;
+function sentenceIsMetaNarration(sentence) {
+  return THINKING_META_RE.test(sentence);
+}
 function sanitizeThinking(text) {
   const parts = String(text).split(/(?<=[。！？!?；;\n])/);
-  return parts.filter((part) => !sentenceHasCodeId(part)).join('').trim();
+  return parts
+    .filter((part) => !sentenceHasCodeId(part) && !sentenceIsMetaNarration(part))
+    .join('')
+    .trim();
 }
 
 // 一轮流式事件的转发：思考先攒着、过语言检查才往外给，答案直通，
@@ -899,6 +914,84 @@ async function* runDeepseekFallback(messages, config) {
   }
 }
 
+// 提问选项（hx 2026-11-23 定）：小豆这一轮以问句收尾、且没亮牌没给
+// 商品时，服务端顺手生成 3~4 个用户最可能点的短回答，随 options 事件
+// 下发，App 在气泡下渲染成按钮，点一下就当用户回了这句，省得打字。
+// 输入：dashscope 配置、导购这句提问、用户上一句原话。
+// 输出：2~4 个短选项的数组；生成失败、解析不出、数量不够都返回空
+// 数组（当没有选项）——选项是锦上添花，绝不能因为它拖住或弄丢正文。
+async function generateQuestionOptions({ dashscope, question, userText }) {
+  try {
+    const message = await chatCompletionRaw({
+      ...dashscope,
+      messages: [
+        {
+          role: 'system',
+          content:
+            '你替用户预备回答选项。给你一句导购的提问，你输出用户最可能点的 3 到 4 个简短回答。' +
+            '每个选项不超过 8 个字，是用户会直接说出口的话（例如「送朋友」「送对象」「100元内」「不限」）。' +
+            '只输出一个 JSON 数组，不要任何解释、不要 markdown，例如 ["送朋友","送对象","送家人","送同担"]。',
+        },
+        {
+          role: 'user',
+          content: `用户刚说：${userText || '（没说什么）'}\n导购问：${question}\n给出回答选项：`,
+        },
+      ],
+      temperature: 0.4,
+      maxTokens: 200,
+      timeoutMs: 8000,
+    });
+    const raw = String(message?.content ?? '');
+    const match = raw.match(/\[[\s\S]*?\]/);
+    if (!match) return [];
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed)) return [];
+    const options = [];
+    for (const item of parsed) {
+      const text = String(item ?? '').trim();
+      if (text.length < 1 || text.length > 12) continue;
+      if (options.includes(text)) continue;
+      options.push(text);
+      if (options.length >= 4) break;
+    }
+    return options.length >= 2 ? options : [];
+  } catch (error) {
+    log.warn('小豆', '提问选项没生成出来（不影响正文，用户打字回答就行）');
+    return [];
+  }
+}
+
+// 该不该带选项，只看两个硬条件：正文以问句收尾（问号结尾），且这一
+// 轮没亮过牌、没给过商品——有牌时用户的下一步是选牌，不该再被选项
+// 分心。带图鉴定那条路自带「找同款/同味道」的选择按钮，不走这里。
+function endsWithQuestion(text) {
+  const trimmed = String(text ?? '').trim();
+  if (trimmed.length < 4) return false;
+  return /[？?]\s*$/.test(trimmed);
+}
+
+// 把一轮事件流原样透传，同时攒正文、记有没有出过牌；流正常走完后
+// 若符合条件，补生成选项并在最后多发一条 options 事件。源流抛错时
+// 直接往外抛（外层的降级守卫照常接住），不会补选项。
+async function* withQuestionOptions(source, { dashscope, userText }) {
+  let fullText = '';
+  let sawCards = false;
+  for await (const event of source) {
+    if (event.type === 'text') fullText += String(event.content ?? '');
+    if (event.type === 'fate_cards' || event.type === 'products' || event.type === 'cart_confirm') {
+      sawCards = true;
+    }
+    yield event;
+  }
+  if (sawCards || !endsWithQuestion(fullText)) return;
+  const options = await generateQuestionOptions({
+    dashscope,
+    question: fullText.trim().slice(-200),
+    userText,
+  });
+  if (options.length > 0) yield { type: 'options', options };
+}
+
 export async function* streamXiaodouAgent(
   messages,
   { dashscope, deepseek, userId, imageBase64, mimeType, starwish, vision } = {},
@@ -969,7 +1062,7 @@ export async function* streamXiaodouAgent(
     // 的答案与卡片，双份打架）。
     let unifiedYielded = false;
     try {
-      for await (const event of runUnifiedAgent(guideMessages, dashscope, { userId, starwish })) {
+      for await (const event of withQuestionOptions(runUnifiedAgent(guideMessages, dashscope, { userId, starwish }), { dashscope, userText: lastUserMessage(guideMessages) })) {
         if (event.type !== 'status' && event.type !== 'thinking') unifiedYielded = true;
         yield event;
       }
@@ -980,7 +1073,7 @@ export async function* streamXiaodouAgent(
     }
     let guideYielded = false;
     try {
-      for await (const event of runGuideFallback(guideMessages, dashscope, { userId, starwish })) {
+      for await (const event of withQuestionOptions(runGuideFallback(guideMessages, dashscope, { userId, starwish }), { dashscope, userText: lastUserMessage(guideMessages) })) {
         if (event.type !== 'status' && event.type !== 'thinking') guideYielded = true;
         yield event;
       }

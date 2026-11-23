@@ -147,6 +147,11 @@ class XiaodouChatProvider extends ChangeNotifier {
                 homework: [...current.homework, entry],
               );
             }
+          case XiaodouStreamKind.options:
+            // 提问选项挂到这条回复上，页面在气泡下方渲染成按钮。
+            if (event.options.isNotEmpty) {
+              _messages[assistantIndex] = current.copyWith(options: event.options);
+            }
           case XiaodouStreamKind.cart:
             _messages[assistantIndex] = current.copyWith(
               content: current.isLoading ? XiaodouCopy.confirmCart : current.content,
@@ -213,6 +218,18 @@ class XiaodouChatProvider extends ChangeNotifier {
       await _persistCurrentSession();
       notifyListeners();
     }
+  }
+
+  // 点提问选项 = 用选项文字替用户发一句。先把这组选项标记用过
+  // （整组撤掉、防重复点），再走正常发送流程；发送中直接忽略。
+  Future<void> chooseOption(int messageIndex, String text) async {
+    if (_sending) return;
+    if (messageIndex < 0 || messageIndex >= _messages.length) return;
+    final target = _messages[messageIndex];
+    if (target.options.isEmpty || target.optionsUsed) return;
+    _messages[messageIndex] = target.copyWith(optionsUsed: true);
+    notifyListeners();
+    await send(text);
   }
 
   List<Product> get lastRecommendedProducts {

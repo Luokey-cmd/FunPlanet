@@ -529,6 +529,9 @@ class _MessageBubble extends StatelessWidget {
     // 正在生成中的就是会话里最后一条助手消息：它没说完之前，
     // 气泡尾巴要挂会动的省略号（问题四，2026-11-23 hx 报）。
     final isStreamingTail = !isUser && sending && msgIndex == chat.messages.length - 1;
+    // 提问选项只挂在最后一条消息上：对话往下走了，旧问题的选项
+    // 不再冒出来挡路。
+    final isLastMessage = msgIndex == chat.messages.length - 1;
 
     return Padding(
       padding: EdgeInsets.only(bottom: _xs(12)),
@@ -635,6 +638,17 @@ class _MessageBubble extends StatelessWidget {
                             ),
                           ),
                         if (message.awaitVisionChoice) _VisionChoice(message: message, enabled: !sending),
+                        // 功课段排在亮牌/商品上方（hx 2026-11-23 口径：先亮功课
+                        // 再亮牌）；办事段还在下方，所以清单卡拆成两张渲染——
+                        // XiaodouAgentCard 对空段自动不画，上方只传功课、下方
+                        // 只传办事，互不影响。
+                        if (message.homework.isNotEmpty)
+                          XiaodouAgentCard(
+                            homework: message.homework,
+                            actions: const [],
+                            onTarget: (action) => openAgentActionTarget(context, action),
+                            onPay: (action) => _payAgentOrder(context, msgIndex, action),
+                          ),
                         if (message.hasProducts) ...[
                           if (message.isFate)
                             XiaodouFateSection(
@@ -665,12 +679,21 @@ class _MessageBubble extends StatelessWidget {
                         ],
                         if (message.giftNote != null && message.giftNote!.isNotEmpty)
                           _GiftNote(text: message.giftNote!),
-                        if (message.hasAgentCard)
+                        if (message.actions.isNotEmpty)
                           XiaodouAgentCard(
-                            homework: message.homework,
+                            homework: const [],
                             actions: message.actions,
                             onTarget: (action) => openAgentActionTarget(context, action),
                             onPay: (action) => _payAgentOrder(context, msgIndex, action),
+                          ),
+                        // 提问选项：小豆问了问题、服务端随信给了短回答
+                        // 选项时，气泡下挂一排按钮，点一下就替用户把
+                        // 这句发出去（hx 2026-11-23 定，省得打字）。
+                        if (message.options.isNotEmpty && !message.optionsUsed && isLastMessage && !sending)
+                          _QuestionOptions(
+                            options: message.options,
+                            onPick: (text) =>
+                                context.read<XiaodouChatProvider>().chooseOption(msgIndex, text),
                           ),
                         // 说了一半停住（在想下一段、查工具、联网搜）时
                         // 最容易被误以为已经说完——尾巴挂上会动的省略号，
@@ -802,6 +825,48 @@ class _VisionChoice extends StatelessWidget {
           label,
           style: TextStyle(fontSize: _xs(12) + AppScale.fontBump, fontWeight: FontWeight.w600, color: AppColors.primary),
         ),
+      ),
+    );
+  }
+}
+
+/// 提问选项按钮排：照 _VisionChoice 的胶囊样式，文字换成服务端随
+/// 问题下发的短回答；点哪个就把哪个当用户回复发出去，整组随即撤掉。
+class _QuestionOptions extends StatelessWidget {
+  const _QuestionOptions({required this.options, required this.onPick});
+
+  final List<String> options;
+  final ValueChanged<String> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: _xs(10)),
+      child: Wrap(
+        spacing: _xs(8),
+        runSpacing: _xs(8),
+        children: [
+          for (final option in options)
+            GestureDetector(
+              onTap: () => onPick(option),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: _xs(12), vertical: _xs(7)),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(_xs(999)),
+                  border: Border.all(color: AppColors.primaryLight),
+                ),
+                child: Text(
+                  option,
+                  style: TextStyle(
+                    fontSize: _xs(12) + AppScale.fontBump,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -473,7 +473,7 @@ async function drawStarCards(args) {
     cards,
     fullProducts: picked,
     roles: picked.map((_, index) => roles[index]),
-    note: picked.length >= 3 ? '三张星牌：本命、遇见、余韵。每张牌的 trait 是系统按真实数据算好的特点句，讲牌时照它说，不要改数字、不要另编特点。' : '货架这一层不足三件，按实际张数推荐。',
+    note: picked.length >= 3 ? '三张牌已明着亮在用户面前。每张牌的 trait 是系统按真实数据算好的特点句，只活在牌面上：你的正文不要复述商品名、价格和特点句，只写一句引出加一句建议，指代用位置（第一张/中间那张/最后一张）。' : '货架这一层不足三件，按实际张数推荐。',
   };
 }
 

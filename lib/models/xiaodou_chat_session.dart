@@ -102,6 +102,10 @@ class XiaodouChatSession {
         if (m.fateHasMore) 'fateHasMore': true,
         if (m.drawArgs.isNotEmpty) 'drawArgs': m.drawArgs,
         if (m.traits.isNotEmpty) 'traits': m.traits,
+        // 提问选项：没点的要留着，重进聊天还能接着点；点过的靠
+        // optionsUsed 标记，重进也不会再冒出来。
+        if (m.options.isNotEmpty) 'options': m.options,
+        if (m.optionsUsed) 'optionsUsed': true,
       };
 
   static ChatMessage _messageFromJson(Map<String, dynamic> json) {
@@ -135,6 +139,8 @@ class XiaodouChatSession {
       drawArgs: (json['drawArgs'] as Map<String, dynamic>?) ?? const {},
       traits: (json['traits'] as Map<dynamic, dynamic>? ?? {})
           .map((key, value) => MapEntry('$key', '$value')),
+      options: (json['options'] as List<dynamic>? ?? []).map((e) => '$e').toList(),
+      optionsUsed: json['optionsUsed'] as bool? ?? false,
     );
   }
 }

@@ -27,6 +27,8 @@ class ChatMessage {
     this.fateHasMore = false,
     this.drawArgs = const {},
     this.traits = const {},
+    this.options = const [],
+    this.optionsUsed = false,
   });
 
   final ChatRole role;
@@ -60,6 +62,11 @@ class ChatMessage {
   // 每张牌的特点句（服务端按真实数据算好）：商品 id -> 一句话。
   final Map<String, String> traits;
 
+  // 提问选项（服务端在这条回复以问句收尾时随信下发）：气泡下方
+  // 渲染成按钮，点一个就当用户回复；optionsUsed 后整组撤掉。
+  final List<String> options;
+  final bool optionsUsed;
+
   bool get hasAgentCard => actions.isNotEmpty || homework.isNotEmpty;
 
   bool get hasProducts => products.isNotEmpty;
@@ -88,6 +95,8 @@ class ChatMessage {
     bool? fateHasMore,
     Map<String, dynamic>? drawArgs,
     Map<String, String>? traits,
+    List<String>? options,
+    bool? optionsUsed,
   }) {
     return ChatMessage(
       role: role,
@@ -110,6 +119,8 @@ class ChatMessage {
       fateHasMore: fateHasMore ?? this.fateHasMore,
       drawArgs: drawArgs ?? this.drawArgs,
       traits: traits ?? this.traits,
+      options: options ?? this.options,
+      optionsUsed: optionsUsed ?? this.optionsUsed,
     );
   }
 }

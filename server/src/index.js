@@ -307,6 +307,10 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
         res.write(`data: ${JSON.stringify({ type: 'actions', action: event.action })}\n\n`);
       } else if (event.type === 'homework') {
         res.write(`data: ${JSON.stringify({ type: 'homework', entry: event.entry })}\n\n`);
+      } else if (event.type === 'options') {
+        // 提问选项：这一轮以问句收尾时随正文下发的短回答按钮，
+        // App 渲染在气泡下方，点了就当用户回复；不落库。
+        res.write(`data: ${JSON.stringify({ type: 'options', options: event.options ?? [] })}\n\n`);
       } else if (event.type === 'cart_confirm') {
         res.write(`data: ${JSON.stringify({ type: 'cart_confirm', products: event.products })}\n\n`);
       } else if (event.type === 'appraisal') {

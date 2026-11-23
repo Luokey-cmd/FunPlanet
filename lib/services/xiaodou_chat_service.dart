@@ -10,7 +10,7 @@ import '../models/agent_records.dart';
 import '../models/chat_message.dart';
 import 'token_storage.dart';
 
-enum XiaodouStreamKind { text, products, fate, cart, appraisal, giftNote, thinking, status, actions, homework }
+enum XiaodouStreamKind { text, products, fate, cart, appraisal, giftNote, thinking, status, actions, homework, options }
 
 /// 一批亮牌的元数据（服务端 fate_cards 事件的 batch 字段）：
 /// 一共有多少件匹配、还有没有下一批、本批的抽牌条件、每张牌的特点句。
@@ -62,6 +62,7 @@ class XiaodouStreamEvent {
     this.batch,
     this.action,
     this.homeworkEntry,
+    this.options = const [],
   });
 
   factory XiaodouStreamEvent.text(String content) =>
@@ -80,6 +81,10 @@ class XiaodouStreamEvent {
   // 功课段条目（小豆做功课的过程，带真实数字）。
   factory XiaodouStreamEvent.homework(HomeworkEntry entry) =>
       XiaodouStreamEvent._(kind: XiaodouStreamKind.homework, homeworkEntry: entry);
+
+  // 提问选项（服务端在问句收尾时下发的短回答，用户点一下即可回复）。
+  factory XiaodouStreamEvent.options(List<String> options) =>
+      XiaodouStreamEvent._(kind: XiaodouStreamKind.options, options: options);
 
   factory XiaodouStreamEvent.cartConfirm(List<Product> pendingCart) =>
       XiaodouStreamEvent._(kind: XiaodouStreamKind.cart, pendingCart: pendingCart);
@@ -107,6 +112,7 @@ class XiaodouStreamEvent {
   final FateBatchMeta? batch;
   final AgentAction? action;
   final HomeworkEntry? homeworkEntry;
+  final List<String> options;
 }
 
 // 云端会话摘要（服务端 AiChatConversation）：和手机本地记录是两套，
@@ -297,6 +303,12 @@ class XiaodouChatService {
             if (rawEntry is Map<String, dynamic>) {
               yield XiaodouStreamEvent.homework(HomeworkEntry.fromJson(rawEntry));
             }
+            continue;
+          }
+
+          if (type == 'options') {
+            final list = (json['options'] as List<dynamic>? ?? []).map((e) => '$e').toList();
+            if (list.isNotEmpty) yield XiaodouStreamEvent.options(list);
             continue;
           }
 

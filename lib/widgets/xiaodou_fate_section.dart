@@ -71,23 +71,25 @@ class XiaodouFateSection extends StatelessWidget {
           onPick: (value) => onRefilter(sort: value),
         ),
         XiaodouFateBoard(
-          // 换一批就换 key：牌板重建，三张牌重新翻着入场
+          // 换一批就换 key：牌板重建，新一批明牌直接换上（淡入，不翻）
           key: ValueKey('fate-$index-${batches[index].isEmpty ? 'empty' : batches[index].first.id}'),
           products: batches[index],
-          roles: index < message.fateRolesBatches.length
-              ? message.fateRolesBatches[index]
-              : message.starRoles,
           traits: message.traits,
         ),
         if (batches.length > 1 || message.fateHasMore || exhausted) ...[
           SizedBox(height: AppScale.s(8)),
           Row(
             children: [
-              _pagerButton(
-                label: '上一批',
-                enabled: index > 0 && !loadingBatch,
-                onTap: onPrev,
-              ),
+              // 第 1 批不摆「上一批」（hx 口径：从第 2 批起才出现）；
+              // 用等宽占位顶住，让「第 X 批」保持居中、下一批保持靠右。
+              if (index > 0)
+                _pagerButton(
+                  label: '上一批',
+                  enabled: !loadingBatch,
+                  onTap: onPrev,
+                )
+              else
+                SizedBox(width: AppScale.s(72)),
               Expanded(
                 child: Text(
                   '第 ${index + 1} 批',
