@@ -876,6 +876,11 @@ async function setOrderNote(args, context) {
 // 付款成功时会发，这里再发就重复计了。
 async function createOrder(args, context) {
   const userId = context.userId;
+  // 同一轮里模型重复调 create_order（真发生过：答完一遍又调一遍）：
+  // 不许再生成第二笔订单，把第一笔的结果原样返回——action 的
+  // id 不变，App 清单也不会多出一行（2026-11-23 全面自查修）。
+  const turn = turnStateOf(context);
+  if (turn.orderResult) return turn.orderResult;
   const items = Array.isArray(args.items) ? args.items : [];
   const built = await buildLineItemsFromRequest(
     items.map((item) => ({
@@ -1030,7 +1035,7 @@ async function createOrder(args, context) {
   const firstName = lineItems[0]?.name ?? '';
   const summary =
     lineItems.length > 1 ? `${firstName} 等 ${lineItems.length} 件` : firstName;
-  return {
+  const result = {
     ok: true,
     orderId: order.id,
     orderNo,
@@ -1052,6 +1057,8 @@ async function createOrder(args, context) {
     }),
     note: '订单只是待付款，绝不能说已经付款或下单成功；把应付金额告诉用户，付款要他在清单卡里点「确认下单」。',
   };
+  turn.orderResult = result;
+  return result;
 }
 
 // 拼收货地址展示文字：与下单路由 composeAddressDetail 同口径
@@ -1063,6 +1070,23 @@ function composeAddressDetailForOrder(address) {
   if (parts && detail && !detail.startsWith(parts)) return parts + detail;
   return detail || parts || null;
 }
+
+// 纯导购保底专用的工具子集：只有查和说，没有办事工具。
+// 保底路线不发 actions 事件、也没有跨调用共享的 turnState，
+// 办事工具在它手里会变成「办了不记账、备注还丢失」，不如
+// 压根不给它（2026-11-23 全面自查修）。
+const GUIDE_TOOL_NAMES = new Set([
+  'search_products',
+  'draw_star_cards',
+  'get_product_detail',
+  'get_promotions',
+  'get_user_context',
+  'get_weather',
+  'web_search',
+]);
+export const XIAODOU_GUIDE_TOOLS = XIAODOU_TOOLS.filter((tool) =>
+  GUIDE_TOOL_NAMES.has(tool.function.name),
+);
 
 export async function executeXiaodouTool(name, rawArgs, context = {}) {
   const args = parseArgs(rawArgs);

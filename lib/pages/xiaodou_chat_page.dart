@@ -1,8 +1,9 @@
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/agent_records.dart';
@@ -160,18 +161,30 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
   void _handleVoiceListeningChanged(bool listening) {
     if (!mounted || _voiceListening == listening) return;
     setState(() => _voiceListening = listening);
+    // 录音与键盘互斥（2026-11-23 hx 定）：一开录音就收起键盘；
+    // 录音中把输入焦点的 canRequestFocus 关掉，点输入框也拿不到
+    // 焦点、键盘弹不起来；关掉录音再恢复，点输入框照常弹键盘。
+    // 为什么用焦点节点的开关而不是给输入框设 readOnly：readOnly
+    // 在部分安卓机型上聚焦仍会带出键盘，焦点这层是硬开关、必生效。
+    // 坑：unfocus 与关开关两个动作都要做，只关开关时已有的焦点
+    // 不一定自动让出，键盘可能赖着不走。
+    if (listening) {
+      _inputFocusNode.unfocus();
+      _inputFocusNode.canRequestFocus = false;
+    } else {
+      _inputFocusNode.canRequestFocus = true;
+    }
   }
 
-  /// 录音守卫：页面里除麦克风外的按钮被点时先过这里。
-  /// 输入：无。输出：true = 正在录音、已弹提示、本次点击作废；
-  /// false = 没在录音、放行原操作。文案是 hx 定的原话，别改。
-  bool _blockWhileListening() {
-    if (!_voiceListening) return false;
-    showTopSnackBar(
-      context,
-      content: Text('请先关闭录音再进行操作', style: TextStyle(fontSize: _xs(14) + AppScale.fontBump, fontWeight: FontWeight.w600)),
-    );
-    return true;
+  /// 录音中点其他按钮（2026-11-23 hx 改口径）：不再拦下弹提示，
+  /// 而是先结束录音、再照常执行那个按钮的动作——点哪个按钮，
+  /// 录音就为哪个按钮让路。键盘是唯一例外：点输入框不结束录音，
+  /// 只是弹不出键盘（见 _handleVoiceListeningChanged 的焦点开关）。
+  /// 输入：无。输出：无。停录音经输入栏的公开方法走，聆听状态
+  /// 随后由 onListeningChanged 同步回来，这里不等它。
+  void _endListeningForAction() {
+    if (!_voiceListening) return;
+    _inputBarKey.currentState?.stopVoiceInput();
   }
 
   @override
@@ -204,23 +217,20 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
               bottom: false,
               child: _Header(
                 onClose: () => Navigator.pop(context),
-                // 顶栏菜单四项都过录音守卫；返回不拦——按下会停掉
-                // 录音离开页面，输入栏 dispose 本就有收口。
+                // 顶栏菜单四项：录音中点按先结束录音、再照常执行；
+                // 返回不拦——按下即离开页面，输入栏 dispose 会停掉
+                // 录音，结果与先停再走一致。
                 onOpenHistory: () {
-                  if (_blockWhileListening()) return;
+                  _endListeningForAction();
                   XiaodouChatHistoryPage.open(context);
                 },
                 onOpenProfile: () {
-                  if (_blockWhileListening()) return;
+                  _endListeningForAction();
                   showStarwishDossierSheet(context);
                 },
                 onNewChat: () {
-                  if (_blockWhileListening()) return;
+                  _endListeningForAction();
                   _startNewChat(context);
-                },
-                onCopyChat: () {
-                  if (_blockWhileListening()) return;
-                  _copyCurrentChat(context);
                 },
               ),
             ),
@@ -236,23 +246,24 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
                     onOpenProfile: () => showStarwishDossierSheet(context),
                     onVoice: () => _inputBarKey.currentState?.startVoiceInput(),
                   ),
-                  // 录音守卫罩：录音时在消息区上方盖一层透明罩，
-                  // 区内一切点击（灵感卡、商品卡、星牌、换一批、
-                  // 识图选项等）统一被接住、只弹提示，不必逐个
-                  // 组件传守卫。只认 tap、滚动照常（拖动会赢下
-                  // 手势竞争，罩子不会把列表弄得滑不动）。
+                  // 录音收尾罩：录音时在消息区上方盖一层透明罩，
+                  // 区内第一下点击（灵感卡、商品卡、星牌、换一批、
+                  // 识图选项等）统一被接住、只做一件事——结束录音；
+                  // 罩子随聆听状态消失，第二下才点到下面的东西。
+                  // 只认 tap、滚动照常（拖动会赢下手势竞争，罩子
+                  // 不会把列表弄得滑不动）。
                   if (_voiceListening)
                     Positioned.fill(
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: () => _blockWhileListening(),
+                        onTap: _endListeningForAction,
                       ),
                     ),
                 ],
               ),
             ),
-            _CartConfirmBar(voiceBlock: _blockWhileListening),
-            _GuideChips(voiceBlock: _blockWhileListening),
+            _CartConfirmBar(onActionTap: _endListeningForAction),
+            _GuideChips(onActionTap: _endListeningForAction),
             _InputBar(
               key: _inputBarKey,
               focusNode: _inputFocusNode,
@@ -269,30 +280,9 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
 Future<void> _startNewChat(BuildContext context) async {
   final chat = context.read<XiaodouChatProvider>();
   if (chat.sending) return;
-  if (!chat.messages.any((m) => m.role == ChatRole.user)) {
-    await chat.startNewChat();
-    return;
-  }
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text('开始新对话', style: TextStyle(fontSize: _xs(16) + AppScale.fontBump)),
-      content: Text('当前对话会自动保存到聊天记录，确定开始新对话吗？', style: TextStyle(fontSize: _xs(14) + AppScale.fontBump, height: 1.5)),
-      actions: [
-        AppTextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-        AppTextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('确定')),
-      ],
-    ),
-  );
-  if (ok == true && context.mounted) {
-    await chat.startNewChat();
-  }
-}
-
-void _copyCurrentChat(BuildContext context) {
-  final chat = context.read<XiaodouChatProvider>();
-  Clipboard.setData(ClipboardData(text: chat.exportCurrentChatText()));
-  showTopSnackBar(context, content: Text('当前对话已复制', style: TextStyle(fontSize: _xs(14) + AppScale.fontBump, fontWeight: FontWeight.w600)));
+  // 不再弹确认框（2026-11-23 hx 拍板）：当前对话本来就会自动存进
+  // 聊天记录，点「开启新对话」就直接开，少一步摩擦。
+  await chat.startNewChat();
 }
 
 // 顶栏（第一批瘦身后只剩 4 个元素）：返回、头像、名称区、更多菜单。
@@ -304,14 +294,12 @@ class _Header extends StatelessWidget {
     required this.onOpenHistory,
     required this.onOpenProfile,
     required this.onNewChat,
-    required this.onCopyChat,
   });
 
   final VoidCallback onClose;
   final VoidCallback onOpenHistory;
   final VoidCallback onOpenProfile;
   final VoidCallback onNewChat;
-  final VoidCallback onCopyChat;
 
   @override
   Widget build(BuildContext context) {
@@ -359,15 +347,12 @@ class _Header extends StatelessWidget {
                   onOpenProfile();
                 case 'new':
                   onNewChat();
-                case 'copy':
-                  onCopyChat();
               }
             },
             itemBuilder: (context) => const [
               PopupMenuItem(value: 'history', child: Text('聊天记录')),
               PopupMenuItem(value: 'profile', child: Text('小豆记得你')),
               PopupMenuItem(value: 'new', child: Text('新对话')),
-              PopupMenuItem(value: 'copy', child: Text('复制当前对话')),
             ],
           ),
         ],
@@ -535,7 +520,11 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == ChatRole.user;
-    final sending = context.watch<XiaodouChatProvider>().sending;
+    final chat = context.watch<XiaodouChatProvider>();
+    final sending = chat.sending;
+    // 正在生成中的就是会话里最后一条助手消息：它没说完之前，
+    // 气泡尾巴要挂会动的省略号（问题四，2026-11-23 hx 报）。
+    final isStreamingTail = !isUser && sending && msgIndex == chat.messages.length - 1;
 
     return Padding(
       padding: EdgeInsets.only(bottom: _xs(12)),
@@ -679,11 +668,66 @@ class _MessageBubble extends StatelessWidget {
                             onTarget: (action) => openAgentActionTarget(context, action),
                             onPay: (action) => _payAgentOrder(context, msgIndex, action),
                           ),
+                        // 说了一半停住（在想下一段、查工具、联网搜）时
+                        // 最容易被误以为已经说完——尾巴挂上会动的省略号，
+                        // 流一结束就自动消失。
+                        if (isStreamingTail) const _TypingDots(),
                       ],
                     ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 会动的省略号：三个小点错峰呼吸（相位各差 1/3 圈），表示
+/// 「还在想、还在写，后面还有」。只在流式生成中出现，组件
+/// 销毁时停掉动画控制器，别留野动画（问题四）。
+class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(top: _xs(8)),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < 3; i++) ...[
+                if (i > 0) SizedBox(width: _xs(4)),
+                Opacity(
+                  opacity: 0.25 + 0.75 * (0.5 + 0.5 * math.sin((_controller.value - i / 3) * 2 * math.pi)),
+                  child: Container(
+                    width: _xs(6),
+                    height: _xs(6),
+                    decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primary),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -798,10 +842,11 @@ class _RecommendActions extends StatelessWidget {
 }
 
 class _CartConfirmBar extends StatelessWidget {
-  const _CartConfirmBar({required this.voiceBlock});
+  const _CartConfirmBar({required this.onActionTap});
 
-  /// 录音守卫（页面传进来）：返回 true 表示正在录音、本次点击作废。
-  final bool Function() voiceBlock;
+  /// 按钮被点时先喊一声（页面传进来）：录音中会先结束录音，
+  /// 然后按钮动作照常执行；没在录音时是空操作。
+  final VoidCallback onActionTap;
 
   @override
   Widget build(BuildContext context) {
@@ -841,7 +886,7 @@ class _CartConfirmBar extends StatelessWidget {
                 Expanded(
                   child: AppOutlinedButton(
                     onPressed: () {
-                      if (voiceBlock()) return;
+                      onActionTap();
                       chat.clearPendingCart();
                     },
                     child: Text('取消', style: TextStyle(fontSize: _xs(12) + AppScale.fontBump)),
@@ -851,7 +896,7 @@ class _CartConfirmBar extends StatelessWidget {
                 Expanded(
                   child: AppFilledButton(
                     onPressed: () {
-                      if (voiceBlock()) return;
+                      onActionTap();
                       final cart = context.read<CartProvider>();
                       for (final product in pending) {
                         cart.addItem(product);
@@ -875,18 +920,24 @@ class _CartConfirmBar extends StatelessWidget {
 }
 
 class _GuideChips extends StatelessWidget {
-  const _GuideChips({required this.voiceBlock});
+  const _GuideChips({required this.onActionTap});
 
-  /// 录音守卫（页面传进来）：返回 true 表示正在录音、本次点击作废。
-  final bool Function() voiceBlock;
+  /// 词条被点时先喊一声（页面传进来）：录音中会先结束录音，
+  /// 然后这条快捷话照常发出去；没在录音时是空操作。
+  final VoidCallback onActionTap;
 
-  // 快捷词（第一批换词）：删掉「点亮星签」——它原来打开星愿档案问卷弹层，
-  // 是旧问卷的另一个入口，必须一并断掉；偏好改从 ⋯ 菜单「小豆记得你」进。
-  static const _chips = [
-    '帮我挑礼物',
-    '50元内小夜灯',
-    '给同担的生日礼物',
-    '今天有什么优惠',
+  // 快捷词（第二批换词，2026-11-23 hx 对着千问定的形态）：学淘宝
+  // 闪购那排——按钮上只放 2~4 字的场景名配小图标，是「入口」不是
+  // 「例句」；点下去发的话也短，场景名本身就是一句完整需求。
+  // 五个入口各通一种导购动作：找优惠（领券办事）、挑礼物（送礼
+  // 流程）、翻三张牌（亮牌）、本周热卖（销量搜）、50 元内（预算搜）。
+  // （第一批的「点亮星签」是旧问卷入口，早已删掉，别再加回来。）
+  static const _chips = <(IconData, String, String)>[
+    (Icons.local_offer_outlined, '找优惠', '找优惠'),
+    (Icons.card_giftcard, '挑礼物', '帮我挑礼物'),
+    (Icons.style_outlined, '翻牌推荐', '翻三张牌'),
+    (Icons.whatshot_outlined, '本周热卖', '本周热卖'),
+    (Icons.savings_outlined, '平价好物', '50元内好物'),
   ];
 
   @override
@@ -908,8 +959,8 @@ class _GuideChips extends StatelessWidget {
                   onTap: chat.sending
                       ? null
                       : () {
-                          if (voiceBlock()) return;
-                          chat.send(_chips[i], starwish: _archiveOf(context));
+                          onActionTap();
+                          chat.send(_chips[i].$3, starwish: _archiveOf(context));
                         },
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: _xs(12), vertical: _xs(7)),
@@ -918,13 +969,20 @@ class _GuideChips extends StatelessWidget {
                       borderRadius: BorderRadius.circular(_xs(999)),
                       border: Border.all(color: AppColors.border),
                     ),
-                    child: Text(
-                      _chips[i],
-                      style: TextStyle(
-                        fontSize: _xs(12) + AppScale.fontBump,
-                        color: AppColors.foreground,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(_chips[i].$1, size: _xs(14), color: AppColors.primary),
+                        SizedBox(width: _xs(4)),
+                        Text(
+                          _chips[i].$2,
+                          style: TextStyle(
+                            fontSize: _xs(12) + AppScale.fontBump,
+                            color: AppColors.foreground,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1062,18 +1120,28 @@ class _InputBarState extends State<_InputBar> {
     widget.onListeningChanged?.call(listening);
   }
 
-  /// 输入栏内部按钮的录音守卫：与页面同一个口径、同一句文案
-  /// （见页面 State 的 _blockWhileListening）。
-  bool _blockWhileListening() {
+  /// 输入栏内部按钮的录音口径（与页面同一个，2026-11-23 hx 定）：
+  /// 录音中点发送/选图/移除附件，先结束录音、再照常执行那个动作。
+  /// 输出：true = 刚结束了一段录音。发送必须 await 它——结束录音
+  /// 会把最后一段识别定稿进输入框，等落定再读文字，发出去的
+  /// 才是完整一句话（旧口径是直接拦下不许发，已被 hx 改掉）。
+  Future<bool> _endListeningForAction() async {
     if (!_listening) return false;
-    _voiceSnack('请先关闭录音再进行操作');
+    await _voice.stopListening();
     return true;
   }
 
-  void _send(XiaodouChatProvider chat) {
-    // 录音中不许发送：识别还在往输入框写字，这时发出去的是半句话，
-    // 且发送会清掉输入框、把正在进行的识别弄乱。弹提示拦下。
-    if (_blockWhileListening()) return;
+  /// 结束录音（公开方法）：页面那边「录音中点了其他按钮」时经
+  /// GlobalKey 调进来，先把录音收尾。只停录音，不动输入框里
+  /// 已识别的文字——接下来是发送还是改字，都接着这份文字走。
+  Future<void> stopVoiceInput() async {
+    if (!_listening) return;
+    await _voice.stopListening();
+  }
+
+  Future<void> _send(XiaodouChatProvider chat) async {
+    await _endListeningForAction();
+    if (!mounted) return;
     final text = _inputController.text;
     final imageBytes = _pendingImageBytes;
     final mimeType = _pendingMimeType;
@@ -1205,8 +1273,9 @@ class _InputBarState extends State<_InputBar> {
                           top: 0,
                           right: 0,
                           child: GestureDetector(
-                            onTap: () {
-                              if (_blockWhileListening()) return;
+                            onTap: () async {
+                              await _endListeningForAction();
+                              if (!mounted) return;
                               _clearPendingImage();
                             },
                             child: Container(
@@ -1233,9 +1302,11 @@ class _InputBarState extends State<_InputBar> {
                 AppIconButton(
                   onPressed: chat.sending
                       ? null
-                      : () {
-                          // 录音中不许选图：相册页一开，录音必然被打断。
-                          if (_blockWhileListening()) return;
+                      : () async {
+                          // 录音中点选图：先结束录音、再照常开相册
+                          // （旧口径是拦下不许选，hx 2026-11-23 改的）。
+                          await _endListeningForAction();
+                          if (!mounted) return;
                           widget.onPickImage();
                         },
               iconSize: _xs(22),

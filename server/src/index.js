@@ -284,20 +284,27 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
     }
     res.write('data: [DONE]\n\n');
     res.end();
-    // 落库放在响应结束之后做，不拖慢用户看到回复的速度
-    const conversation = await persistChatTurn({
-      userId: req.user?.sub,
-      userText: lastUserText,
-      assistantText: assistantFullText,
-    });
-    if (recommendedProducts.length > 0) {
-      await recordGuideRecommendations({
+    // 落库放在响应结束之后做，不拖慢用户看到回复的速度。
+    // 单独包一层：响应已经结束，这里再失败也只能记日志——要是
+    // 抛进外层 catch，它会往已关闭的响应里写错误事件，直接崩
+    // （2026-11-23 全面自查修）。
+    try {
+      const conversation = await persistChatTurn({
         userId: req.user?.sub,
-        conversationId: conversation?.id ?? null,
-        requestText: lastUserText,
-        route: req.body?.starwish?.route ?? req.body?.starwish?.purpose ?? null,
-        products: recommendedProducts,
+        userText: lastUserText,
+        assistantText: assistantFullText,
       });
+      if (recommendedProducts.length > 0) {
+        await recordGuideRecommendations({
+          userId: req.user?.sub,
+          conversationId: conversation?.id ?? null,
+          requestText: lastUserText,
+          route: req.body?.starwish?.route ?? req.body?.starwish?.purpose ?? null,
+          products: recommendedProducts,
+        });
+      }
+    } catch (persistError) {
+      console.error('[chat/stream] persist failed:', persistError);
     }
   } catch (error) {
     console.error('[chat/stream]', error);

@@ -110,7 +110,12 @@ class XiaodouChatProvider extends ChangeNotifier {
             );
           case XiaodouStreamKind.fate:
             _messages[assistantIndex] = current.copyWith(
-              content: current.isLoading ? '三张牌已经亮出来了，本命、遇见、余韵都在，点任意一张就能看详情。' : current.content,
+              // 货架不足三件时别硬说三张牌（2026-11-23 自查修）。
+              content: current.isLoading
+                  ? (event.products.length >= 3
+                        ? '三张牌已经亮出来了，本命、遇见、余韵都在，点任意一张就能看详情。'
+                        : '牌已经亮出来了，点任意一张就能看详情。')
+                  : current.content,
               isLoading: false,
               products: event.products,
               starRoles: event.roles,
@@ -171,13 +176,15 @@ class XiaodouChatProvider extends ChangeNotifier {
           content: '抱歉，我没有想好怎么说…',
         );
       } else if (_messages[assistantIndex].isLoading) {
-        // 只收到状态/思考就断了流：不能把转圈占位永远留着，收成一句
-        // 兜底（思考过程保留，用户能看到它刚才在想什么）。
+        // 只收到状态/思考/清单事件就断了流：不能把转圈占位永远留着，
+        // 收成一句兜底。已收到的办事清单、功课、卡片必须原样保住
+        // ——以前这里整条重建消息，纯办事轮次（只办事、没正文）会
+        // 把办好的事连清单一起抹掉、只剩一句抱歉（2026-11-23
+        // 全面自查修）。
         final tail = _messages[assistantIndex];
-        _messages[assistantIndex] = ChatMessage(
-          role: ChatRole.assistant,
-          content: '抱歉，我没有想好怎么说…',
-          thinking: tail.thinking,
+        _messages[assistantIndex] = tail.copyWith(
+          content: tail.hasAgentCard ? '办好了，清单在下面，你看看。' : '抱歉，我没有想好怎么说…',
+          isLoading: false,
         );
       }
     } catch (e) {

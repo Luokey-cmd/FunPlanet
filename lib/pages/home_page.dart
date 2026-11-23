@@ -486,6 +486,30 @@ class _MarketSectionState extends State<_MarketSection> {
   MarketTab _tab = MarketTab.recommend;
   RankingSubTab _rankingSub = RankingSubTab.sales;
 
+  // 市集 tab 滑动切换（2026-11-23 hx 要求）：记住滑动方向——
+  // 往右边的 tab 走，新内容从右滑入；往左回，从左滑入。
+  int _slideDir = 1;
+
+  void _selectTab(MarketTab next) {
+    if (next == _tab) return;
+    final oldIndex = marketTabs.indexWhere((t) => t.$1 == _tab);
+    final newIndex = marketTabs.indexWhere((t) => t.$1 == next);
+    setState(() {
+      _slideDir = newIndex >= oldIndex ? 1 : -1;
+      _tab = next;
+    });
+  }
+
+  void _selectSub(RankingSubTab next) {
+    if (next == _rankingSub) return;
+    // 子榜单在行里的顺序是收藏在前、售卖在后，按这个顺序定方向。
+    const order = [RankingSubTab.collect, RankingSubTab.sales];
+    setState(() {
+      _slideDir = order.indexOf(next) >= order.indexOf(_rankingSub) ? 1 : -1;
+      _rankingSub = next;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = productsByMarketTab(_tab, rankingSub: _rankingSub);
@@ -513,7 +537,7 @@ class _MarketSectionState extends State<_MarketSection> {
                 final active = _tab == t.$1;
                 return Expanded(
                   child: AppGestureDetector(
-                    onTap: () => setState(() => _tab = t.$1),
+                    onTap: () => _selectTab(t.$1),
                     behavior: HitTestBehavior.opaque,
                     enablePressScale: false,
                     enableParticle: false,
@@ -529,7 +553,9 @@ class _MarketSectionState extends State<_MarketSection> {
                           ),
                         ),
                         SizedBox(height: AppScale.s(4)),
-                        Container(
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOut,
                           width: active ? AppScale.s(20) : 0,
                           height: AppScale.s(3),
                           decoration: BoxDecoration(
@@ -544,26 +570,49 @@ class _MarketSectionState extends State<_MarketSection> {
               }).toList(),
             ),
           ),
-          if (_tab == MarketTab.ranking) ...[
-            SizedBox(height: AppScale.s(8)),
-            Row(
+          SizedBox(height: AppScale.s(12)),
+          // 内容区滑动切换：新内容按 _slideDir 从一侧滑入、旧的淡出，
+          // 不再整块瞬换。子榜单切换同走这条动画（key 带上子榜单）。
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeOutCubic,
+            transitionBuilder: (child, animation) {
+              final slide = Tween<Offset>(
+                begin: Offset(_slideDir * 0.16, 0),
+                end: Offset.zero,
+              ).animate(animation);
+              return SlideTransition(
+                position: slide,
+                child: FadeTransition(opacity: animation, child: child),
+              );
+            },
+            child: Column(
+              key: ValueKey('${_tab.name}-${_rankingSub.name}'),
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _RankingChip(
-                  label: '收藏排行榜单',
-                  active: _rankingSub == RankingSubTab.collect,
-                  onTap: () => setState(() => _rankingSub = RankingSubTab.collect),
-                ),
-                SizedBox(width: AppScale.s(8)),
-                _RankingChip(
-                  label: '售卖排行榜单',
-                  active: _rankingSub == RankingSubTab.sales,
-                  onTap: () => setState(() => _rankingSub = RankingSubTab.sales),
-                ),
+                if (_tab == MarketTab.ranking) ...[
+                  Row(
+                    children: [
+                      _RankingChip(
+                        label: '收藏排行榜单',
+                        active: _rankingSub == RankingSubTab.collect,
+                        onTap: () => _selectSub(RankingSubTab.collect),
+                      ),
+                      SizedBox(width: AppScale.s(8)),
+                      _RankingChip(
+                        label: '售卖排行榜单',
+                        active: _rankingSub == RankingSubTab.sales,
+                        onTap: () => _selectSub(RankingSubTab.sales),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: AppScale.s(12)),
+                ],
+                StaggeredProductGrid(products: items),
               ],
             ),
-          ],
-          SizedBox(height: AppScale.s(12)),
-          StaggeredProductGrid(products: items),
+          ),
         ],
       ),
     );

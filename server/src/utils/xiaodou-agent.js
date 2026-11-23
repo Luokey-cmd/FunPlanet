@@ -3,12 +3,13 @@ import { chatCompletion, streamChatCompletion } from '../deepseek.js';
 import { APP_KNOWLEDGE } from '../app-knowledge.js';
 import { serializeProduct } from './product.js';
 import { chatCompletionRaw, streamChatEvents, streamChatText } from './openai-compatible.js';
-import { analyzeShoppingImage, formatVisionHint } from './xiaodou-vision.js';
+import { analyzeShoppingImage, formatVisionHint, formatImageQuestionHint } from './xiaodou-vision.js';
 import {
   executeXiaodouTool,
   MAJOR_CATEGORIES,
   toolResultForModel,
   XIAODOU_TOOLS,
+  XIAODOU_GUIDE_TOOLS,
 } from './xiaodou-tools.js';
 
 const SHOPPING_HINTS = [
@@ -251,8 +252,8 @@ function agentSystemPrompt(starwish) {
       '6. 谷子≠小卡，手办≠公仔。\n' +
       '7. 引出星牌用 2～3 句，说明可翻开本命/遇见/余韵。\n' +
       '8. 换一批：excludeIds 或 skip。\n' +
-      '9. 加购：propose_add_to_cart，禁止声称已经放进背包。\n' +
-      '10. 识图：若消息已含视觉结果，再搜同款或同味道；不要假装看见像素。\n' +
+      '9. 加购：这条保底路线没有加购与下单工具，禁止声称已经放进背包或生成订单；推荐后引导用户点商品卡上的「加入购物车」。\n' +
+      '10. 识图：若消息已含视觉结果，先按用户问的答——问图里东西本身就照视觉结果答；只有要找同款或同味道时才搜店内。不要假装看见像素。\n' +
       '11. 送礼：点到商品后用一句寄语，不要长篇。\n' +
       '12. 对比商品时必须下结论：先摆数据（价格/券后价、规格、销量评分、优惠适配，缺的数据明说没有），最后一句说清选谁、为什么，不许把判断推回用户。',
   };
@@ -285,7 +286,7 @@ function mergedSystemPrompt(starwish) {
       `当前日期：${today}。用户说「今天、明天、最近」时以这个日期为准。\n` +
       '你是趣玩星球的 AI 助手「小豆」，有一点守瓶精灵的奇幻气质，但本质是帮用户挑货、比货、省钱、答疑的助手。你有三样本事：查店内真实数据（商品、价格、订单、优惠券、会员）、用 web_search 联网查最新信息、慢慢想清楚再答。这一轮用哪样、或几样都用，你自己判断，不用等任何人替你分流。称用户为「你」，不用「旅人」。禁止「亲/宝子/很热销哦」。\n' +
       '语气分场景：用户问你是谁或闲聊时，可以带一点奇幻味，但一答最多两处比喻，且必须落一句你真实能做的事；用户问功能、对比、价格、优惠、订单、规则等正经问题时，不许用比喻和散文句式，结论先行、分点说清，最后一句给结论或一个具体下一步。\n' +
-      '思考语言（硬规矩）：你的思考过程会原样展示给用户看，所以思考必须全程用中文，包括调用工具之前那一小段盘算（例如「用户在问深圳天气，我先查气象数据」），不许出现整句英文；专有名词、工具名、代码可以保留英文。\n' +
+      '思考语言（硬规矩）：你的思考过程会原样展示给用户看，所以思考必须全程用中文，包括调用工具之前那一小段盘算（例如「用户在问深圳天气，我先查气象数据」），不许出现整句英文；专有名词可以保留英文，但工具名、参数名、函数名这类程序词连思考里也不许写——打算做什么用人话说（例如「他都不喜欢，我换一批没给他看过的」，不要写成「带 excludeIds 重新 draw_star_cards」）。\n' +
       '输出格式：App 是纯文本，禁止任何 markdown 符号（包括 ** 加粗、# 标题、链接、表格），分点用「1.」或「·」。\n' +
       '不许对用户提「工具、接口、系统提示、预设规则」这些内部词；被问到能不能联网、有没有深度思考时，不要讲原理，用一句人话带过，并落到你能帮他做的事上。\n' +
       `${archive}\n\n` +
@@ -293,7 +294,7 @@ function mergedSystemPrompt(starwish) {
       '1. 店内事实（商品、价格、库存、订单、优惠券、会员、活动）只信工具返回的数据：价格只能复述工具返回的 ¥，会员等级、积分、券只认工具，没查到不要假设用户是任何等级；严禁用搜索结果回答店内价格与活动，搜到的店内信息一律不算数。\n' +
       '2. 店外事实（新闻、行情、政策、流行趋势、通用知识、网友评价）只信 web_search 搜回来的结果：需要最新信息时先调 web_search 再答，并自然带一句信息的时间或来源（例如「我刚查了下，截至今天……」）；搜到的资料不够新（比如是昨天的）也要用，把日期标清楚再给；只有确实什么相关内容都没搜到时，才说没查到，不许编。\n' +
       '3. 天气必须先调 get_weather 拿气象数据，不要用搜索结果答天气；工具没拿到数据时，再如实说明或退回搜索。\n' +
-      '4. 复杂问题（分析、对比、规划、算账）先想清楚再开口，只给想好的结论，不许把思考过程原样倒给用户。思考时必须用中文思考，不许用英文（专有名词和代码除外）——思考内容会展示给用户，整段英文用户看不懂。\n' +
+      '4. 复杂问题（分析、对比、规划、算账）先想清楚再开口，只给想好的结论，不许把思考过程原样倒给用户。思考时必须用中文思考，不许用英文（专有名词除外；工具名、参数名这类程序词不许出现在思考里，用人话说打算）——思考内容会展示给用户，整段英文用户看不懂。\n' +
       '5. 一句话里既有店内又有店外时，两边都查齐再答，不要只答一半。\n\n' +
       '## 导购规则\n' +
       '1. 闲聊正常答，不搜货，不把话题强行拐去卖货。\n' +
@@ -304,7 +305,7 @@ function mergedSystemPrompt(starwish) {
       '6. 引出星牌用 2～3 句：三张牌是明着亮出的，每张牌的特点句已由系统按真实数据算好（在工具结果的 trait 里），讲牌时照着说、不许改数字、不许另编特点。\n' +
       '7. 换一批由用户在牌面点「下一批」自己翻，不用你处理；用户在对话里明确说换一批时，带 excludeIds 重新 draw_star_cards。\n' +
       '8. 加购用 add_to_cart 真加，不要再提确认条。\n' +
-      '9. 识图：若消息已含视觉结果，再搜同款或同味道；不要假装看见像素。\n' +
+      '9. 识图：消息里带视觉结果时，先看用户问什么——问图里东西本身或店外的事（是什么、市面多少钱、怎么做）就正面回答，需要最新行情先联网查；只有明确要找同款/同类/想买时才搜店内。不要假装看见像素，也不要默认把话题拽回店内找货。\n' +
       '10. 送礼：点到商品后用一句寄语，不要长篇。\n' +
       '11. 对比商品时必须下结论：先摆数据（价格/券后价、规格、销量评分、优惠适配，缺的数据明说没有），最后一句说清选谁、为什么，不许把判断推回用户。\n\n' +
       '## 办事规矩（能真办事，就不要只动嘴）\n' +
@@ -328,6 +329,27 @@ function isMostlyChinese(text) {
   return cjk + latin === 0 || cjk >= latin;
 }
 
+// 思考展示前的「去程序词」清洗（2026-11-23 hx 截图实锤后加）：
+// 思考里夹了工具名、参数名这类程序标识时，含标识的那一句整句
+// 不展示。输入一整轮思考文本，输出清洗后的文本（可能为空串）。
+// 为什么整句丢而不是只删那个词：删完词的句子多半不通顺（「带
+// 重新。」），整句丢掉用户无感，漏一个词用户立刻出戏。
+// 判为程序标识的：下划线命名（draw_star_cards）、反引号代码段、
+// 小写开头驼峰词（excludeIds）。商品英文名多是全大写或普通单词，
+// 不受影响；DeepSeek 这类首字母大写的词靠词边界避开；iPhone 这
+// 类日常词用放行名单兜底。
+const THINKING_CAMEL_ALLOW = new Set(['iPhone', 'iPad', 'iOS']);
+function sentenceHasCodeId(sentence) {
+  if (sentence.includes('`')) return true;
+  if (/[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+/.test(sentence)) return true;
+  const camels = sentence.match(/\b[a-z]+[A-Z][A-Za-z0-9]*\b/g) || [];
+  return camels.some((word) => !THINKING_CAMEL_ALLOW.has(word));
+}
+function sanitizeThinking(text) {
+  const parts = String(text).split(/(?<=[。！？!?；;\n])/);
+  return parts.filter((part) => !sentenceHasCodeId(part)).join('').trim();
+}
+
 // 一轮流式事件的转发：思考先攒着、过语言检查才往外给，答案直通，
 // 工具调用收进 sink 不往外发。输入是 streamChatEvents 的事件流与
 // sink（{ calls, text, started }，就地回填）；输出 thinking / text 事件。
@@ -342,8 +364,12 @@ function isMostlyChinese(text) {
 async function* streamRoundWithReasoningFilter(events, sink) {
   let buffer = '';
   const flush = (isFinal = false) => {
-    const text = buffer;
+    const raw = buffer;
     buffer = '';
+    if (!raw) return null;
+    // 先去程序词再过语言检查：清洗后整段没了就不展示；长度门槛
+    // 也按清洗后的算，脏句被丢后剩下的短报幕照样拦得住。
+    const text = sanitizeThinking(raw);
     if (!text || !isMostlyChinese(text)) return null;
     if (isFinal && sink.calls.length > 0 && text.length <= 40) return null;
     return { type: 'thinking', content: text };
@@ -447,6 +473,7 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
 
   let started = false; // 已吐内容或已执行工具：整轮重试会重复，禁止
   let answered = false; // 出现无工具调用的一轮 = 模型已给出最终回答
+  let produced = false; // 本轮有没有产出任何实质内容（正文/卡片/清单/功课），结尾要查账
   let tier = 1;
   let stallRetryRound = -1; // 已为停滞重试过的轮次号（重试标记必须放循环外，放里面每轮清零会变成无限重试）
 
@@ -468,6 +495,7 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
       calls = sink.calls;
       roundText = sink.text;
       if (sink.started) started = true;
+      if (sink.text) produced = true;
     } catch (error) {
       const stalled = error?.code === 'STREAM_STALL';
       if (stalled && !sink.text && stallRetryRound !== round) {
@@ -573,12 +601,14 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
           action = merged.action;
         }
         yield { type: 'actions', action };
+        produced = true;
       }
       // 功课段：数字只从工具结果里摘，同轮同句不重复发，最多 5 条。
       for (const entry of homeworkFrom(call.name, result)) {
         if (homeworkSeen.size >= 5 || homeworkSeen.has(entry.text)) continue;
         homeworkSeen.add(entry.text);
         yield { type: 'homework', entry };
+        produced = true;
       }
       history.push({
         role: 'tool',
@@ -598,6 +628,7 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
         streamChatEvents({ ...base, messages: history, extra: extraFor(tier), idleTimeoutMs }),
         sink,
       );
+      if (sink.text) produced = true;
     } catch (error) {
       // 收尾轮卡住就直接结束这一轮，别为最后一句把整轮拖垮；
       // 其他错误照常抛出去走保底链。
@@ -607,6 +638,7 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
   }
 
   if (offerCards && byId.size > 0) {
+    produced = true;
     const products = [...byId.values()].slice(0, 3);
     if (fateRoles.length >= 2) {
       yield {
@@ -634,7 +666,16 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
     }
   }
   if (pendingCart.length > 0) {
+    produced = true;
     yield { type: 'cart_confirm', products: pendingCart.slice(0, 3) };
+  }
+
+  // 结尾查账：模型空转一整轮（只吐了被过滤掉的思考、正文为空、
+  // 没查成任何工具、没办成任何事）时，不许静默交白卷——抛出去
+  // 让 streamXiaodouAgent 走保底链，总得有人把这轮接住
+  // （2026-11-23 全面自查修，与问题三「问题没到大脑」同类）。
+  if (!produced) {
+    throw new Error('统一大脑本轮没有产出任何内容');
   }
 }
 
@@ -700,7 +741,9 @@ async function* runGuideFallback(messages, dashscope, { userId, starwish } = {})
     const message = await chatCompletionRaw({
       ...dashscope,
       messages: history,
-      tools: XIAODOU_TOOLS,
+      // 保底只给查说工具：办事工具在保底手里不记账、备注还会丢
+      // （见 xiaodou-tools.js 的 XIAODOU_GUIDE_TOOLS 说明）。
+      tools: XIAODOU_GUIDE_TOOLS,
       temperature: 0.5,
       maxTokens: 700,
     });
@@ -727,7 +770,7 @@ async function* runGuideFallback(messages, dashscope, { userId, starwish } = {})
       // 与统一大脑同一条规矩：单个工具翻车喂回错误结果，不掀翻整轮。
       let result;
       try {
-        result = await executeXiaodouTool(name, args, { userId });
+        result = await executeXiaodouTool(name, args, { userId, messages, dashscope });
       } catch (error) {
         console.warn('[xiaodou-agent] guide tool failed:', name, error.message);
         result = { ok: false, error: `工具 ${name} 执行失败。不要编造数据，如实告诉用户这项暂时查不了。` };
@@ -859,29 +902,51 @@ export async function* streamXiaodouAgent(
   messages,
   { dashscope, deepseek, userId, imageBase64, mimeType, starwish, vision } = {},
 ) {
+  // 带图消息分两路（2026-11-23 hx 实锤后改）：只有图没字时 App
+  // 会补一句默认的找同款文案，这种才走「先鉴定、再让用户选找
+  // 同款还是同味道」的拍图找货老流程；用户打了字问别的事（拿
+  // 炒面照片问在深圳卖多少钱），图只是问题的一半——视觉结果
+  // 降级为背景信息交给统一大脑，先正面回答他问的，不许硬拽
+  // 回找同款。老流程是整段拦截：问题根本到不了大脑，必改。
+  let imageIntro = null;
   if (dashscope?.apiKey && imageBase64) {
+    const userText = (lastUserMessage(messages) || '').trim();
+    const isDefaultAsk = !userText || userText === '帮我看看店里有没有同款或同类';
+    if (isDefaultAsk) {
+      try {
+        const result = await analyzeShoppingImage({ dashscope, imageBase64, mimeType });
+        const notes = result.notes || '瓶子里映出一件轮廓。';
+        yield {
+          type: 'appraisal',
+          content: `${notes} 你要找几乎一样的，还是只要这个味道？`,
+          vision: result,
+        };
+        return;
+      } catch (error) {
+        console.warn('[xiaodou-agent] vision failed:', error.message);
+        yield {
+          type: 'appraisal',
+          content: '瓶子晃了一下，这张照片我还看不真切。换一张更清楚的，或告诉我品类。',
+          vision: null,
+        };
+        return;
+      }
+    }
     try {
       const result = await analyzeShoppingImage({ dashscope, imageBase64, mimeType });
-      const notes = result.notes || '瓶子里映出一件轮廓。';
-      yield {
-        type: 'appraisal',
-        content: `${notes} 你要找几乎一样的，还是只要这个味道？`,
-        vision: result,
-      };
-      return;
+      imageIntro = formatImageQuestionHint(result);
     } catch (error) {
       console.warn('[xiaodou-agent] vision failed:', error.message);
-      yield {
-        type: 'appraisal',
-        content: '瓶子晃了一下，这张照片我还看不真切。换一张更清楚的，或告诉我品类。',
-        vision: null,
-      };
-      return;
+      imageIntro =
+        '用户发来一张照片，但这次视觉识别失败、没看清图里是什么。' +
+        '他问的事若与图有关，如实说没看清、请他补一句图里是什么；与图无关的照常回答。';
     }
   }
 
   let guideMessages = messages;
-  if (vision && typeof vision === 'object') {
+  if (imageIntro) {
+    guideMessages = [{ role: 'user', content: imageIntro }, ...messages];
+  } else if (vision && typeof vision === 'object') {
     guideMessages = [
       {
         role: 'user',
@@ -895,29 +960,33 @@ export async function* streamXiaodouAgent(
   // 模型自己判断用哪样）。它整体失败时先回落纯导购保底，再失败
   // 才轮到 DeepSeek 兜底，保证这一轮一定有回复。
   if (dashscope?.apiKey) {
-    let unifiedYieldedText = false;
+    // 降级守卫按「有没有实质内容已经到用户眼前」算账（正文、卡片、
+    // 清单、功课都算；状态与思考只是进度，不算）。已经给了实质
+    // 内容才失败的：直接收尾，绝不再叠一份别家的答案打架；什么
+    // 都没给成的：才轮到下一档接住（2026-11-23 全面自查修——
+    // 以前只认正文，保底只给卡片没给正文时会再叠一份 DeepSeek
+    // 的答案与卡片，双份打架）。
+    let unifiedYielded = false;
     try {
       for await (const event of runUnifiedAgent(guideMessages, dashscope, { userId, starwish })) {
-        if (event.type === 'text') unifiedYieldedText = true;
+        if (event.type !== 'status' && event.type !== 'thinking') unifiedYielded = true;
         yield event;
       }
       return;
     } catch (error) {
       console.warn('[xiaodou-agent] unified failed, fallback guide:', error.message);
-      // 已经吐过正文才失败的：答案已在用户眼前，再叠一份保底答案
-      // 会变成两段话打架，直接收尾（半截答案也比双份答案强）。
-      if (unifiedYieldedText) return;
+      if (unifiedYielded) return;
     }
-    let guideYieldedText = false;
+    let guideYielded = false;
     try {
       for await (const event of runGuideFallback(guideMessages, dashscope, { userId, starwish })) {
-        if (event.type === 'text') guideYieldedText = true;
+        if (event.type !== 'status' && event.type !== 'thinking') guideYielded = true;
         yield event;
       }
       return;
     } catch (error) {
       console.warn('[xiaodou-agent] qwen failed, fallback deepseek:', error.message);
-      if (guideYieldedText) return;
+      if (guideYielded) return;
     }
   }
 

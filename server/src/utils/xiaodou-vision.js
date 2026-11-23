@@ -83,6 +83,18 @@ export async function analyzeShoppingImage({ dashscope, imageBase64, mimeType })
   };
 }
 
+// 带图提问（用户打了字问事）时给大脑的背景说明：视觉结果只交代
+// 图里是什么，答什么由用户的问题决定，不预设找同款（2026-11-23
+// hx 实锤后加：拿炒面照片问市面价格，被老流程硬拽回找同款）。
+export function formatImageQuestionHint(vision) {
+  const parts = ['用户发来一张照片，下面是视觉识别结果，只作背景参考，不要默认当成找同款任务。'];
+  if (vision.notes) parts.push(`图里是：${vision.notes}`);
+  if (vision.majorCategory) parts.push(`若他要找同类，大致品类：${vision.majorCategory}`);
+  if (vision.query) parts.push(`若他要找同类，可用关键词：${vision.query}`);
+  parts.push('先正面回答用户最后一条消息问的事；只有他明确要找同款/同类/想买时，才搜店内商品。');
+  return parts.join('\n');
+}
+
 export function formatVisionHint(vision) {
   const parts = ['用户发来一张商品照片，请按视觉结果搜店内同款或同类，不要编造未搜到的商品。'];
   if (vision.majorCategory) parts.push(`品类：${vision.majorCategory}`);

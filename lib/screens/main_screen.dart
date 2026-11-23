@@ -29,6 +29,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   bool _showXiaodouGuide = false;
   final _guideStorage = XiaodouGuideStorage();
 
+  // 底部导航滑动切换（2026-11-23 hx 要求）：页面容器从 IndexedStack
+  // 换成 PageView，点导航时 animateToPage 滑过去，不再整屏瞬跳。
+  final _pageController = PageController();
+
   late final List<Widget> _pages = const [
     _KeepAlivePage(key: ValueKey(AppTab.home), child: HomePage()),
     _KeepAlivePage(key: ValueKey(AppTab.mall), child: MallPage()),
@@ -52,6 +56,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _tabProvider?.detach();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -85,9 +90,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   void _onTabTap(AppTab tab) {
     if (_activeTab == tab) return;
-    final toProfile = tab == AppTab.profile;
+    // 只下令滑动；_activeTab 等页面真正滑到后在 _onPageChanged 里
+    // 统一同步——点按、程序跳转（AppTabProvider）都走这一条路，
+    // 导航高亮不会和页面位置对不上。
+    _pageController.animateToPage(
+      tab.index,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _onPageChanged(int index) {
+    final tab = AppTab.values[index];
+    if (_activeTab == tab) return;
     setState(() => _activeTab = tab);
-    if (toProfile) {
+    if (tab == AppTab.profile) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         unawaited(refreshSessionData(context));
@@ -106,9 +123,13 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           body: Column(
             children: [
               Expanded(
-                child: IndexedStack(
-                  index: _activeTab.index,
-                  sizing: StackFit.expand,
+                child: PageView(
+                  controller: _pageController,
+                  // 只许点按触发滑动，不开放手指横滑：各页里有横向
+                  // 滚动的区域（首页市集 tab、横幅等），手势会互抢。
+                  // 子页的保活仍靠 _KeepAlivePage，滑走再回来不重建。
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: _onPageChanged,
                   children: _pages,
                 ),
               ),

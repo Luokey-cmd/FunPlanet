@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'providers/app_tab_provider.dart';
 import 'providers/auth_provider.dart';
@@ -10,7 +11,6 @@ import 'providers/cart_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/product_catalog_provider.dart';
 import 'providers/user_provider.dart';
-import 'screens/auth_gate.dart';
 import 'screens/first_entry_intro_gate.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_stability.dart';
@@ -52,6 +52,18 @@ class FunPlanetApp extends StatelessWidget {
         title: '趣玩星球',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
+        // 全 App 中文化（2026-11-23 hx 报）：以前没挂语言包，
+        // Flutter 自带控件的文案全是英文——最明显的是任何输入框
+        // 长按弹出的「Paste / Select all」。挂上官方中文语言包并
+        // 锁定中文后，这些自带菜单全变中文（粘贴/全选/剪切/复制），
+        // 所有页面一起生效。配套：pubspec 要加 flutter_localizations。
+        locale: const Locale('zh', 'CN'),
+        supportedLocales: const [Locale('zh', 'CN'), Locale('en', 'US')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         builder: (context, child) {
           return Theme(
             data: AppTheme.withReadableType(Theme.of(context)),
