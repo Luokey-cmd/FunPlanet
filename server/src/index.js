@@ -34,6 +34,7 @@ import { syncAllProductSales } from './utils/product-sales.js';
 import { persistChatTurn, recordGuideRecommendations } from './utils/chat-history.js';
 import { seedAiCommunityIfNeeded } from './utils/ai-community-seed.js';
 import { assertProductionConfig } from './utils/startup-check.js';
+import { log } from './utils/log.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
@@ -67,6 +68,31 @@ if (corsOrigins.length > 0) {
 }
 
 app.use(express.json({ limit: '100mb' }));
+
+// 请求日志中间件（middleware：在每次请求进来时先过一道手的组件）。
+// 每个接口请求在控制台留一行中文：调了什么、结果码、耗时；标签按
+// 路径第一段翻成中文模块名，hx 搜【订单】就能只看订单的往来。
+// 4xx 记警告、5xx 记报错——不用翻每个路由文件也知道哪儿出事了。
+const API_TAG_MAP = {
+  auth: '账号', products: '商品', banners: '横幅', categories: '分类',
+  cart: '购物车', favorites: '收藏', 'browse-history': '足迹',
+  coupons: '优惠券', notifications: '通知', addresses: '地址',
+  orders: '订单', profile: '个人资料', support: '客服', reviews: '评价',
+  ai: 'AI绘画', 'ai-community': 'AI社区', voice: '语音', admin: '后台',
+  changelog: '更新日志', chat: '小豆',
+};
+app.use('/api', (req, res, next) => {
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    const seg = req.path.split('/').filter(Boolean)[0] ?? '';
+    const tag = API_TAG_MAP[seg] ?? '请求';
+    const line = `${req.method} ${req.originalUrl} → ${res.statusCode} · ${Date.now() - startedAt}ms`;
+    if (res.statusCode >= 500) log.error(tag, `服务器内部错误：${line}`);
+    else if (res.statusCode >= 400) log.warn(tag, `请求没成功：${line}`);
+    else log.info(tag, line);
+  });
+  next();
+});
 
 const assetsRoot = path.resolve(__dirname, '../../assets');
 app.use('/assets', express.static(assetsRoot));
@@ -217,10 +243,16 @@ app.post('/api/chat', authRequired, async (req, res) => {
       assistantText: reply,
     });
   } catch (error) {
-    console.error('[chat]', error);
+    log.error('小豆', '普通对话回复失败', error);
     res.status(500).json({ code: 500, message: error.message || '对话失败', data: null });
   }
 });
+
+// 日志里截一段用户问题预览：只取前 40 字，避免整段对话刷屏。
+function lastUserTextPreview(messages) {
+  const text = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
+  return text.length > 40 ? `${text.slice(0, 40)}…` : text;
+}
 
 app.post('/api/chat/stream', authRequired, async (req, res) => {
   if (!ensureApiKey(res)) return;
@@ -235,6 +267,8 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
     res.status(400).json({ code: 400, message: '没有有效的对话消息', data: null });
     return;
   }
+
+  log.info('小豆', `收到提问：${lastUserTextPreview(sanitized)}${imageBase64 ? '（带图片）' : ''}`);
 
   // 流式回复边推边攒全文，推完把这一轮落库（聊天记录 + 导购推荐记录）
   let assistantFullText = '';
@@ -284,6 +318,7 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
     }
     res.write('data: [DONE]\n\n');
     res.end();
+    log.info('小豆', `回复完成，共 ${assistantFullText.length} 字${recommendedProducts.length > 0 ? `，亮牌 ${recommendedProducts.length} 件商品` : ''}`);
     // 落库放在响应结束之后做，不拖慢用户看到回复的速度。
     // 单独包一层：响应已经结束，这里再失败也只能记日志——要是
     // 抛进外层 catch，它会往已关闭的响应里写错误事件，直接崩
@@ -304,10 +339,10 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
         });
       }
     } catch (persistError) {
-      console.error('[chat/stream] persist failed:', persistError);
+      log.error('小豆', '聊天记录保存失败（回复已经发给用户，不影响这次使用）', persistError);
     }
   } catch (error) {
-    console.error('[chat/stream]', error);
+    log.error('小豆', '流式回复中途失败', error);
     res.write(`data: ${JSON.stringify({ error: error.message || '对话失败' })}\n\n`);
     res.end();
   }
@@ -330,27 +365,34 @@ app.post('/api/chat/draw-batch', authRequired, async (req, res) => {
       sort: typeof body.sort === 'string' ? body.sort : undefined,
       excludeIds,
     });
+    log.info('小豆', `亮牌翻页：已排除 ${excludeIds.length} 件，这批 ${result?.products?.length ?? 0} 件${result?.hasMore ? '，后面还有' : '，已是最后一批'}`);
     res.json({ code: 0, message: 'ok', data: result });
   } catch (error) {
-    console.error('[chat/draw-batch]', error);
+    log.error('小豆', '亮牌翻页（下一批）失败', error);
     res.status(500).json({ code: 500, message: error.message || '抽牌失败', data: null });
   }
 });
 
 const httpServer = app.listen(port, '0.0.0.0', () => {
-  console.log(`趣玩星球 API 已启动: http://127.0.0.1:${port}`);
-  if (!process.env.DATABASE_URL) console.warn('警告: 未检测到 DATABASE_URL');
+  log.info('系统', `趣玩星球服务端已启动：http://127.0.0.1:${port}`);
+  if (!process.env.DATABASE_URL) log.warn('系统', '未检测到 DATABASE_URL（数据库地址），数据功能不可用');
   if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'production') {
-    console.warn('警告: 未检测到 JWT_SECRET，使用默认值不安全');
+    log.warn('系统', '未检测到 JWT_SECRET（登录令牌密钥），正在用默认值，不安全');
   }
-  if (!apiKey) console.warn('警告: 未检测到 DEEPSEEK_API_KEY（小豆备援）');
-  if (!process.env.DASHSCOPE_API_KEY) console.warn('警告: 未检测到 DASHSCOPE_API_KEY（小豆导购 / AI 绘画）');
+  if (!apiKey) log.warn('系统', '未检测到 DEEPSEEK_API_KEY（小豆备援大脑的钥匙）');
+  if (!process.env.DASHSCOPE_API_KEY) log.warn('系统', '未检测到 DASHSCOPE_API_KEY（小豆导购 / AI 绘画的钥匙）');
   if (process.env.DATABASE_URL) {
+    // 启动自检：真连一次数据库，成败都打中文日志，免得 hx 对着
+    // 后面的报错猜是不是数据库没起来。
+    prisma.$queryRaw`SELECT 1`
+      .then(() => log.info('系统', '数据库连接成功'))
+      .catch((err) => log.error('系统', '数据库连接失败，先检查数据库容器是否启动', err));
     seedAiCommunityIfNeeded()
-      .catch((err) => console.warn('AI 社区种子数据初始化失败:', err.message));
+      .then(() => log.debug('系统', 'AI 社区种子数据检查完成'))
+      .catch((err) => log.warn('系统', `AI 社区种子数据初始化失败：${err.message}`));
     syncAllProductSales()
-      .then(() => console.log('商品销量已同步为真实订单数据'))
-      .catch((err) => console.warn('商品销量同步失败:', err.message));
+      .then(() => log.info('系统', '商品销量已同步为真实订单数据'))
+      .catch((err) => log.warn('系统', `商品销量同步失败：${err.message}`));
   }
 });
 

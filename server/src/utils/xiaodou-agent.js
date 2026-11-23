@@ -1,4 +1,5 @@
 import { prisma } from '../db.js';
+import { log } from './log.js';
 import { chatCompletion, streamChatCompletion } from '../deepseek.js';
 import { APP_KNOWLEDGE } from '../app-knowledge.js';
 import { serializeProduct } from './product.js';
@@ -923,7 +924,7 @@ export async function* streamXiaodouAgent(
         };
         return;
       } catch (error) {
-        console.warn('[xiaodou-agent] vision failed:', error.message);
+        log.error('小豆', '看图失败，这张照片没鉴定成（多半是视觉模型或网络的问题）', error);
         yield {
           type: 'appraisal',
           content: '瓶子晃了一下，这张照片我还看不真切。换一张更清楚的，或告诉我品类。',
@@ -936,7 +937,7 @@ export async function* streamXiaodouAgent(
       const result = await analyzeShoppingImage({ dashscope, imageBase64, mimeType });
       imageIntro = formatImageQuestionHint(result);
     } catch (error) {
-      console.warn('[xiaodou-agent] vision failed:', error.message);
+      log.error('小豆', '看图失败，这张照片没鉴定成（多半是视觉模型或网络的问题）', error);
       imageIntro =
         '用户发来一张照片，但这次视觉识别失败、没看清图里是什么。' +
         '他问的事若与图有关，如实说没看清、请他补一句图里是什么；与图无关的照常回答。';

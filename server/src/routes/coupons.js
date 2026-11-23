@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
+import { log } from '../utils/log.js';
 import {
   currentMonthKey,
   ensureProfileFresh,
@@ -147,9 +148,15 @@ export async function claimCouponGroupForUser(userId, groupKey) {
   return { ok: true, coupons: created };
 }
 
+const CLAIM_GROUP_LABELS = { newcomer: '新人券', member_monthly: '会员月券', center: '领券中心' };
+
 async function respondClaim(req, res, groupKey) {
   const result = await claimCouponGroupForUser(req.user.sub, groupKey);
-  if (!result.ok) return fail(res, result.status, result.error);
+  if (!result.ok) {
+    log.warn('优惠券', `领取${CLAIM_GROUP_LABELS[groupKey] ?? groupKey}没成：${result.error}`);
+    return fail(res, result.status, result.error);
+  }
+  log.info('优惠券', `领取${CLAIM_GROUP_LABELS[groupKey] ?? groupKey}成功，共 ${result.coupons.length} 张（用户 id ${req.user.sub}）`);
   return ok(res, { coupons: result.coupons });
 }
 

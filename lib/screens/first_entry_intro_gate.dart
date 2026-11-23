@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
+import '../utils/app_log.dart';
 
 import 'auth_gate.dart';
 
@@ -69,9 +70,11 @@ class _FirstEntryIntroGateState extends State<FirstEntryIntroGate> {
       return;
     }
     if (shouldPlay) {
+      AppLog.info('开场', '第一次打开 App，播放开场动画');
       setState(() => _phase = _Phase.video);
       _startVideo();
     } else {
+      AppLog.info('开场', '不是第一次打开，跳过开场动画');
       setState(() => _phase = _Phase.done);
     }
   }
@@ -86,7 +89,8 @@ class _FirstEntryIntroGateState extends State<FirstEntryIntroGate> {
       await controller.play();
       if (mounted) setState(() {});
       _safetyTimer = Timer(const Duration(seconds: 25), _finish);
-    } catch (_) {
+    } catch (e) {
+      AppLog.error('开场', '开场动画播放失败，直接进 App', e);
       _finish();
     }
   }
@@ -105,6 +109,7 @@ class _FirstEntryIntroGateState extends State<FirstEntryIntroGate> {
   Future<void> _finish() async {
     if (_finished) return;
     _finished = true;
+    AppLog.info('开场', '开场结束，进入 App');
     _safetyTimer?.cancel();
     final controller = _controller;
     _controller = null;

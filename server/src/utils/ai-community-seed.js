@@ -1,3 +1,4 @@
+import { log } from './log.js';
 import { prisma } from '../db.js';
 import { AI_FRIENDS, SEED_POSTS } from '../data/ai-friends.js';
 
@@ -41,7 +42,7 @@ export async function seedAiCommunityIfNeeded() {
     return;
   }
 
-  console.log('[ai-community] seeding virtual friends and posts...');
+  log.info('AI社区', '正在初始化社区种子数据（虚拟好友和帖子）…');
 
   for (const [index, friend] of AI_FRIENDS.entries()) {
     await prisma.aiFriend.create({
@@ -78,5 +79,5 @@ export async function seedAiCommunityIfNeeded() {
     }
   }
 
-  console.log('[ai-community] seed completed');
+  log.info('AI社区', '社区种子数据初始化完成');
 }

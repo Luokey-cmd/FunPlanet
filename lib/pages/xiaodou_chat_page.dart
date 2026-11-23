@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import '../utils/app_log.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -141,6 +142,7 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
   Future<void> _attachPickedImage() async {
     final picked = await _pickImageForChat(context);
     if (picked == null || !mounted) return;
+    AppLog.info('小豆', '选好了一张图片，已挂到输入框上方，等用户点发送');
     _inputBarKey.currentState?.setPendingImage(picked.bytes, picked.mimeType);
   }
 
@@ -161,17 +163,19 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
   void _handleVoiceListeningChanged(bool listening) {
     if (!mounted || _voiceListening == listening) return;
     setState(() => _voiceListening = listening);
-    // 录音与键盘互斥（2026-11-23 hx 定）：一开录音就收起键盘；
-    // 录音中把输入焦点的 canRequestFocus 关掉，点输入框也拿不到
-    // 焦点、键盘弹不起来；关掉录音再恢复，点输入框照常弹键盘。
-    // 为什么用焦点节点的开关而不是给输入框设 readOnly：readOnly
-    // 在部分安卓机型上聚焦仍会带出键盘，焦点这层是硬开关、必生效。
+    // 录音与键盘互斥（2026-11-23 hx 定）：一开录音就收起键盘
+    // （unfocus 这步真机已验生效）；录音中点输入框弹不出键盘的
+    // 硬保证在输入栏那边——录音时给输入框盖透明罩物理隔断。
+    // 这里关 canRequestFocus 只作辅助（挡程序性 requestFocus）：
+    // 它在 hx 的荣耀机上实测没拦住手指点击聚焦，不能单独当保证。
     // 坑：unfocus 与关开关两个动作都要做，只关开关时已有的焦点
     // 不一定自动让出，键盘可能赖着不走。
     if (listening) {
+      AppLog.info('小豆', '开始录音');
       _inputFocusNode.unfocus();
       _inputFocusNode.canRequestFocus = false;
     } else {
+      AppLog.info('小豆', '录音结束');
       _inputFocusNode.canRequestFocus = true;
     }
   }
@@ -1327,25 +1331,45 @@ class _InputBarState extends State<_InputBar> {
             ),
             SizedBox(width: _xs(4)),
             Expanded(
-              child: AppTextField(
-                controller: _inputController,
-                focusNode: widget.focusNode,
-                minLines: 1,
-                maxLines: 4,
-                style: TextStyle(fontSize: _xs(14) + AppScale.fontBump),
-                textInputAction: TextInputAction.send,
-                onSubmitted: chat.sending ? null : (_) => _send(chat),
-                decoration: InputDecoration(
-                  hintText: _listening ? '正在听…说完再点一下麦克风' : '说你想要的…',
-                  hintStyle: TextStyle(fontSize: _xs(14) + AppScale.fontBump, color: AppColors.mutedForeground),
-                  filled: true,
-                  fillColor: AppColors.muted,
-                  contentPadding: EdgeInsets.symmetric(horizontal: _xs(14), vertical: _xs(10)),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(_xs(999)),
-                    borderSide: BorderSide.none,
+              child: Stack(
+                children: [
+                  AppTextField(
+                    controller: _inputController,
+                    focusNode: widget.focusNode,
+                    minLines: 1,
+                    maxLines: 4,
+                    style: TextStyle(fontSize: _xs(14) + AppScale.fontBump),
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: chat.sending ? null : (_) => _send(chat),
+                    decoration: InputDecoration(
+                      hintText: _listening ? '正在听…说完再点一下麦克风' : '说你想要的…',
+                      hintStyle: TextStyle(fontSize: _xs(14) + AppScale.fontBump, color: AppColors.mutedForeground),
+                      filled: true,
+                      fillColor: AppColors.muted,
+                      contentPadding: EdgeInsets.symmetric(horizontal: _xs(14), vertical: _xs(10)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(_xs(999)),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
                   ),
-                ),
+                  // 录音中给输入框盖一层透明罩：点输入框的手势全被
+                  // 罩子吃掉，输入框根本收不到点击，键盘绝无可能弹
+                  // 起，录音也不受影响（hx 的口径：点输入框不结束
+                  // 录音、只是弹不出键盘）。为什么不用焦点开关做
+                  // 硬保证：canRequestFocus 在 hx 的荣耀机上实测没
+                  // 拦住点击聚焦（2026-11-23 真机回报），罩子是物
+                  // 理隔断，不挑机型不挑版本。罩子只盖输入框本身，
+                  // 麦克风/发送/选图按钮各有各的让路逻辑、不受影响。
+                  if (_listening)
+                    Positioned.fill(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {},
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                ],
               ),
             ),
             SizedBox(width: _xs(8)),

@@ -1,3 +1,4 @@
+import { log } from './log.js';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -118,7 +119,7 @@ export async function generateWanxImage(
     try {
       const imageUrl = await requestWanxImage(safePrompt, { apiKey, model: currentModel, size });
       if (currentModel !== model) {
-        console.warn('[wanx] fallback model succeeded', { from: model, to: currentModel });
+        log.warn('AI绘画', `主模型没成，已用备用模型 ${currentModel} 生成成功`);
       }
       return { imageUrl, model: currentModel };
     } catch (error) {
@@ -126,7 +127,7 @@ export async function generateWanxImage(
       if (!isContentBlockedError(error.message)) {
         throw error;
       }
-      console.warn('[wanx] content blocked', { model: currentModel, message: error.message });
+      log.warn('AI绘画', `内容被模型拦截（${currentModel}）：${error.message}`);
     }
   }
 

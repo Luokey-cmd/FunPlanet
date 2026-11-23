@@ -6,6 +6,7 @@ import { prisma } from '../db.js';
 import { adminAuthRequired } from '../middleware/adminAuth.js';
 import { signToken, verifyToken } from '../utils/jwt.js';
 import { serializeProduct } from '../utils/product.js';
+import { log } from '../utils/log.js';
 import { getPaidSalesMap, syncAllProductSales } from '../utils/product-sales.js';
 import {
   changeAdminPassword,
@@ -154,6 +155,7 @@ router.post('/auth/login', async (req, res) => {
     const profile = resolveAdminProfile(registered.username);
     const token = signToken({ role: 'admin', username: registered.username, name: profile.name });
     appendAuditLog({ username: registered.username, name: profile.name, action: '登录后台', detail: '' });
+    log.info('后台', `管理员登录成功：${registered.username}`);
     ok(res, { token, admin: profile });
     return;
   }
@@ -163,6 +165,7 @@ router.post('/auth/login', async (req, res) => {
     const profile = resolveAdminProfile(adminUser);
     const token = signToken({ role: 'admin', username: adminUser, name: profile.name });
     appendAuditLog({ username: adminUser, name: profile.name, action: '登录后台', detail: '' });
+    log.info('后台', `管理员登录成功：${adminUser}（默认管理员）`);
     ok(res, { token, admin: profile });
     return;
   }
@@ -539,7 +542,7 @@ router.put('/products/:id', adminAuthRequired, async (req, res) => {
     ok(res, { product: serializeProduct(product) });
   } catch (error) {
     if (error?.code === 'P2025') return fail(res, 404, '商品不存在');
-    console.error('[admin] update product failed', error);
+    log.error('后台', '更新商品失败', error);
     return fail(res, 500, '保存失败，请看服务端日志');
   }
 });
@@ -555,7 +558,7 @@ router.patch('/products/:id/shelf', adminAuthRequired, async (req, res) => {
     // P2025 才是真的找不到记录；其他错误（如数据库还没加 is_on_shelf 列）
     // 不能再谎报「商品不存在」，把真实原因打进日志并如实返回
     if (error?.code === 'P2025') return fail(res, 404, '商品不存在');
-    console.error('[admin] toggle shelf failed', error);
+    log.error('后台', '商品上下架失败', error);
     return fail(res, 500, '上下架失败，请看服务端日志');
   }
 });
@@ -566,7 +569,7 @@ router.delete('/products/:id', adminAuthRequired, async (req, res) => {
     ok(res, { deleted: true });
   } catch (error) {
     if (error?.code === 'P2025') return fail(res, 404, '商品不存在');
-    console.error('[admin] delete product failed', error);
+    log.error('后台', '删除商品失败', error);
     return fail(res, 500, '删除失败，请看服务端日志');
   }
 });
@@ -982,7 +985,7 @@ async function setModerationStatus(delegate, id, status, res, notFoundMessage) {
     ok(res, { updated: true, status });
   } catch (error) {
     if (error?.code === 'P2025') return fail(res, 404, notFoundMessage);
-    console.error('[admin] moderation status failed', error);
+    log.error('后台', '改审核状态失败', error);
     return fail(res, 500, '操作失败，请看服务端日志');
   }
 }
@@ -993,7 +996,7 @@ async function deleteModerated(delegate, id, res, notFoundMessage) {
     ok(res, { deleted: true });
   } catch (error) {
     if (error?.code === 'P2025') return fail(res, 404, notFoundMessage);
-    console.error('[admin] moderation delete failed', error);
+    log.error('后台', '删除待审内容失败', error);
     return fail(res, 500, '删除失败，请看服务端日志');
   }
 }

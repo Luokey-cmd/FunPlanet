@@ -14,6 +14,7 @@ import 'providers/user_provider.dart';
 import 'screens/first_entry_intro_gate.dart';
 import 'theme/app_theme.dart';
 import 'utils/app_stability.dart';
+import 'utils/app_log.dart';
 import 'widgets/click_effect/click_effect.dart';
 
 void main() {
@@ -27,6 +28,7 @@ void main() {
     // 多商品页切 Tab 时尽量保住已解码图片，减少空白闪一下。
     PaintingBinding.instance.imageCache.maximumSize = 300;
     PaintingBinding.instance.imageCache.maximumSizeBytes = 120 << 20;
+    AppLog.info('系统', 'App 启动');
     runApp(const FunPlanetApp());
   });
 }

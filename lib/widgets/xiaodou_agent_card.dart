@@ -248,7 +248,9 @@ class _XiaodouAgentCardState extends State<XiaodouAgentCard> {
             ),
             if (action.target.isNotEmpty)
               Text(
-                failed ? '自己去办' : '查看',
+                failed
+                    ? ((action.failReason ?? '').contains('开通会员') ? '去开通' : '自己去办')
+                    : '查看',
                 style: TextStyle(fontSize: AppScale.t(11.5), color: AppColors.primary, fontWeight: FontWeight.w600),
               ),
           ],

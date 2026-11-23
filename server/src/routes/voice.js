@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { log } from '../utils/log.js';
 import { authRequired } from '../middleware/auth.js';
 
 const router = Router();
@@ -63,7 +64,7 @@ router.post('/transcribe', authRequired, async (req, res) => {
 
     const raw = await response.text();
     if (!response.ok) {
-      console.error('[voice/transcribe]', response.status, raw.slice(0, 400));
+      log.error('语音', `语音转文字没成：接口返回 ${response.status}，原文片段：${raw.slice(0, 200)}`);
       return res.status(502).json({
         code: 502,
         message: '语音识别服务暂时不可用',
@@ -95,7 +96,7 @@ router.post('/transcribe', authRequired, async (req, res) => {
     text = String(text || '').trim();
     return res.json({ code: 0, message: 'ok', data: { text } });
   } catch (error) {
-    console.error('[voice/transcribe]', error);
+    log.error('语音', '语音转文字出错', error);
     return res.status(500).json({
       code: 500,
       message: error?.message || '语音识别失败',

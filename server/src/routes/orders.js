@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
+import { log } from '../utils/log.js';
 import { generateOrderNo, parseCouponMinAmount, serializeOrder } from '../utils/order.js';
 import { recordWalletLedger } from '../utils/wallet-ledger.js';
 import { AFTER_SALE_TYPES } from '../utils/status-values.js';
@@ -225,6 +226,7 @@ router.post('/:id/after-sale', authRequired, async (req, res) => {
       targetId: order.id,
     },
   });
+  log.info('订单', `收到售后申请，订单 id ${req.params.id}，售后单 id ${row.id}`);
   ok(res, { request: { id: row.id, status: row.status, type: row.type } });
 });
 
@@ -433,6 +435,7 @@ router.post('/', authRequired, async (req, res) => {
     return created;
   });
 
+  log.info('订单', `创建订单成功，订单号 ${order.orderNo}，应付 ¥${order.total}${payNow ? '，已直接支付' : '，待付款'}`);
   ok(res, { order: serializeOrder(order) });
 });
 
@@ -504,6 +507,7 @@ router.post('/:id/pay', authRequired, async (req, res) => {
     return next;
   });
 
+  log.info('订单', `订单支付成功，订单号 ${updated.orderNo ?? updated.id}`);
   ok(res, { order: serializeOrder(updated) });
 });
 
@@ -541,6 +545,7 @@ router.put('/:id/cancel', authRequired, async (req, res) => {
     }
     return next;
   });
+  log.info('订单', `订单已取消，订单号 ${updated.orderNo ?? updated.id}`);
   ok(res, { order: serializeOrder(updated) });
 });
 
@@ -557,6 +562,7 @@ router.put('/:id/confirm', authRequired, async (req, res) => {
     data: { status: 'completed', receivedAt: new Date() },
     include: { items: true },
   });
+  log.info('订单', `用户确认收货，订单号 ${updated.orderNo ?? updated.id}`);
   ok(res, { order: serializeOrder(updated) });
 });
 

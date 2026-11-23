@@ -4,6 +4,7 @@ import { prisma } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { signToken } from '../utils/jwt.js';
 import { fail, ok } from '../utils/response.js';
+import { log } from '../utils/log.js';
 import { allocatePublicUserId } from '../utils/public-user-id.js';
 
 const router = Router();
@@ -65,6 +66,7 @@ router.post('/register', async (req, res) => {
   });
 
   const token = signToken({ sub: user.id, phone: user.phone });
+  log.info('账号', `新用户注册成功，用户 id ${user.id}`);
   ok(res, { token, user: serializeUser(user) });
 });
 
@@ -84,7 +86,10 @@ router.post('/login', async (req, res) => {
   if (user.status === 'deleted' || user.deletedAt) return fail(res, 403, '该账号已注销');
 
   const match = await bcrypt.compare(password, user.password);
-  if (!match) return fail(res, 401, '密码错误');
+  if (!match) {
+    log.warn('账号', `登录失败：密码不对（用户 id ${user.id}）`);
+    return fail(res, 401, '密码错误');
+  }
 
   // 登录成功记一次最后登录时间；写失败不挡登录
   await prisma.user
@@ -92,6 +97,7 @@ router.post('/login', async (req, res) => {
     .catch(() => {});
 
   const token = signToken({ sub: user.id, phone: user.phone });
+  log.info('账号', `用户登录成功，用户 id ${user.id}`);
   ok(res, { token, user: serializeUser(user) });
 });
 

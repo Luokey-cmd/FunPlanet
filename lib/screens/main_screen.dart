@@ -23,15 +23,25 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
+class _MainScreenState extends State<MainScreen>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   AppTab _activeTab = AppTab.home;
   AppTabProvider? _tabProvider;
   bool _showXiaodouGuide = false;
   final _guideStorage = XiaodouGuideStorage();
 
-  // 底部导航滑动切换（2026-11-23 hx 要求）：页面容器从 IndexedStack
-  // 换成 PageView，点导航时 animateToPage 滑过去，不再整屏瞬跳。
-  final _pageController = PageController();
+  // 底部导航直达滑动（2026-11-23 hx 二次要求）：上一版用 PageView，
+  // 相邻切换很顺，但从第 1 页跳到第 4 页时动画要拖着中间两页一起
+  // 滑，又卡又乱。改成两页直达：四页全部常驻（不在台前的用
+  // Offstage 收起，状态与滚动位置都保住），切换时只有「离开的页」
+  // 和「进来的页」两页参与滑动——出去一屏、进来一屏，距离多远
+  // 都是同一种滑动、同一个时长，中间页不参与、不拖速度。
+  late final AnimationController _slideCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 300),
+  );
+  AppTab? _outgoingTab; // 正在滑出的页，动画结束即清空
+  double _slideDir = 1; // +1 新页从右进来，-1 从左进来
 
   late final List<Widget> _pages = const [
     _KeepAlivePage(key: ValueKey(AppTab.home), child: HomePage()),
@@ -43,6 +53,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _slideCtrl.addStatusListener((status) {
+      if (status == AnimationStatus.completed && _outgoingTab != null) {
+        setState(() => _outgoingTab = null);
+      }
+    });
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -56,7 +71,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _tabProvider?.detach();
-    _pageController.dispose();
+    _slideCtrl.dispose();
     super.dispose();
   }
 
@@ -90,26 +105,46 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   void _onTabTap(AppTab tab) {
     if (_activeTab == tab) return;
-    // 只下令滑动；_activeTab 等页面真正滑到后在 _onPageChanged 里
-    // 统一同步——点按、程序跳转（AppTabProvider）都走这一条路，
-    // 导航高亮不会和页面位置对不上。
-    _pageController.animateToPage(
-      tab.index,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  void _onPageChanged(int index) {
-    final tab = AppTab.values[index];
-    if (_activeTab == tab) return;
-    setState(() => _activeTab = tab);
+    // 点按、程序跳转（AppTabProvider）都走这一条路：记下谁滑出、
+    // 谁滑入与方向，动画从头播一遍。高亮立刻跟上（_activeTab 当场
+    // 换），页面随后滑到，观感是「点哪去哪」。
+    setState(() {
+      _slideDir = tab.index > _activeTab.index ? 1.0 : -1.0;
+      _outgoingTab = _activeTab;
+      _activeTab = tab;
+    });
+    _slideCtrl.forward(from: 0);
     if (tab == AppTab.profile) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         unawaited(refreshSessionData(context));
       });
     }
+  }
+
+  /// 四页在台上的摆法：当前页与滑出页按动画进度平移，其余页
+  /// Offstage 收起（不绘制、不响应，但状态保住）。
+  Widget _pageLayer(int index, double width, double t) {
+    final tab = AppTab.values[index];
+    final isActive = tab == _activeTab;
+    final isOutgoing = tab == _outgoingTab;
+    if (!isActive && !isOutgoing) {
+      return Offstage(offstage: true, child: _pages[index]);
+    }
+    var dx = 0.0;
+    if (isOutgoing) {
+      dx = -_slideDir * t * width;
+    } else if (_outgoingTab != null) {
+      dx = _slideDir * (1 - t) * width;
+    }
+    return Transform.translate(
+      offset: Offset(dx, 0),
+      child: IgnorePointer(
+        // 动画期间两页都不许点（防滑到一半误触）；结束只放当前页。
+        ignoring: !isActive || _outgoingTab != null,
+        child: _pages[index],
+      ),
+    );
   }
 
   @override
@@ -123,14 +158,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           body: Column(
             children: [
               Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  // 只许点按触发滑动，不开放手指横滑：各页里有横向
-                  // 滚动的区域（首页市集 tab、横幅等），手势会互抢。
-                  // 子页的保活仍靠 _KeepAlivePage，滑走再回来不重建。
-                  physics: const NeverScrollableScrollPhysics(),
-                  onPageChanged: _onPageChanged,
-                  children: _pages,
+                child: AnimatedBuilder(
+                  animation: _slideCtrl,
+                  builder: (context, _) {
+                    final width = MediaQuery.sizeOf(context).width;
+                    final t = Curves.easeOutCubic.transform(_slideCtrl.value);
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        for (var i = 0; i < _pages.length; i++)
+                          _pageLayer(i, width, t),
+                      ],
+                    );
+                  },
                 ),
               ),
               AppTabBar(active: _activeTab, onChange: _onTabTap),

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
+import '../utils/app_log.dart';
 import '../data/product_data.dart';
 import '../models/agent_records.dart';
 import '../models/chat_message.dart';
@@ -232,8 +233,10 @@ class XiaodouChatService {
 
     if (response.statusCode != 200) {
       final body = await response.stream.bytesToString();
+      AppLog.error('小豆', '小豆连接没成功（${response.statusCode}）');
       throw Exception(_parseError(body) ?? '发送失败 (${response.statusCode})');
     }
+    AppLog.info('小豆', '已连上小豆，开始接收回复');
 
     var buffer = '';
     await for (final chunk in response.stream.transform(utf8.decoder)) {
@@ -248,7 +251,10 @@ class XiaodouChatService {
         for (final line in event.split('\n')) {
           if (!line.startsWith('data: ')) continue;
           final data = line.substring(6).trim();
-          if (data == '[DONE]') return;
+          if (data == '[DONE]') {
+            AppLog.info('小豆', '回复接收完成');
+            return;
+          }
 
           final json = jsonDecode(data) as Map<String, dynamic>;
           final error = json['error'] as String?;

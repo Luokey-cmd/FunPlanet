@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
+import { log } from '../utils/log.js';
 import { saveSupportChatImage } from '../utils/support-media.js';
 import {
   appendMessage,
@@ -113,6 +114,7 @@ router.post('/conversations/:id/messages', authRequired, async (req, res) => {
       stickerId,
       notifyAdmin: true,
     });
+    log.info('客服', `用户发来一条${messageType === 'text' ? '文字' : '多媒体'}消息（会话 id ${conversation.id}）`);
     ok(res, {
       message: serializeMessage(message),
       conversation: serializeConversation(updated, updated.user),

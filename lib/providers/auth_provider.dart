@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../config/api_config.dart';
+import '../utils/app_log.dart';
 import '../models/auth_user.dart';
 import '../services/api_client.dart';
 import '../services/auth_api_service.dart';
@@ -88,10 +89,13 @@ class AuthProvider extends ChangeNotifier {
       isLoggedIn = true;
       lastError = null;
       notifyListeners();
+      AppLog.info('账号', '登录成功');
       return null;
     } on ApiException catch (e) {
+      AppLog.error('账号', '登录没成：${e.message}');
       return e.message;
     } catch (e) {
+      AppLog.error('账号', '登录没成：连不上服务器', e);
       return _connectionErrorMessage();
     }
   }
@@ -122,16 +126,20 @@ class AuthProvider extends ChangeNotifier {
       isLoggedIn = true;
       lastError = null;
       notifyListeners();
+      AppLog.info('账号', '注册成功，已自动登录');
       return null;
     } on ApiException catch (e) {
+      AppLog.error('账号', '注册没成：${e.message}');
       return e.message;
     } catch (e) {
+      AppLog.error('账号', '注册没成：连不上服务器', e);
       return _connectionErrorMessage();
     }
   }
 
   Future<void> logout() async {
     await _api.logout();
+    AppLog.info('账号', '已退出登录');
     currentUser = null;
     isLoggedIn = false;
     PageMemoryCache.clearAll();

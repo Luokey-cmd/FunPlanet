@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
+import { log } from '../utils/log.js';
 
 const router = Router();
 
@@ -26,6 +27,7 @@ router.post('/toggle', authRequired, async (req, res) => {
 
   if (existing) {
     await prisma.favorite.delete({ where: { id: existing.id } });
+    log.info('收藏', `取消收藏商品 ${productId}`);
     ok(res, { productId, favorited: false });
     return;
   }
@@ -33,6 +35,7 @@ router.post('/toggle', authRequired, async (req, res) => {
   await prisma.favorite.create({
     data: { userId: req.user.sub, productId },
   });
+  log.info('收藏', `收藏了商品 ${productId}`);
   ok(res, { productId, favorited: true });
 });
 

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
+import { log } from '../utils/log.js';
 import {
   assertUserOwnsImagePath,
   saveCommunityImage,
@@ -221,6 +222,7 @@ router.post('/posts', authRequired, async (req, res) => {
     config: deepseekConfig(),
   });
 
+  log.info('AI社区', `用户发了新帖子，帖子 id ${post.id}`);
   ok(res, { post: serializePost(post, req.user.sub) });
 });
 

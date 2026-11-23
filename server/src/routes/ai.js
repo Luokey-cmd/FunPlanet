@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { formatChinaDate } from '../utils/datetime.js';
 import { fail, ok } from '../utils/response.js';
+import { log } from '../utils/log.js';
 import { formatWanxErrorMessage, generateWanxImage, persistRemoteImage } from '../utils/wanx-image.js';
 
 const router = Router();
@@ -60,7 +61,7 @@ router.post('/draw', authRequired, async (req, res) => {
   const prompt = String(req.body?.prompt ?? '').trim();
   const style = String(req.body?.style ?? '').trim().slice(0, 32);
 
-  console.log('[ai/draw] start', { userId: req.user.sub, promptLen: prompt.length, style });
+  log.info('AI绘画', `开始生成：用户 id ${req.user.sub}，描述 ${prompt.length} 字，风格 ${style || '默认'}`);
 
   if (!prompt) {
     fail(res, 400, '请输入画面描述');
@@ -103,9 +104,9 @@ router.post('/draw', authRequired, async (req, res) => {
       artwork: serializeArtwork(artwork),
       remainingToday: Math.max(0, DAILY_LIMIT - used - 1),
     });
-    console.log('[ai/draw] ok', { userId: req.user.sub, artworkId: artwork.id });
+    log.info('AI绘画', `生成成功，作品 id ${artwork.id}`);
   } catch (error) {
-    console.error('[ai/draw]', error);
+    log.error('AI绘画', '生成失败', error);
     fail(res, 500, formatWanxErrorMessage(error.message));
   }
 });

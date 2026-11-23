@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
+import { log } from '../utils/log.js';
 import { serializeProduct } from '../utils/product.js';
 
 const router = Router();
@@ -46,6 +47,7 @@ router.post('/', authRequired, async (req, res) => {
     const quantity = existing.quantity + delta;
     if (quantity <= 0) {
       await prisma.cartItem.delete({ where: { id: existing.id } });
+      log.info('购物车', `商品 ${productId} 数量减到 0，已移出购物车`);
       ok(res, { item: null });
       return;
     }
@@ -68,6 +70,7 @@ router.post('/', authRequired, async (req, res) => {
     });
   }
 
+  log.info('购物车', `购物车已更新：商品 ${productId}，当前数量 ${item.quantity}`);
   ok(res, { item: serializeCartItem(item) });
 });
 

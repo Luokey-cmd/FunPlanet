@@ -1,4 +1,5 @@
 import { prisma } from '../db.js';
+import { log } from './log.js';
 import { serializeProduct } from './product.js';
 import { buildWeatherContext } from './weather.js';
 import { streamChatEvents } from './openai-compatible.js';
@@ -1088,7 +1089,45 @@ export const XIAODOU_GUIDE_TOOLS = XIAODOU_TOOLS.filter((tool) =>
   GUIDE_TOOL_NAMES.has(tool.function.name),
 );
 
+// 工具名 → 人话标签：日志里打人话，hx 一眼看懂小豆刚办了什么事。
+const TOOL_LABELS = {
+  search_products: '查商品',
+  draw_star_cards: '亮牌抽卡',
+  get_product_detail: '看商品详情',
+  get_promotions: '查优惠',
+  get_user_context: '读用户档案',
+  propose_add_to_cart: '提议加购',
+  claim_coupon: '领优惠券',
+  add_to_cart: '加入购物车',
+  update_cart: '调整购物车',
+  add_favorite: '收藏商品',
+  set_order_note: '写订单备注',
+  create_order: '生成订单',
+  get_weather: '查天气',
+  web_search: '联网搜索',
+};
+
+// 工具统一入口：所有工具都从这里过，所以日志也只在这里打一处——
+// 小豆每办一件事留一行中文；没办成打警告并带上原因；抛错打报错后
+// 原样往上抛（不改变原来的失败处理）。
 export async function executeXiaodouTool(name, rawArgs, context = {}) {
+  const label = TOOL_LABELS[name] ?? name;
+  let result;
+  try {
+    result = await dispatchXiaodouTool(name, rawArgs, context);
+  } catch (error) {
+    log.error('小豆', `办事出错：${label}`, error);
+    throw error;
+  }
+  if (result && result.ok === false) {
+    log.warn('小豆', `办事没成：${label}——${result.error ?? '未知原因'}`);
+  } else {
+    log.info('小豆', `办了一件事：${label}`);
+  }
+  return result;
+}
+
+async function dispatchXiaodouTool(name, rawArgs, context = {}) {
   const args = parseArgs(rawArgs);
   if (name === 'search_products') return searchProducts(args);
   if (name === 'draw_star_cards') return drawStarCards(args);

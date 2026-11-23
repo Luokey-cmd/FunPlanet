@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../data/product_data.dart';
+import '../utils/app_log.dart';
 import '../services/cart_api_service.dart';
 
 class CartProvider extends ChangeNotifier {
@@ -37,6 +38,7 @@ class CartProvider extends ChangeNotifier {
   }
 
   void addItem(Product product) {
+    AppLog.info('购物车', '加入购物车：${product.name}');
     final index = _items.indexWhere((i) => i.product.id == product.id);
     if (index >= 0) {
       _items[index] = _items[index].copyWith(quantity: _items[index].quantity + 1);
@@ -56,6 +58,7 @@ class CartProvider extends ChangeNotifier {
   }
 
   void removeItem(String productId) {
+    AppLog.info('购物车', '移出购物车：商品 $productId');
     _items.removeWhere((i) => i.product.id == productId);
     notifyListeners();
     if (_cloudSync) unawaited(_syncRemoveItem(productId));
@@ -73,6 +76,7 @@ class CartProvider extends ChangeNotifier {
     final index = _items.indexWhere((i) => i.product.id == productId);
     if (index < 0) return;
     final newQty = _items[index].quantity + delta;
+    AppLog.info('购物车', '改数量：${_items[index].product.name} → $newQty 件');
     if (newQty <= 0) {
       _items.removeAt(index);
     } else {

@@ -1,4 +1,5 @@
 import { chatCompletion } from '../deepseek.js';
+import { log } from './log.js';
 import { AI_FRIENDS } from '../data/ai-friends.js';
 
 // 兜底文案：没有配模型密钥或调用失败时使用。每人 8 条，长度与人设
@@ -146,7 +147,7 @@ async function generateText(systemPrompt, userPrompt, config) {
       config,
     );
   } catch (error) {
-    console.warn('[ai-community-ai]', error.message);
+    log.warn('AI社区', `AI 好友生成内容失败：${error.message}`);
     return null;
   }
 }
@@ -185,6 +186,7 @@ export async function scheduleAiEngagementForUserPost({
 }) {
   const friendsForLike = pickFriendsForLikes(content, randomBetween(2, 4));
   const friendsForComment = pickFriendsForUserPost(content, randomBetween(1, 3));
+  log.info('AI社区', `新帖子已安排 AI 好友互动：约 ${friendsForLike.length} 个点赞、${friendsForComment.length} 条评论会陆续出现（帖子 id ${postId}）`);
 
   setTimeout(async () => {
     for (const friend of friendsForLike) {
@@ -204,7 +206,7 @@ export async function scheduleAiEngagementForUserPost({
           },
         });
       } catch (error) {
-        console.warn('[ai-community] like failed', error.message);
+        log.warn('AI社区', `AI 好友点赞失败：${error.message}`);
       }
     }
   }, randomBetween(3000, 8000));
@@ -229,7 +231,7 @@ export async function scheduleAiEngagementForUserPost({
           },
         });
       } catch (error) {
-        console.warn('[ai-community] auto comment failed', error.message);
+        log.warn('AI社区', `AI 好友自动评论失败：${error.message}`);
       }
       // 延迟与 App 端轮询窗口对齐：首条 5～10 秒，后续每条再错开 3～6 秒
     }, randomBetween(5000, 10000) + index * randomBetween(3000, 6000));
@@ -250,6 +252,7 @@ export async function scheduleAiReplyToUserComment({
   replyToUserName,
   contextComments = [],
 }) {
+  log.info('AI社区', `已安排 AI 好友回复用户评论（帖子 id ${postId}）`);
   setTimeout(async () => {
     try {
       const reply = await generateFriendReply(friend, post, userComment, userName, config, contextComments);
@@ -268,7 +271,7 @@ export async function scheduleAiReplyToUserComment({
         },
       });
     } catch (error) {
-      console.warn('[ai-community] auto reply failed', error.message);
+      log.warn('AI社区', `AI 好友自动回复失败：${error.message}`);
     }
   }, randomBetween(3000, 12000));
 }
