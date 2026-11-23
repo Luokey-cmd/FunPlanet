@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../config/api_config.dart';
 import '../data/product_data.dart';
 import '../data/xiaodou_copy.dart';
+import '../models/agent_records.dart';
 import '../models/chat_message.dart';
 import '../models/xiaodou_chat_session.dart';
 import '../services/xiaodou_chat_history_storage.dart';
@@ -109,11 +110,38 @@ class XiaodouChatProvider extends ChangeNotifier {
             );
           case XiaodouStreamKind.fate:
             _messages[assistantIndex] = current.copyWith(
-              content: current.isLoading ? '三张星牌已经压在瓶口。本命、遇见、余韵，点开你先揭哪一张。' : current.content,
+              content: current.isLoading ? '三张牌已经亮出来了，本命、遇见、余韵都在，点任意一张就能看详情。' : current.content,
               isLoading: false,
               products: event.products,
               starRoles: event.roles,
+              fateBatches: [event.products],
+              fateRolesBatches: [event.roles],
+              fateIndex: 0,
+              fateTotal: event.batch?.totalCount ?? event.products.length,
+              fateHasMore: event.batch?.hasMore ?? false,
+              drawArgs: event.batch?.drawArgs ?? const {},
+              traits: event.batch?.traits ?? const {},
             );
+          case XiaodouStreamKind.actions:
+            // 办事清单：按 id 追加或覆盖（同轮改量合并、付款后翻状态都靠它）
+            final incoming = event.action;
+            if (incoming != null && incoming.id.isNotEmpty) {
+              final list = List<AgentAction>.from(current.actions);
+              final at = list.indexWhere((a) => a.id == incoming.id);
+              if (at >= 0) {
+                list[at] = incoming;
+              } else {
+                list.add(incoming);
+              }
+              _messages[assistantIndex] = current.copyWith(actions: list);
+            }
+          case XiaodouStreamKind.homework:
+            final entry = event.homeworkEntry;
+            if (entry != null && entry.text.isNotEmpty) {
+              _messages[assistantIndex] = current.copyWith(
+                homework: [...current.homework, entry],
+              );
+            }
           case XiaodouStreamKind.cart:
             _messages[assistantIndex] = current.copyWith(
               content: current.isLoading ? XiaodouCopy.confirmCart : current.content,
@@ -222,6 +250,119 @@ class XiaodouChatProvider extends ChangeNotifier {
     await send('再看看「$category」里的同类，排除这些：$ids');
   }
 
+  // 正在拉下一批的消息下标（防重复点），界面拿它转圈。
+  final Set<int> _batchLoading = {};
+
+  bool isBatchLoading(int index) => _batchLoading.contains(index);
+
+  /// 亮牌「下一批」：拿服务端回带的抽牌条件 + 已展示的全部商品 id
+  /// 接着抽，抽到的新一批原样存下并切过去；池子空了就把 hasMore 关掉。
+  Future<void> nextFateBatch(int index) async {
+    if (index < 0 || index >= _messages.length || _batchLoading.contains(index)) return;
+    final message = _messages[index];
+    if (!message.fateHasMore || message.fateBatches.isEmpty) return;
+    _batchLoading.add(index);
+    notifyListeners();
+    try {
+      final excludeIds = message.fateBatches.expand((b) => b).map((p) => p.id).toList();
+      final result = await _service.drawBatch(args: message.drawArgs, excludeIds: excludeIds);
+      final current = _messages[index];
+      if (result.products.isEmpty) {
+        _messages[index] = current.copyWith(fateHasMore: false);
+      } else {
+        final batches = [...current.fateBatches, result.products];
+        final roleBatches = [...current.fateRolesBatches, result.roles];
+        _messages[index] = current.copyWith(
+          fateBatches: batches,
+          fateRolesBatches: roleBatches,
+          fateIndex: batches.length - 1,
+          products: result.products,
+          starRoles: result.roles,
+          fateHasMore: result.meta.hasMore,
+          fateTotal: current.fateTotal > 0 ? current.fateTotal : result.meta.totalCount + excludeIds.length,
+          traits: {...current.traits, ...result.meta.traits},
+        );
+      }
+      await _persistCurrentSession();
+    } catch (_) {
+      // 拉下一批失败不打断聊天：按钮还在，用户可以再点一次
+    } finally {
+      _batchLoading.remove(index);
+      notifyListeners();
+    }
+  }
+
+  /// 上一批/下一批切换：只动下标，牌都是存好的，不发请求。
+  void setFateBatchIndex(int index, int batchIndex) {
+    if (index < 0 || index >= _messages.length) return;
+    final message = _messages[index];
+    if (batchIndex < 0 || batchIndex >= message.fateBatches.length) return;
+    _messages[index] = message.copyWith(
+      fateIndex: batchIndex,
+      products: message.fateBatches[batchIndex],
+      starRoles: batchIndex < message.fateRolesBatches.length
+          ? message.fateRolesBatches[batchIndex]
+          : message.starRoles,
+    );
+    notifyListeners();
+  }
+
+  /// 牌面调档（预算/路线）：按新条件从第一批重新抽，旧批次作废。
+  Future<void> refilterFate(int index, {int? maxPrice, String? sort}) async {
+    if (index < 0 || index >= _messages.length || _batchLoading.contains(index)) return;
+    final message = _messages[index];
+    final args = Map<String, dynamic>.from(message.drawArgs);
+    if (maxPrice != null) {
+      if (maxPrice <= 0) {
+        args.remove('maxPrice');
+      } else {
+        args['maxPrice'] = maxPrice;
+      }
+    }
+    if (sort != null) args['sort'] = sort;
+    _batchLoading.add(index);
+    notifyListeners();
+    try {
+      final result = await _service.drawBatch(args: args, excludeIds: const []);
+      if (result.products.isEmpty) return;
+      _messages[index] = _messages[index].copyWith(
+        fateBatches: [result.products],
+        fateRolesBatches: [result.roles],
+        fateIndex: 0,
+        products: result.products,
+        starRoles: result.roles,
+        fateHasMore: result.meta.hasMore,
+        fateTotal: result.meta.totalCount,
+        drawArgs: args,
+        traits: result.meta.traits,
+      );
+      await _persistCurrentSession();
+    } catch (_) {
+      // 调档失败保持原样，用户可再试
+    } finally {
+      _batchLoading.remove(index);
+      notifyListeners();
+    }
+  }
+
+  /// 清单里的待付款订单被用户付掉后回写：状态翻成已办好，
+  /// 明细补一句已付款（清单是快照，这里只动这一条的状态）。
+  void markActionPaid(int index, String actionId) {
+    if (index < 0 || index >= _messages.length) return;
+    final message = _messages[index];
+    final at = message.actions.indexWhere((a) => a.id == actionId);
+    if (at < 0) return;
+    final list = List<AgentAction>.from(message.actions);
+    final action = list[at];
+    list[at] = action.copyWith(
+      status: 'done',
+      detail: action.detail.contains('已付款') ? action.detail : '${action.detail} · 已付款',
+    );
+    _messages[index] = message.copyWith(actions: list);
+    _persistCurrentSession();
+    notifyListeners();
+  }
+
   Future<void> startNewChat() async {
     if (_sending) return;
     await _persistCurrentSession();
@@ -245,6 +386,15 @@ class XiaodouChatProvider extends ChangeNotifier {
             products: List<Product>.from(m.products),
             starRoles: List<String>.from(m.starRoles),
             giftNote: m.giftNote,
+            actions: List<AgentAction>.from(m.actions),
+            homework: List<HomeworkEntry>.from(m.homework),
+            fateBatches: m.fateBatches.map((b) => List<Product>.from(b)).toList(),
+            fateRolesBatches: m.fateRolesBatches.map((r) => List<String>.from(r)).toList(),
+            fateIndex: m.fateIndex,
+            fateTotal: m.fateTotal,
+            fateHasMore: m.fateHasMore,
+            drawArgs: Map<String, dynamic>.from(m.drawArgs),
+            traits: Map<String, String>.from(m.traits),
           )));
     _error = null;
     notifyListeners();

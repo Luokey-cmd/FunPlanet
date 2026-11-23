@@ -34,8 +34,11 @@ router.post('/', authRequired, async (req, res) => {
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) return fail(res, 404, '商品不存在');
 
-  const existing = await prisma.cartItem.findUnique({
-    where: { userId_productId: { userId: req.user.sub, productId } },
+  // 查已有行必须带上 spec：购物车唯一约束是（用户、商品、规格）三字段，
+  // findUnique 写 userId_productId 会在运行时报 Unknown argument 直接 500
+  // （2026-11-23 云端实测踩实；旧版能跑只是靠本地生成的旧客户端撑着）。
+  const existing = await prisma.cartItem.findFirst({
+    where: { userId: req.user.sub, productId, spec: product.spec ?? '' },
   });
 
   let item;
@@ -74,8 +77,11 @@ router.put('/:productId', authRequired, async (req, res) => {
   if (!productId) return fail(res, 400, '缺少 productId');
   if (!Number.isFinite(quantity)) return fail(res, 400, 'quantity 无效');
 
-  const existing = await prisma.cartItem.findUnique({
-    where: { userId_productId: { userId: req.user.sub, productId } },
+  // 同上：不用 findUnique 的复合键，按用户+商品取最近更新的一行
+  // （App 里同一商品只会有一种规格的一行）。
+  const existing = await prisma.cartItem.findFirst({
+    where: { userId: req.user.sub, productId },
+    orderBy: { updatedAt: 'desc' },
   });
   if (!existing) return fail(res, 404, '购物车无此商品');
 

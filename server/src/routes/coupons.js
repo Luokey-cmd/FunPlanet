@@ -10,7 +10,7 @@ import {
 
 const router = Router();
 
-const CLAIM_GROUPS = {
+export const CLAIM_GROUPS = {
   newcomer: ['c1', 'c4'],
   member_monthly: ['c5'],
   center: ['c6'],
@@ -55,40 +55,61 @@ router.get('/', authRequired, async (req, res) => {
   });
 });
 
-async function claimGroup(req, res, groupKey, flagField) {
+// 领券核心（路由与小豆的办事工具共用同一份口径，规则只许在这里改）：
+// 输入：userId + groupKey（newcomer / member_monthly / center）。
+// 输出：{ ok: true, coupons } 或 { ok: false, status, error }。
+// 坑：会员月券有 VIP2 门槛和跨月再领规则，都在这一层判断完，
+// 调用方不要再各判一遍，否则两边口径迟早不一致。
+export async function claimCouponGroupForUser(userId, groupKey) {
   const templateIds = CLAIM_GROUPS[groupKey];
-  if (!templateIds) return fail(res, 400, '无效的领取类型');
+  if (!templateIds) return { ok: false, status: 400, error: '无效的领取类型' };
+  const flagField =
+    groupKey === 'newcomer'
+      ? 'newcomerClaimed'
+      : groupKey === 'member_monthly'
+        ? 'memberMonthlyCouponClaimed'
+        : null;
 
-  const profile = await ensureProfile(req.user.sub);
-  // 会员月券的「已领」按月份判断；新人券仍是终身一次的布尔判断
-  const alreadyClaimed =
-    groupKey === 'member_monthly'
-      ? isMemberCouponClaimedThisMonth(profile)
-      : flagField
-        ? Boolean(profile[flagField])
-        : false;
+  const profile = await ensureProfile(userId);
+  if (groupKey === 'member_monthly' && (profile?.vipLevel ?? 1) < 2) {
+    return { ok: false, status: 403, error: '请先开通会员' };
+  }
+
+  // 会员月券的「已领」按月份判断；新人券仍是终身一次的布尔判断；
+  // 领券中心的券看有没有领过这一张。
+  let alreadyClaimed = false;
+  if (groupKey === 'member_monthly') {
+    alreadyClaimed = isMemberCouponClaimedThisMonth(profile);
+  } else if (flagField) {
+    alreadyClaimed = Boolean(profile?.[flagField]);
+  } else {
+    const existing = await prisma.userCoupon.findUnique({
+      where: { userId_templateId: { userId, templateId: templateIds[0] } },
+    });
+    alreadyClaimed = Boolean(existing);
+  }
   if (alreadyClaimed) {
-    return fail(res, 409, '已领取过');
+    return { ok: false, status: 409, error: '已领取过' };
   }
 
   const templates = await prisma.couponTemplate.findMany({
     where: { id: { in: templateIds } },
   });
   if (templates.length !== templateIds.length) {
-    return fail(res, 500, '优惠券配置不完整，请重新 seed');
+    return { ok: false, status: 500, error: '优惠券配置不完整，请重新 seed' };
   }
 
   // 发行侧检查：还没到领取时间、或总量已领完的券不能再发
   const now = new Date();
   for (const template of templates) {
     if (template.claimStartAt && now < template.claimStartAt) {
-      return fail(res, 400, '优惠券尚未开始领取');
+      return { ok: false, status: 400, error: '优惠券尚未开始领取' };
     }
     if (template.totalQuantity != null && template.issuedCount >= template.totalQuantity) {
-      return fail(res, 409, '优惠券已领完');
+      return { ok: false, status: 409, error: '优惠券已领完' };
     }
     if (template.expireAt && now > template.expireAt) {
-      return fail(res, 400, '优惠券已过期');
+      return { ok: false, status: 400, error: '优惠券已过期' };
     }
   }
 
@@ -97,9 +118,9 @@ async function claimGroup(req, res, groupKey, flagField) {
   for (const templateId of templateIds) {
     const row = await prisma.userCoupon.upsert({
       where: {
-        userId_templateId: { userId: req.user.sub, templateId },
+        userId_templateId: { userId, templateId },
       },
-      create: { userId: req.user.sub, templateId },
+      create: { userId, templateId },
       // 会员月券跨月再领时复用同一行：把已用状态清掉、领取时间刷新；其他组保持原样不动
       update: isMonthlyReclaim
         ? { used: false, usedAt: null, orderId: null, claimedAt: now }
@@ -118,32 +139,30 @@ async function claimGroup(req, res, groupKey, flagField) {
     // 领月券时把月份一起钉住，下个月新鲜度检查靠它放行
     if (isMonthlyReclaim) data.memberCouponMonth = currentMonthKey();
     await prisma.userProfile.update({
-      where: { userId: req.user.sub },
+      where: { userId },
       data,
     });
   }
 
-  ok(res, { coupons: created });
+  return { ok: true, coupons: created };
+}
+
+async function respondClaim(req, res, groupKey) {
+  const result = await claimCouponGroupForUser(req.user.sub, groupKey);
+  if (!result.ok) return fail(res, result.status, result.error);
+  return ok(res, { coupons: result.coupons });
 }
 
 router.post('/claim/newcomer', authRequired, (req, res) =>
-  claimGroup(req, res, 'newcomer', 'newcomerClaimed'),
+  respondClaim(req, res, 'newcomer'),
 );
 
-router.post('/claim/member-monthly', authRequired, async (req, res) => {
-  const profile = await ensureProfile(req.user.sub);
-  if (profile.vipLevel < 2) return fail(res, 403, '请先开通会员');
-  return claimGroup(req, res, 'member_monthly', 'memberMonthlyCouponClaimed');
-});
+router.post('/claim/member-monthly', authRequired, (req, res) =>
+  respondClaim(req, res, 'member_monthly'),
+);
 
-router.post('/claim/center', authRequired, async (req, res) => {
-  const existing = await prisma.userCoupon.findUnique({
-    where: {
-      userId_templateId: { userId: req.user.sub, templateId: 'c6' },
-    },
-  });
-  if (existing) return fail(res, 409, '已领取过');
-  return claimGroup(req, res, 'center', null);
-});
+router.post('/claim/center', authRequired, (req, res) =>
+  respondClaim(req, res, 'center'),
+);
 
 export default router;

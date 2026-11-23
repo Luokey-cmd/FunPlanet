@@ -301,12 +301,19 @@ function mergedSystemPrompt(starwish) {
       '3. 需求清楚时优先 draw_star_cards（三张星牌），不要一次甩很多热销。\n' +
       '4. 信息不够只问 1 个问题。\n' +
       '5. 谷子≠小卡，手办≠公仔。\n' +
-      '6. 引出星牌用 2～3 句，说明可翻开本命/遇见/余韵。\n' +
-      '7. 换一批：excludeIds 或 skip。\n' +
-      '8. 加购：propose_add_to_cart，禁止声称已经放进背包。\n' +
+      '6. 引出星牌用 2～3 句：三张牌是明着亮出的，每张牌的特点句已由系统按真实数据算好（在工具结果的 trait 里），讲牌时照着说、不许改数字、不许另编特点。\n' +
+      '7. 换一批由用户在牌面点「下一批」自己翻，不用你处理；用户在对话里明确说换一批时，带 excludeIds 重新 draw_star_cards。\n' +
+      '8. 加购用 add_to_cart 真加，不要再提确认条。\n' +
       '9. 识图：若消息已含视觉结果，再搜同款或同味道；不要假装看见像素。\n' +
       '10. 送礼：点到商品后用一句寄语，不要长篇。\n' +
-      '11. 对比商品时必须下结论：先摆数据（价格/券后价、规格、销量评分、优惠适配，缺的数据明说没有），最后一句说清选谁、为什么，不许把判断推回用户。',
+      '11. 对比商品时必须下结论：先摆数据（价格/券后价、规格、销量评分、优惠适配，缺的数据明说没有），最后一句说清选谁、为什么，不许把判断推回用户。\n\n' +
+      '## 办事规矩（能真办事，就不要只动嘴）\n' +
+      '1. 用户明确要你办的事，用工具真办：领券 claim_coupon、加购物车 add_to_cart、改数量 update_cart、收藏 add_favorite、写备注 set_order_note、生成待付款订单 create_order。办完的结果会自动记进办事清单给用户看，你在正文里一句话确认即可，不要逐条复述清单。\n' +
+      '2. 只有用户明确表达了意图才动手：说「就它了/买这个/帮我下单」才 create_order；说「先加购物车」就只 add_to_cart，不要自作主张替他下单；只是咨询、对比时不许动手。\n' +
+      '3. 付款是唯一的闸：你最多把订单生成到待付款，绝不能说「已经下单成功/已经付款」；生成订单后把应付金额说清，并提醒他在清单卡里点「确认下单」付款。\n' +
+      '4. 工具返回失败（action.status 是 failed）时如实转告原因，不要假装办成、不要换个说法糊弄过去；可以顺带给一个能点的下一步（如先加地址、先领别的券）。\n' +
+      '5. 用户交代备注或贺卡内容时先 set_order_note 记下，同一轮里再 create_order 会自动带上，不用重复问。\n' +
+      '6. 下单前若有一张他能领、且明显能省钱的券（get_promotions 里查得到），可以先 claim_coupon 再 create_order，create_order 会自动挑最划算的已领券抵扣。',
   };
 }
 
@@ -401,6 +408,12 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
   const pendingCart = [];
   let offerCards = false;
   let fateRoles = [];
+  // 办事一轮的共享暂存（先记备注、后下单自动带上，靠它传递）与
+  // 本轮最近一次抽牌的批次元数据（总数/还有没有下一批/特点句），
+  // 随 fate_cards 事件一起发给 App 做批次翻页。
+  const turnState = {};
+  let lastDrawMeta = null;
+  const homeworkSeen = new Set();
   const history = [mergedSystemPrompt(starwish), ...messages];
 
   // 先报一句状态：思考与查工具都要时间，第一秒就让用户知道在动。
@@ -505,7 +518,7 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
       // 把失败当成一条工具结果喂回模型，让它换个说法或如实告知。
       let result;
       try {
-        result = await executeXiaodouTool(call.name, call.arguments, { userId, messages, dashscope, smartModel });
+        result = await executeXiaodouTool(call.name, call.arguments, { userId, messages, dashscope, smartModel, turnState });
       } catch (error) {
         console.warn('[xiaodou-agent] tool failed:', call.name, error.message);
         result = { ok: false, error: `工具 ${call.name} 执行失败。不要编造数据，如实告诉用户这项暂时查不了。` };
@@ -521,6 +534,16 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
         collectProducts(byId, result.fullProducts);
         offerCards = (result.fullProducts?.length ?? 0) > 0;
         fateRoles = Array.isArray(result.roles) ? result.roles : [];
+        if (result.ok !== false && Array.isArray(result.cards)) {
+          const traits = {};
+          for (const card of result.cards) traits[card.id] = card.trait;
+          lastDrawMeta = {
+            totalCount: result.totalCount ?? 0,
+            hasMore: Boolean(result.hasMore),
+            drawArgs: result.drawArgs ?? {},
+            traits,
+          };
+        }
       }
       if (call.name === 'get_product_detail' && result.fullProduct) {
         collectProducts(byId, [result.fullProduct]);
@@ -528,6 +551,34 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
       }
       if (call.name === 'propose_add_to_cart' && result.fullProduct) {
         pendingCart.push(result.fullProduct);
+      }
+      // 办事结果：办成或没办成都发一条 actions 事件，App 实时记进
+      // 清单。改购物车数量同轮多次只占一行——把明细攒在 turnState
+      // 里重写同一条记录（id 不变，App 按 id 覆盖）。
+      if (result?.action) {
+        let action = result.action;
+        if (action.type === 'cart_update') {
+          const merged = (turnState.cartUpdate ??= { items: new Map(), action: null });
+          if (result.cartUpdateItem) {
+            merged.items.set(result.cartUpdateItem.productId, result.cartUpdateItem);
+          }
+          if (!merged.action) merged.action = action;
+          const parts = [...merged.items.values()].map((item) =>
+            item.quantity === 0 ? `${item.name} 已移除` : `${item.name} 改为 ${item.quantity} 件`,
+          );
+          merged.action = {
+            ...merged.action,
+            detail: parts.length > 2 ? `共调整 ${parts.length} 件商品` : parts.join('；'),
+          };
+          action = merged.action;
+        }
+        yield { type: 'actions', action };
+      }
+      // 功课段：数字只从工具结果里摘，同轮同句不重复发，最多 5 条。
+      for (const entry of homeworkFrom(call.name, result)) {
+        if (homeworkSeen.size >= 5 || homeworkSeen.has(entry.text)) continue;
+        homeworkSeen.add(entry.text);
+        yield { type: 'homework', entry };
       }
       history.push({
         role: 'tool',
@@ -558,7 +609,12 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
   if (offerCards && byId.size > 0) {
     const products = [...byId.values()].slice(0, 3);
     if (fateRoles.length >= 2) {
-      yield { type: 'fate_cards', products, roles: fateRoles.slice(0, products.length) };
+      yield {
+        type: 'fate_cards',
+        products,
+        roles: fateRoles.slice(0, products.length),
+        ...(lastDrawMeta ? { batch: lastDrawMeta } : {}),
+      };
     } else {
       yield { type: 'products', products };
     }
@@ -580,6 +636,45 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
   if (pendingCart.length > 0) {
     yield { type: 'cart_confirm', products: pendingCart.slice(0, 3) };
   }
+}
+
+// 功课段条目：把一次工具结果翻成一句带真实数字的「做了什么」，
+// 可点开的候选明细只带名字与价格。数字只能来自工具返回，
+// 这里不许出现任何估算或约数（全流程稿拍 3 的硬规矩）。
+function homeworkFrom(toolName, result) {
+  if (!result || result.ok === false) return [];
+  const entries = [];
+  const candidateOf = (item) => ({ id: item.id, name: item.name, price: Number(item.price ?? 0) });
+  if (toolName === 'search_products' && (result.totalCount ?? 0) > 0) {
+    entries.push({
+      text: `按你的条件找到 ${result.totalCount} 件商品`,
+      candidates: (result.products ?? []).map(candidateOf),
+    });
+  }
+  if (toolName === 'draw_star_cards' && Array.isArray(result.cards) && result.cards.length > 0) {
+    entries.push({
+      text: `从 ${result.totalCount ?? result.cards.length} 件里挑出 ${result.cards.length} 张牌，价格、销量、评分都比过`,
+      candidates: result.cards.map(candidateOf),
+    });
+    if ((result.reviewTotal ?? 0) > 0) {
+      entries.push({ text: `看了这几件的用户评价，一共 ${result.reviewTotal} 条`, candidates: [] });
+    }
+  }
+  if (toolName === 'get_product_detail' && result.product) {
+    const p = result.product;
+    entries.push({
+      text: `细看了「${p.name}」：¥${p.price} · 已售 ${p.sales ?? 0} 件`,
+      candidates: [],
+    });
+  }
+  if (toolName === 'get_user_context') {
+    const coupons = result.unusedCoupons ?? [];
+    if (coupons.length > 0) {
+      entries.push({ text: `翻了你的券包：${coupons.length} 张券还没用`, candidates: [] });
+    }
+    entries.push({ text: `看了你的会员档案：VIP${result.vipLevel ?? 1}`, candidates: [] });
+  }
+  return entries;
 }
 
 function collectProducts(byId, fullList = []) {

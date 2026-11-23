@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../data/product_data.dart';
+import 'agent_records.dart';
 
 enum ChatRole { user, assistant }
 
@@ -17,6 +18,15 @@ class ChatMessage {
     this.isAppraisal = false,
     this.visionPayload,
     this.thinking = '',
+    this.actions = const [],
+    this.homework = const [],
+    this.fateBatches = const [],
+    this.fateRolesBatches = const [],
+    this.fateIndex = 0,
+    this.fateTotal = 0,
+    this.fateHasMore = false,
+    this.drawArgs = const {},
+    this.traits = const {},
   });
 
   final ChatRole role;
@@ -32,6 +42,25 @@ class ChatMessage {
   final String? giftNote;
   final bool isAppraisal;
   final Map<String, String>? visionPayload;
+
+  // 办事清单与功课段（Agent 第二步）：只存本地记录，不回发服务端。
+  final List<AgentAction> actions;
+  final List<HomeworkEntry> homework;
+
+  // 亮牌批次：每一批的三张牌与角色原样存下，上一批/下一批只切下标、
+  // 不重新抽；drawArgs 是服务端回带的抽牌条件，「下一批」与牌面
+  // 调档（预算/路线）都拿它接着调 draw-batch 接口。
+  final List<List<Product>> fateBatches;
+  final List<List<String>> fateRolesBatches;
+  final int fateIndex;
+  final int fateTotal;
+  final bool fateHasMore;
+  final Map<String, dynamic> drawArgs;
+
+  // 每张牌的特点句（服务端按真实数据算好）：商品 id -> 一句话。
+  final Map<String, String> traits;
+
+  bool get hasAgentCard => actions.isNotEmpty || homework.isNotEmpty;
 
   bool get hasProducts => products.isNotEmpty;
   bool get hasPendingCart => pendingCart.isNotEmpty;
@@ -50,6 +79,15 @@ class ChatMessage {
     bool? isAppraisal,
     Map<String, String>? visionPayload,
     String? thinking,
+    List<AgentAction>? actions,
+    List<HomeworkEntry>? homework,
+    List<List<Product>>? fateBatches,
+    List<List<String>>? fateRolesBatches,
+    int? fateIndex,
+    int? fateTotal,
+    bool? fateHasMore,
+    Map<String, dynamic>? drawArgs,
+    Map<String, String>? traits,
   }) {
     return ChatMessage(
       role: role,
@@ -63,6 +101,15 @@ class ChatMessage {
       isAppraisal: isAppraisal ?? this.isAppraisal,
       visionPayload: visionPayload ?? this.visionPayload,
       thinking: thinking ?? this.thinking,
+      actions: actions ?? this.actions,
+      homework: homework ?? this.homework,
+      fateBatches: fateBatches ?? this.fateBatches,
+      fateRolesBatches: fateRolesBatches ?? this.fateRolesBatches,
+      fateIndex: fateIndex ?? this.fateIndex,
+      fateTotal: fateTotal ?? this.fateTotal,
+      fateHasMore: fateHasMore ?? this.fateHasMore,
+      drawArgs: drawArgs ?? this.drawArgs,
+      traits: traits ?? this.traits,
     );
   }
 }

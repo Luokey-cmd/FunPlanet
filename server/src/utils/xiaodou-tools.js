@@ -2,6 +2,13 @@ import { prisma } from '../db.js';
 import { serializeProduct } from './product.js';
 import { buildWeatherContext } from './weather.js';
 import { streamChatEvents } from './openai-compatible.js';
+import { CLAIM_GROUPS, claimCouponGroupForUser } from '../routes/coupons.js';
+import {
+  buildLineItemsFromRequest,
+  resolveAddress,
+  resolveDiscount,
+} from '../routes/orders.js';
+import { generateOrderNo } from './order.js';
 
 export const MAJOR_CATEGORIES = ['玩具', '文具', '手办', '公仔', '谷子', '小卡', '实用类周边'];
 const SEARCH_LIMIT = 3;
@@ -26,7 +33,7 @@ export const XIAODOU_TOOLS = [
           maxPrice: { type: 'number', description: '最高价格（元）' },
           sort: {
             type: 'string',
-            enum: ['sales', 'price_asc', 'price_desc'],
+            enum: ['sales', 'price_asc', 'price_desc', 'rating'],
             description: '默认按销量',
           },
           skip: { type: 'number', description: '换一批时跳过前几条，例如 4、8' },
@@ -52,6 +59,11 @@ export const XIAODOU_TOOLS = [
           majorCategory: { type: 'string', enum: MAJOR_CATEGORIES },
           minPrice: { type: 'number' },
           maxPrice: { type: 'number' },
+          sort: {
+            type: 'string',
+            enum: ['sales', 'price_asc', 'price_desc', 'rating'],
+            description: '默认按销量；用户看重口碑传 rating，看重省钱传 price_asc',
+          },
           excludeIds: { type: 'array', items: { type: 'string' } },
         },
       },
@@ -90,15 +102,107 @@ export const XIAODOU_TOOLS = [
   {
     type: 'function',
     function: {
-      name: 'propose_add_to_cart',
+      name: 'add_to_cart',
       description:
-        '用户明确说加入购物车或帮我加购某件商品时调用。不会真正加购，只发起确认，请用户在界面点确认。',
+        '用户明确说加入购物车、帮我加购某件商品时调用：直接真的加进购物车，办完会记进办事清单，用户可以自己再去改。不要只是嘴上说加好了。',
+      parameters: {
+        type: 'object',
+        properties: {
+          productId: { type: 'string' },
+          quantity: { type: 'number', description: '数量，默认 1' },
+        },
+        required: ['productId'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_cart',
+      description:
+        '用户要改购物车里某件商品的数量时调用（改成几件、去掉这件）。quantity 是改完的目标数量，传 0 表示从购物车移除。只对已经在购物车里的商品有效。',
+      parameters: {
+        type: 'object',
+        properties: {
+          productId: { type: 'string' },
+          quantity: { type: 'number', description: '改完的数量；0 = 移除' },
+        },
+        required: ['productId', 'quantity'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'claim_coupon',
+      description:
+        '帮用户领取一张优惠券：用户说要领券时，或下单前发现有他能领、且对这次购买明显有用的券时调用。templateId 用 get_promotions 返回的券 id。领过的、领完的会如实返回失败，不要假装领到。',
+      parameters: {
+        type: 'object',
+        properties: {
+          templateId: { type: 'string', description: '券模板 id，如 c6' },
+        },
+        required: ['templateId'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'add_favorite',
+      description: '用户说收藏、先存着、加心愿单时调用：真的把商品加进他的收藏夹。',
       parameters: {
         type: 'object',
         properties: {
           productId: { type: 'string' },
         },
         required: ['productId'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'set_order_note',
+      description:
+        '用户交代订单备注或贺卡内容时调用（如「备注写生日快乐，帮我包好看点」）：先记下来，本轮稍后生成订单时会自动带上；没生成订单也会记进办事清单。',
+      parameters: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: '备注原文，最多 200 字' },
+        },
+        required: ['text'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_order',
+      description:
+        '用户明确拍板要买（「就它了，帮我下单」「买这个」）时调用：按给定商品生成一张待付款订单。只生成待付款，绝不替用户付款；没指定券时系统会自动挑一张最划算的可用券。地址用他的默认地址，没有地址会如实返回失败。',
+      parameters: {
+        type: 'object',
+        properties: {
+          items: {
+            type: 'array',
+            description: '要买的商品列表',
+            items: {
+              type: 'object',
+              properties: {
+                productId: { type: 'string' },
+                quantity: { type: 'number', description: '数量，默认 1' },
+              },
+              required: ['productId'],
+            },
+          },
+          couponTemplateId: {
+            type: 'string',
+            description: '指定用哪张已领取的券（模板 id）；不传则自动挑最划算的',
+          },
+          note: { type: 'string', description: '订单备注；不传则用本轮 set_order_note 记下的' },
+        },
+        required: ['items'],
       },
     },
   },
@@ -152,6 +256,7 @@ function parseArgs(raw) {
 function orderByFor(sort) {
   if (sort === 'price_asc') return [{ price: 'asc' }, { id: 'asc' }];
   if (sort === 'price_desc') return [{ price: 'desc' }, { id: 'asc' }];
+  if (sort === 'rating') return [{ rating: 'desc' }, { sales: 'desc' }, { id: 'asc' }];
   return [{ sales: 'desc' }, { id: 'asc' }];
 }
 
@@ -263,11 +368,58 @@ async function searchProducts(args, { take = SEARCH_LIMIT } = {}) {
   };
 }
 
+// 给三张牌各算一句「特点」：只用真实数据里的最高级——口碑最好（评分）、
+// 价格最低、卖得最火（销量），一张牌占一条、互不重复；哪条都没占上
+// 就退回「价格 · 销量 · 评分」的事实行。不许模型自己编特点，
+// 数字全在这里算死（导购全流程稿拍 4 的硬规矩）。
+// 输入：本批三件商品；输出：Map<商品 id, 特点句>。
+function computeTraits(picked) {
+  const traits = new Map();
+  const used = new Set();
+  const bestRating = Math.max(...picked.map((x) => Number(x.rating ?? 0)));
+  const minPrice = Math.min(...picked.map((x) => Number(x.price ?? 0)));
+  const maxPrice = Math.max(...picked.map((x) => Number(x.price ?? 0)));
+  const bestSales = Math.max(...picked.map((x) => Number(x.sales ?? 0)));
+  for (const item of picked) {
+    const rating = Number(item.rating ?? 0);
+    const price = Number(item.price ?? 0);
+    const sales = Number(item.sales ?? 0);
+    if (rating > 0 && rating === bestRating && !used.has('rating')) {
+      used.add('rating');
+      traits.set(item.id, `口碑最好，评分 ${rating}`);
+    } else if (price === minPrice && maxPrice > minPrice && !used.has('price')) {
+      used.add('price');
+      traits.set(item.id, `价格最低，比最贵的省 ¥${Math.round(maxPrice - minPrice)}`);
+    } else if (sales === bestSales && sales > 0 && !used.has('sales')) {
+      used.add('sales');
+      traits.set(item.id, `卖得最火，已售 ${sales} 件`);
+    } else {
+      traits.set(item.id, `¥${price} · 已售 ${sales} 件 · 评分 ${rating}`);
+    }
+  }
+  return traits;
+}
+
 async function drawStarCards(args) {
   const result = await searchProducts(args, { take: 12 });
   const list = result.fullProducts ?? [];
+  // 本次抽牌的有效条件原样回带：App 的「下一批」要拿它接着抽，
+  // 批次翻页不能靠模型重新猜条件。
+  const drawArgs = {
+    ...(String(args.query ?? '').trim() ? { query: String(args.query).trim() } : {}),
+    ...(MAJOR_CATEGORIES.includes(args.majorCategory)
+      ? { majorCategory: args.majorCategory }
+      : {}),
+    ...(Number.isFinite(Number(args.minPrice)) && args.minPrice != null
+      ? { minPrice: Number(args.minPrice) }
+      : {}),
+    ...(Number.isFinite(Number(args.maxPrice)) && args.maxPrice != null
+      ? { maxPrice: Number(args.maxPrice) }
+      : {}),
+    sort: ['price_asc', 'price_desc', 'rating'].includes(args.sort) ? args.sort : 'sales',
+  };
   if (list.length === 0) {
-    return { ...result, cards: [], fate: true };
+    return { ...result, cards: [], fate: true, drawArgs, hasMore: false };
   }
   const fate = list[0];
   const rest = list.slice(1);
@@ -287,6 +439,15 @@ async function drawStarCards(args) {
   }
   const roles = ['fate', 'encounter', 'linger'];
   const picked = unique.slice(0, 3);
+
+  // 每张牌的真实评价条数：功课段要报「看了 N 条评价」，数字从这来。
+  const reviewCounts = await Promise.all(
+    picked.map((item) =>
+      prisma.productReview.count({ where: { productId: item.id } }).catch(() => 0),
+    ),
+  );
+
+  const traitMap = computeTraits(picked);
   const cards = picked.map((item, index) => ({
     role: roles[index],
     id: item.id,
@@ -295,16 +456,41 @@ async function drawStarCards(args) {
     price: item.price,
     tag: item.tag,
     sales: item.sales,
+    rating: Number(item.rating ?? 0),
+    reviewCount: reviewCounts[index],
+    trait: traitMap.get(item.id) ?? '',
   }));
 
   return {
     ok: true,
     fate: picked.length >= 2,
     totalCount: result.totalCount,
+    // totalCount 是「扣掉已展示后还剩多少件匹配」，大于本批张数就是还有下一批
+    hasMore: (result.totalCount ?? 0) > picked.length,
+    drawArgs,
+    reviewTotal: reviewCounts.reduce((sum, n) => sum + n, 0),
     cards,
     fullProducts: picked,
     roles: picked.map((_, index) => roles[index]),
-    note: picked.length >= 3 ? '三张星牌：本命、遇见、余韵。请用两三句星愿笺引出，不要报库存编造。' : '货架这一层不足三件，按实际张数推荐。',
+    note: picked.length >= 3 ? '三张星牌：本命、遇见、余韵。每张牌的 trait 是系统按真实数据算好的特点句，讲牌时照它说，不要改数字、不要另编特点。' : '货架这一层不足三件，按实际张数推荐。',
+  };
+}
+
+// 批次翻页专用（App 点「下一批」时走 /api/chat/draw-batch 直达，不经模型）：
+// 输入同一套抽牌条件 + 已展示的 excludeIds，输出下一批三张与批次元数据。
+// 坑：excludeIds 必须把之前每一批都算上，漏了就会把看过的牌再端上来。
+export async function drawStarCardsBatch(args = {}) {
+  const result = await drawStarCards(args);
+  const traits = {};
+  for (const card of result.cards ?? []) traits[card.id] = card.trait;
+  return {
+    ok: result.ok !== false,
+    products: result.fullProducts ?? [],
+    roles: result.roles ?? [],
+    traits,
+    totalCount: result.totalCount ?? 0,
+    hasMore: Boolean(result.hasMore),
+    drawArgs: result.drawArgs ?? {},
   };
 }
 
@@ -368,6 +554,7 @@ async function getUserContext(userId) {
     newcomerClaimed: profile?.newcomerClaimed ?? false,
     memberMonthlyCouponClaimed: profile?.memberMonthlyCouponClaimed ?? false,
     unusedCoupons: coupons.map((row) => ({
+      id: row.templateId,
       title: row.template.title,
       discount: Number(row.template.discount),
       condition: row.template.condition,
@@ -461,6 +648,422 @@ async function webSearch(args, context) {
   return { ok: true, findings: text.slice(0, 3000) };
 }
 
+
+// ================= 办事工具（Agent 第二步「长手」） =================
+// 共同规矩：每个办事工具都返回一份 action 记录（办成 done / 没办成
+// failed + 人话原因），大脑循环把它发成 actions 事件、App 记进办事
+// 清单。没办成不许假装办成——failed 也是清单的一条（设计稿硬规矩）。
+// 输入：args 是模型给的参数，context 带 userId 与本轮共享的 turnState。
+// 坑：turnState 是「这一轮对话」的暂存（比如先记备注、后生成订单），
+// 跨轮不保留，不要拿它当长期记忆用。
+
+function turnStateOf(context) {
+  if (!context.turnState) context.turnState = {};
+  return context.turnState;
+}
+
+// 造一条清单记录：id 在一轮内递增不重复，App 按 id 更新同一条。
+function makeAction(context, fields) {
+  const turn = turnStateOf(context);
+  turn.actionSeq = (turn.actionSeq ?? 0) + 1;
+  return {
+    id: `a${turn.actionSeq}`,
+    status: 'done',
+    saved: 0,
+    ...fields,
+  };
+}
+
+function failedAction(context, type, title, failReason, target) {
+  return makeAction(context, {
+    type,
+    title,
+    detail: '',
+    status: 'failed',
+    failReason,
+    ...(target ? { target } : {}),
+  });
+}
+
+function money(value) {
+  const n = Number(value ?? 0);
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
+// 领券：按 templateId 反查它属于哪个领券组，走 coupons 路由同款核心
+// 逻辑（claimCouponGroupForUser），已领/领完/未到时间都如实失败。
+async function claimCoupon(args, context) {
+  const userId = context.userId;
+  const templateId = String(args.templateId ?? '').trim();
+  if (!userId) {
+    return { ok: false, action: failedAction(context, 'coupon', '领取优惠券', '用户未登录，领不了券') };
+  }
+  const template = templateId
+    ? await prisma.couponTemplate.findUnique({ where: { id: templateId } })
+    : null;
+  if (!template) {
+    return { ok: false, action: failedAction(context, 'coupon', '领取优惠券', '这张券不存在') };
+  }
+  const groupKey = Object.keys(CLAIM_GROUPS).find((key) => CLAIM_GROUPS[key].includes(templateId));
+  if (!groupKey) {
+    return {
+      ok: false,
+      action: failedAction(context, 'coupon', `领取${template.title}`, '这张券不能直接领取'),
+    };
+  }
+  const result = await claimCouponGroupForUser(userId, groupKey);
+  if (!result.ok) {
+    const reason =
+      result.status === 409 && result.error === '已领取过'
+        ? '这张券你已经领过了'
+        : result.error;
+    return {
+      ok: false,
+      action: failedAction(context, 'coupon', `领取${template.title}`, reason, { page: 'coupons' }),
+    };
+  }
+  const first = result.coupons[0];
+  const titles = result.coupons.map((c) => c.title).join('、');
+  return {
+    ok: true,
+    action: makeAction(context, {
+      type: 'coupon',
+      title: `已领取优惠券`,
+      detail: `${titles} · ${first?.condition ?? ''} · ${first?.expire ?? ''} 到期`,
+      target: { page: 'coupons' },
+    }),
+    note: '券已真实领取到账，可以在正文里告诉用户。',
+  };
+}
+
+// 加购：与购物车路由同一套写法（已有就累加数量，没有就新建，
+// spec 存商品自身规格文字、没规格存空字符串）。
+async function addToCart(args, context) {
+  const userId = context.userId;
+  const productId = String(args.productId ?? '').trim();
+  const quantity = Math.max(1, Number.parseInt(String(args.quantity ?? 1), 10) || 1);
+  const product = productId ? await prisma.product.findUnique({ where: { id: productId } }) : null;
+  if (!product) {
+    return { ok: false, action: failedAction(context, 'cart_add', '加入购物车', '商品不存在') };
+  }
+  // 找已有行用 findFirst 按（用户、商品、规格）匹配：购物车的唯一
+  // 约束是三字段的，findUnique 的复合键名写成 userId_productId 会在
+  // 运行时直接报错（购物车路由就踩过这个坑），findFirst 没这问题。
+  const existing = await prisma.cartItem.findFirst({
+    where: { userId, productId, spec: product.spec ?? '' },
+  });
+  let finalQty = quantity;
+  if (existing) {
+    finalQty = existing.quantity + quantity;
+    await prisma.cartItem.update({ where: { id: existing.id }, data: { quantity: finalQty } });
+  } else {
+    await prisma.cartItem.create({
+      data: { userId, productId, quantity, spec: product.spec ?? '' },
+    });
+  }
+  return {
+    ok: true,
+    fullProduct: serializeProduct(product),
+    action: makeAction(context, {
+      type: 'cart_add',
+      title: '已加入购物车',
+      detail: `${product.name} ×${finalQty} · ¥${money(product.price)}`,
+      target: { page: 'cart', productId },
+    }),
+  };
+}
+
+// 改购物车数量：quantity 是改完的目标值，0 = 移除。同一轮多次改量
+// 由大脑循环合并成清单里的一行，这里只管把这一件办对。
+async function updateCart(args, context) {
+  const userId = context.userId;
+  const productId = String(args.productId ?? '').trim();
+  const quantity = Number.parseInt(String(args.quantity ?? -1), 10);
+  const existing = productId
+    ? await prisma.cartItem.findFirst({
+        where: { userId, productId },
+        include: { product: true },
+        orderBy: { updatedAt: 'desc' },
+      })
+    : null;
+  if (!existing) {
+    return {
+      ok: false,
+      action: failedAction(context, 'cart_update', '调整购物车', '购物车里没有这件商品', { page: 'cart' }),
+    };
+  }
+  if (!Number.isFinite(quantity) || quantity < 0) {
+    return {
+      ok: false,
+      action: failedAction(context, 'cart_update', '调整购物车', '数量不对，没改成'),
+    };
+  }
+  if (quantity === 0) {
+    await prisma.cartItem.delete({ where: { id: existing.id } });
+  } else {
+    await prisma.cartItem.update({ where: { id: existing.id }, data: { quantity } });
+  }
+  return {
+    ok: true,
+    cartUpdateItem: { productId, name: existing.product.name, quantity },
+    action: makeAction(context, {
+      type: 'cart_update',
+      title: '已调整购物车',
+      detail:
+        quantity === 0
+          ? `${existing.product.name} 已移除`
+          : `${existing.product.name} 改为 ${quantity} 件`,
+      target: { page: 'cart', productId },
+    }),
+  };
+}
+
+// 收藏：已收藏过不算办成，如实记 failed（清单的信用靠这个）。
+async function addFavorite(args, context) {
+  const userId = context.userId;
+  const productId = String(args.productId ?? '').trim();
+  const product = productId ? await prisma.product.findUnique({ where: { id: productId } }) : null;
+  if (!product) {
+    return { ok: false, action: failedAction(context, 'favorite', '收藏商品', '商品不存在') };
+  }
+  const existing = await prisma.favorite.findUnique({
+    where: { userId_productId: { userId, productId } },
+  });
+  if (existing) {
+    return {
+      ok: false,
+      action: failedAction(context, 'favorite', `收藏${product.name}`, '这件你已经收藏过了', {
+        page: 'favorites',
+        productId,
+      }),
+    };
+  }
+  await prisma.favorite.create({ data: { userId, productId } });
+  return {
+    ok: true,
+    action: makeAction(context, {
+      type: 'favorite',
+      title: '已收藏',
+      detail: product.name,
+      target: { page: 'favorites', productId },
+    }),
+  };
+}
+
+// 写订单备注：先存进本轮 turnState，本轮稍后 create_order 自动带上；
+// 这一轮没生成订单，备注本身也是一条办成的事（结算时用户能接着用
+// 的说法不要许诺过头——正文只说「记下了，下单时会带上」）。
+async function setOrderNote(args, context) {
+  const text = String(args.text ?? '').trim().slice(0, 200);
+  if (!text) {
+    return { ok: false, action: failedAction(context, 'order_note', '写订单备注', '备注是空的，没记上') };
+  }
+  turnStateOf(context).note = text;
+  return {
+    ok: true,
+    action: makeAction(context, {
+      type: 'order_note',
+      title: '已写好订单备注',
+      detail: `「${text}」`,
+      target: { page: 'cart' },
+    }),
+  };
+}
+
+// 生成待付款订单：库存/地址/用券全部复用下单路由导出的同一套函数，
+// 与用户自己下单一个口径。只生成到待付款为止，付款留用户在清单里
+// 点「确认下单」（付款闸）。积分与趣玩币不在这里发——支付接口在
+// 付款成功时会发，这里再发就重复计了。
+async function createOrder(args, context) {
+  const userId = context.userId;
+  const items = Array.isArray(args.items) ? args.items : [];
+  const built = await buildLineItemsFromRequest(
+    items.map((item) => ({
+      productId: String(item?.productId ?? ''),
+      quantity: Math.max(1, Number(item?.quantity) || 1),
+    })),
+  );
+  if (built.error) {
+    return {
+      ok: false,
+      action: failedAction(context, 'order_create', '生成订单', built.error.message),
+    };
+  }
+  const lineItems = built.lineItems;
+  const subtotal = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+  // 用券：指定了就按指定的验；没指定就把未用的券挨个试一遍，
+  // 挑减得最多的一张——挑券的口径只认 resolveDiscount 的判定。
+  let discount = 0;
+  let usedTemplateId = null;
+  const wanted = String(args.couponTemplateId ?? '').trim();
+  if (wanted) {
+    const resolved = await resolveDiscount(userId, wanted, subtotal, lineItems);
+    if (resolved.error) {
+      return {
+        ok: false,
+        action: failedAction(context, 'order_create', '生成订单', resolved.error.message),
+      };
+    }
+    discount = resolved.discount ?? 0;
+    usedTemplateId = resolved.templateId ?? null;
+  } else {
+    const unused = await prisma.userCoupon.findMany({
+      where: { userId, used: false },
+      include: { template: true },
+    });
+    for (const row of unused) {
+      if (row.template.expireAt && new Date() > row.template.expireAt) continue;
+      const resolved = await resolveDiscount(userId, row.templateId, subtotal, lineItems);
+      if (!resolved.error && (resolved.discount ?? 0) > discount) {
+        discount = resolved.discount ?? 0;
+        usedTemplateId = resolved.templateId ?? null;
+      }
+    }
+  }
+
+  const address = await resolveAddress(userId, null);
+  if (!address) {
+    return {
+      ok: false,
+      action: failedAction(context, 'order_create', '生成订单', '还没有收货地址，先去加一个地址', {
+        page: 'addresses',
+      }),
+    };
+  }
+
+  const freight = 0;
+  const total = Math.max(0, subtotal - discount + freight);
+  const remark =
+    String(args.note ?? '').trim().slice(0, 200) || turnStateOf(context).note || null;
+  const orderNo = generateOrderNo();
+  const now = new Date();
+
+  const order = await prisma.$transaction(async (tx) => {
+    const created = await tx.order.create({
+      data: {
+        userId,
+        orderNo,
+        status: 'pending',
+        subtotal,
+        discount,
+        total,
+        addressName: address.name,
+        addressPhone: address.phone,
+        addressDetail: composeAddressDetailForOrder(address),
+        couponTemplateId: usedTemplateId,
+        paymentMethod: null,
+        paymentStatus: 'pending',
+        paidAt: null,
+        freight,
+        remark,
+        items: {
+          create: lineItems.map((item) => ({
+            productId: item.productId,
+            name: item.name,
+            quantity: item.quantity,
+            spec: item.spec ?? '',
+            imagePath: item.imagePath ?? null,
+            unitPrice: item.unitPrice,
+            subtotal: item.subtotal,
+          })),
+        },
+      },
+      include: { items: true },
+    });
+
+    // 订单里的商品从购物车里划掉（与下单路由的部分结算口径一致）
+    await tx.cartItem.deleteMany({
+      where: { userId, productId: { in: lineItems.map((item) => item.productId) } },
+    });
+
+    if (usedTemplateId) {
+      await tx.userCoupon.update({
+        where: { userId_templateId: { userId, templateId: usedTemplateId } },
+        data: { used: true, usedAt: now, orderId: created.id },
+      });
+    }
+
+    await tx.paymentTransaction.create({
+      data: {
+        orderId: created.id,
+        userId,
+        method: 'mock',
+        transactionNo: `MOCK${now.getTime()}${created.orderNo}`,
+        amount: total,
+        status: 'pending',
+        paidAt: null,
+      },
+    });
+
+    await tx.notification.create({
+      data: {
+        userId,
+        title: '待付款订单',
+        body: `订单 ${orderNo} 待支付，请尽快完成付款`,
+        type: 'order',
+        targetType: 'order',
+        targetId: created.id,
+      },
+    });
+
+    // 导购推荐回填：买了小豆推荐过的商品就标 ordered（失败不挡下单）
+    try {
+      await tx.guideRecommendation.updateMany({
+        where: {
+          userId,
+          productId: { in: lineItems.map((item) => item.productId) },
+          outcome: { in: ['recommended', 'clicked'] },
+        },
+        data: { outcome: 'ordered' },
+      });
+    } catch {
+      // 推荐记录是统计用途，写不上不回滚订单
+    }
+
+    return created;
+  });
+
+  const couponRow = usedTemplateId
+    ? await prisma.couponTemplate.findUnique({ where: { id: usedTemplateId } })
+    : null;
+  const firstName = lineItems[0]?.name ?? '';
+  const summary =
+    lineItems.length > 1 ? `${firstName} 等 ${lineItems.length} 件` : firstName;
+  return {
+    ok: true,
+    orderId: order.id,
+    orderNo,
+    total,
+    action: makeAction(context, {
+      type: 'order_create',
+      title: '已生成待付款订单',
+      detail: `订单 ${orderNo} · ${summary}`,
+      status: 'pending',
+      saved: discount,
+      payment: {
+        subtotal,
+        discount,
+        freight,
+        total,
+        ...(couponRow ? { couponTitle: couponRow.title } : {}),
+      },
+      target: { page: 'order', id: order.id, orderNo },
+    }),
+    note: '订单只是待付款，绝不能说已经付款或下单成功；把应付金额告诉用户，付款要他在清单卡里点「确认下单」。',
+  };
+}
+
+// 拼收货地址展示文字：与下单路由 composeAddressDetail 同口径
+// （新地址拆了省市区，订单快照仍存一整段文字）。
+function composeAddressDetailForOrder(address) {
+  if (!address) return null;
+  const parts = [address.province, address.city, address.district].filter(Boolean).join('');
+  const detail = address.detail ?? '';
+  if (parts && detail && !detail.startsWith(parts)) return parts + detail;
+  return detail || parts || null;
+}
+
 export async function executeXiaodouTool(name, rawArgs, context = {}) {
   const args = parseArgs(rawArgs);
   if (name === 'search_products') return searchProducts(args);
@@ -469,6 +1072,12 @@ export async function executeXiaodouTool(name, rawArgs, context = {}) {
   if (name === 'get_promotions') return getPromotions();
   if (name === 'get_user_context') return getUserContext(context.userId);
   if (name === 'propose_add_to_cart') return proposeAddToCart(args);
+  if (name === 'claim_coupon') return claimCoupon(args, context);
+  if (name === 'add_to_cart') return addToCart(args, context);
+  if (name === 'update_cart') return updateCart(args, context);
+  if (name === 'add_favorite') return addFavorite(args, context);
+  if (name === 'set_order_note') return setOrderNote(args, context);
+  if (name === 'create_order') return createOrder(args, context);
   if (name === 'get_weather') return getWeather(args, context);
   if (name === 'web_search') return webSearch(args, context);
   return { ok: false, error: `未知工具 ${name}` };
@@ -479,7 +1088,7 @@ export function toolResultForModel(name, result) {
     const { fullProducts, ...rest } = result;
     return JSON.stringify(rest);
   }
-  if (name === 'get_product_detail' || name === 'propose_add_to_cart') {
+  if (name === 'get_product_detail' || name === 'propose_add_to_cart' || name === 'add_to_cart') {
     const { fullProduct, ...rest } = result;
     return JSON.stringify(rest);
   }

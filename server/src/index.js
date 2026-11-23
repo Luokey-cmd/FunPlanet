@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { APP_KNOWLEDGE } from './app-knowledge.js';
 import { chatCompletion } from './deepseek.js';
 import { streamXiaodouAgent } from './utils/xiaodou-agent.js';
+import { drawStarCardsBatch } from './utils/xiaodou-tools.js';
 import { chatCompletionRaw } from './utils/openai-compatible.js';
 import { prisma } from './db.js';
 import { authRequired } from './middleware/auth.js';
@@ -265,7 +266,13 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
         if (Array.isArray(event.products) && event.products.length > 0) {
           recommendedProducts = event.products;
         }
-        res.write(`data: ${JSON.stringify({ type: event.type, products: event.products, roles: event.roles ?? [] })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: event.type, products: event.products, roles: event.roles ?? [], ...(event.batch ? { batch: event.batch } : {}) })}\n\n`);
+      } else if (event.type === 'actions') {
+        // 办事清单条目：办成一条推一条，App 实时往清单卡里追加；
+        // 不落云端聊天记录（清单只存用户手机本地，与设计稿一致）。
+        res.write(`data: ${JSON.stringify({ type: 'actions', action: event.action })}\n\n`);
+      } else if (event.type === 'homework') {
+        res.write(`data: ${JSON.stringify({ type: 'homework', entry: event.entry })}\n\n`);
       } else if (event.type === 'cart_confirm') {
         res.write(`data: ${JSON.stringify({ type: 'cart_confirm', products: event.products })}\n\n`);
       } else if (event.type === 'appraisal') {
@@ -296,6 +303,30 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
     console.error('[chat/stream]', error);
     res.write(`data: ${JSON.stringify({ error: error.message || '对话失败' })}\n\n`);
     res.end();
+  }
+});
+
+// 亮牌批次翻页：App 点「下一批」时直达这里，不经模型——拿上一批的
+// 抽牌条件 + 已展示的商品 id，接着抽下一批。纯查库，不需要 AI 钥匙。
+app.post('/api/chat/draw-batch', authRequired, async (req, res) => {
+  try {
+    const body = req.body ?? {};
+    const excludeIds = (Array.isArray(body.excludeIds) ? body.excludeIds : [])
+      .map((id) => String(id).trim())
+      .filter(Boolean)
+      .slice(0, 200);
+    const result = await drawStarCardsBatch({
+      query: typeof body.query === 'string' ? body.query : undefined,
+      majorCategory: typeof body.majorCategory === 'string' ? body.majorCategory : undefined,
+      minPrice: Number.isFinite(Number(body.minPrice)) && body.minPrice != null ? Number(body.minPrice) : undefined,
+      maxPrice: Number.isFinite(Number(body.maxPrice)) && body.maxPrice != null ? Number(body.maxPrice) : undefined,
+      sort: typeof body.sort === 'string' ? body.sort : undefined,
+      excludeIds,
+    });
+    res.json({ code: 0, message: 'ok', data: result });
+  } catch (error) {
+    console.error('[chat/draw-batch]', error);
+    res.status(500).json({ code: 500, message: error.message || '抽牌失败', data: null });
   }
 });
 

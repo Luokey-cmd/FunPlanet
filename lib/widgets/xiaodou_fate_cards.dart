@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../data/product_data.dart';
 import '../data/product_whispers.dart';
 import '../pages/checkout_page.dart';
+import '../pages/product_detail_page.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../theme/app_theme.dart';
@@ -10,23 +14,24 @@ import '../widgets/product_image.dart';
 import '../widgets/click_effect/app_buttons.dart';
 import 'holo_card.dart';
 
+/// 亮牌牌板（导购全流程拍 4/5）：三张牌翻着入场、明着亮出，
+/// 每张牌带一句按真实数据算好的特点；点一张牌先转牌再进详情页——
+/// 与开场动画最后一格的动作同一套语言，动画不能骗人。
+/// 批次切换由外层（XiaodouFateSection）换 key 重建本组件，
+/// 每换一批都会重新翻着入场。
 class XiaodouFateBoard extends StatefulWidget {
   const XiaodouFateBoard({
     super.key,
     required this.products,
     required this.roles,
-    this.flipped,
-    this.onFlip,
+    this.traits = const {},
   });
 
   final List<Product> products;
   final List<String> roles;
 
-  /// 可选的受控翻牌状态：外部传入时由外部决定哪些牌已翻开
-  /// （今日星签半屏层的「翻开这张牌」按钮用）；不传则维持原行为，
-  /// 由牌板自己记状态（小豆聊天里的用法不变）。
-  final Set<int>? flipped;
-  final ValueChanged<int>? onFlip;
+  /// 商品 id -> 特点句（服务端算好）；没有时退回旧的星语小句。
+  final Map<String, String> traits;
 
   @override
   State<XiaodouFateBoard> createState() => _XiaodouFateBoardState();
@@ -34,6 +39,7 @@ class XiaodouFateBoard extends StatefulWidget {
 
 class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
   final _flipped = <int>{};
+  final List<Timer> _timers = [];
 
   static const _labels = {'fate': '本命', 'encounter': '遇见', 'linger': '余韵'};
 
@@ -43,6 +49,28 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
     'encounter': HoloRarity.silver,
     'linger': HoloRarity.cosmos,
   };
+
+  @override
+  void initState() {
+    super.initState();
+    // 入场动效：三张牌依次翻着亮相（间隔 140ms），对齐转牌改版
+    // 「快旋入场」的节奏；定时器在组件销毁时全部取消，别留野回调。
+    for (var i = 0; i < widget.products.length; i++) {
+      _timers.add(
+        Timer(Duration(milliseconds: 120 + i * 140), () {
+          if (mounted) setState(() => _flipped.add(i));
+        }),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final timer in _timers) {
+      timer.cancel();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,14 +90,9 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
                 rarity:
                     _rarities[i < widget.roles.length ? widget.roles[i] : ''] ??
                     HoloRarity.gold,
-                flipped: (widget.flipped ?? _flipped).contains(i),
-                onFlip: () {
-                  if (widget.onFlip != null) {
-                    widget.onFlip!(i);
-                  } else {
-                    setState(() => _flipped.add(i));
-                  }
-                },
+                trait: widget.traits[widget.products[i].id],
+                flipped: _flipped.contains(i),
+                onFlip: () => setState(() => _flipped.add(i)),
               ),
             ),
           ],
@@ -79,13 +102,14 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
   }
 }
 
-class _FateCard extends StatelessWidget {
+class _FateCard extends StatefulWidget {
   const _FateCard({
     required this.product,
     required this.label,
     required this.rarity,
     required this.flipped,
     required this.onFlip,
+    this.trait,
   });
 
   final Product product;
@@ -93,19 +117,70 @@ class _FateCard extends StatelessWidget {
   final HoloRarity rarity;
   final bool flipped;
   final VoidCallback onFlip;
+  final String? trait;
+
+  @override
+  State<_FateCard> createState() => _FateCardState();
+}
+
+class _FateCardState extends State<_FateCard> with SingleTickerProviderStateMixin {
+  // 转牌：点中已亮出的牌，先 0.35 秒转到侧面（微微放大），再进详情页；
+  // 节奏对齐转牌改版 v2 的「约 0.6 秒快旋」前半段，详情页接住后半段。
+  late final AnimationController _turn = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 350),
+  );
+  bool _turning = false;
+
+  @override
+  void dispose() {
+    _turn.dispose();
+    super.dispose();
+  }
+
+  Future<void> _turnAndOpen() async {
+    if (_turning) return;
+    _turning = true;
+    await _turn.forward();
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ProductDetailPage(product: widget.product)),
+    );
+    if (mounted) {
+      _turn.reset();
+      _turning = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: AppScale.s(220),
-      child: HoloCard(
-        rarity: rarity,
-        flipped: flipped,
-        onTap: onFlip,
-        // 商品图窗口位置（分数）：光柱只在这个区域里流动
-        artWindow: const Rect.fromLTRB(0.05, 0.03, 0.95, 0.40),
-        front: _front(context),
-        back: _back(),
+    return AnimatedBuilder(
+      animation: _turn,
+      builder: (context, child) {
+        final angle = _turn.value * math.pi * 0.5;
+        final scale = 1 + 0.05 * math.sin(_turn.value * math.pi);
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.001)
+            ..rotateY(angle)
+            ..scaleByDouble(scale, scale, scale, 1),
+          child: child,
+        );
+      },
+      child: SizedBox(
+        height: AppScale.s(220),
+        child: HoloCard(
+          rarity: widget.rarity,
+          flipped: widget.flipped,
+          // 还没翻开（入场动画没轮到）时点它 = 提前翻开；
+          // 已亮出时点它 = 转牌进详情。
+          onTap: widget.flipped ? _turnAndOpen : widget.onFlip,
+          // 商品图窗口位置（分数）：光柱只在这个区域里流动
+          artWindow: const Rect.fromLTRB(0.05, 0.03, 0.95, 0.40),
+          front: _front(context),
+          back: _back(),
+        ),
       ),
     );
   }
@@ -119,7 +194,7 @@ class _FateCard extends StatelessWidget {
           colors: [Color(0xFF251E54), Color(0xFF171238), Color(0xFF110D2A)],
         ),
         borderRadius: BorderRadius.circular(AppScale.s(14)),
-        border: Border.all(color: rarity.border, width: 1.5),
+        border: Border.all(color: widget.rarity.border, width: 1.5),
       ),
       child: Stack(
         children: [
@@ -156,7 +231,7 @@ class _FateCard extends StatelessWidget {
                 ),
                 SizedBox(height: AppScale.s(10)),
                 Text(
-                  label,
+                  widget.label,
                   style: TextStyle(
                     fontFamily: AppTheme.fontFamily,
                     fontSize: AppScale.t(15),
@@ -201,7 +276,7 @@ class _FateCard extends StatelessWidget {
           colors: [Color(0xFF2E2364), Color(0xFF1A1440), Color(0xFF130F30)],
         ),
         borderRadius: BorderRadius.circular(AppScale.s(14)),
-        border: Border.all(color: rarity.border, width: 1.5),
+        border: Border.all(color: widget.rarity.border, width: 1.5),
       ),
       padding: EdgeInsets.all(AppScale.s(7)),
       child: Column(
@@ -227,7 +302,7 @@ class _FateCard extends StatelessWidget {
                       vertical: AppScale.s(2),
                     ),
                     decoration: BoxDecoration(
-                      color: rarity.glow,
+                      color: widget.rarity.glow,
                       borderRadius: BorderRadius.circular(99),
                       boxShadow: [
                         BoxShadow(
@@ -238,7 +313,7 @@ class _FateCard extends StatelessWidget {
                       ],
                     ),
                     child: Text(
-                      label,
+                      widget.label,
                       style: TextStyle(
                         fontSize: AppScale.t(10),
                         fontWeight: FontWeight.w700,
@@ -254,7 +329,7 @@ class _FateCard extends StatelessWidget {
           SizedBox(
             height: AppScale.s(44),
             child: Text(
-              product.name,
+              widget.product.name,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -269,7 +344,11 @@ class _FateCard extends StatelessWidget {
           SizedBox(
             height: AppScale.s(40),
             child: Text(
-              whisperFor(product.id),
+              // 特点句优先：服务端按真实数据算好的那句（口碑最好/价格最低…）；
+              // 老消息没有特点句时退回原来的星语小句。
+              (widget.trait != null && widget.trait!.isNotEmpty)
+                  ? widget.trait!
+                  : whisperFor(widget.product.id),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -284,18 +363,18 @@ class _FateCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '¥${product.price.toStringAsFixed(product.price.truncateToDouble() == product.price ? 0 : 2)}',
+                  '¥${widget.product.price.toStringAsFixed(widget.product.price.truncateToDouble() == widget.product.price ? 0 : 2)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: AppScale.t(13),
                     fontWeight: FontWeight.w800,
-                    color: rarity.glow,
+                    color: widget.rarity.glow,
                   ),
                 ),
               ),
               AppFilledButton(
-                onPressed: () => CheckoutPage.openBuyNow(context, product),
+                onPressed: () => CheckoutPage.openBuyNow(context, widget.product),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   padding: EdgeInsets.symmetric(horizontal: AppScale.s(12)),
@@ -322,6 +401,7 @@ class _FateCard extends StatelessWidget {
   // 图窗内容：深紫底打底，商品图裁剪填满（cover），不再露白板；
   // 无图商品用商品色块 + 图标兜底。
   Widget _artwork() {
+    final product = widget.product;
     if (product.imagePath.isEmpty) {
       final bg = product.imageColor ?? AppColors.secondary;
       return Container(

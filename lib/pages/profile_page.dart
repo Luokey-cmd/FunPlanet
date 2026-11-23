@@ -13,6 +13,7 @@ import '../widgets/starwish_dossier_sheet.dart';
 import '../widgets/sparkle_background.dart';
 import '../widgets/user_avatar_image.dart';
 import 'orders_sheet.dart';
+import 'xiaodou_records_page.dart';
 import 'ai_community_page.dart';
 import 'ai_paint_page.dart';
 import 'profile_edit_page.dart';
@@ -1001,6 +1002,35 @@ class _ContentSection extends StatelessWidget {
             _ServiceRow(
               items: _items,
               onTap: (label) => _handleTap(context, label),
+            ),
+            SizedBox(height: _ps(10)),
+            Divider(height: 1, color: AppColors.border.withValues(alpha: 0.7)),
+            // 小豆办事记录入口（Agent 第二步）：整行可点，进汇总页
+            InkWell(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const XiaodouRecordsPage()),
+              ),
+              child: Padding(
+                padding: EdgeInsets.only(top: _ps(10)),
+                child: Row(
+                  children: [
+                    Icon(Icons.receipt_long_outlined, size: _ps(19), color: AppColors.primary),
+                    SizedBox(width: _ps(8)),
+                    Expanded(
+                      child: Text(
+                        '小豆办事记录',
+                        style: TextStyle(fontSize: _pt(13), fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    Text(
+                      '小豆替你办过的事都在这',
+                      style: TextStyle(fontSize: _pt(11), color: AppColors.mutedForeground),
+                    ),
+                    Icon(Icons.chevron_right, size: _ps(16), color: AppColors.mutedForeground),
+                  ],
+                ),
+              ),
             ),
           ],
         ),

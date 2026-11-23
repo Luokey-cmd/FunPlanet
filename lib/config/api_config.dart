@@ -17,7 +17,7 @@ class ApiConfig {
     const fromEnv = String.fromEnvironment('API_BASE_URL');
     if (fromEnv.isNotEmpty) return [fromEnv];
 
-    if (kIsWeb) return ['http://127.0.0.1:3000'];
+    if (kIsWeb) return ['http://127.0.0.1:3200'];
 
     if (Platform.isAndroid) {
       if (kReleaseMode) {
@@ -34,7 +34,7 @@ class ApiConfig {
         '10.0.2.2',
         if (kLocalApiHostOverride.trim().isNotEmpty) kLocalApiHostOverride.trim(),
       ];
-      final urls = hosts.map((h) => 'http://$h:3000').toList();
+      final urls = hosts.map((h) => 'http://$h:3200').toList();
       final production = kProductionApiBaseUrl.trim();
       if (production.isNotEmpty && !urls.contains(production)) {
         urls.add(production);
@@ -42,7 +42,7 @@ class ApiConfig {
       return urls;
     }
 
-    return ['http://127.0.0.1:3000'];
+    return ['http://127.0.0.1:3200'];
   }
 
   static Future<String> baseUrl() async {

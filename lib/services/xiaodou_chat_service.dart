@@ -5,10 +5,50 @@ import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
 import '../data/product_data.dart';
+import '../models/agent_records.dart';
 import '../models/chat_message.dart';
 import 'token_storage.dart';
 
-enum XiaodouStreamKind { text, products, fate, cart, appraisal, giftNote, thinking, status }
+enum XiaodouStreamKind { text, products, fate, cart, appraisal, giftNote, thinking, status, actions, homework }
+
+/// 一批亮牌的元数据（服务端 fate_cards 事件的 batch 字段）：
+/// 一共有多少件匹配、还有没有下一批、本批的抽牌条件、每张牌的特点句。
+class FateBatchMeta {
+  const FateBatchMeta({
+    required this.totalCount,
+    required this.hasMore,
+    required this.drawArgs,
+    required this.traits,
+  });
+
+  final int totalCount;
+  final bool hasMore;
+  final Map<String, dynamic> drawArgs;
+  final Map<String, String> traits;
+
+  factory FateBatchMeta.fromJson(Map<String, dynamic> json) {
+    return FateBatchMeta(
+      totalCount: json['totalCount'] as int? ?? 0,
+      hasMore: json['hasMore'] as bool? ?? false,
+      drawArgs: (json['drawArgs'] as Map<String, dynamic>?) ?? const {},
+      traits: (json['traits'] as Map<dynamic, dynamic>? ?? {})
+          .map((key, value) => MapEntry('$key', '$value')),
+    );
+  }
+}
+
+/// draw-batch 接口的返回：下一批三张牌 + 批次元数据（不经模型，纯查库）。
+class FateBatchResult {
+  const FateBatchResult({
+    required this.products,
+    required this.roles,
+    required this.meta,
+  });
+
+  final List<Product> products;
+  final List<String> roles;
+  final FateBatchMeta meta;
+}
 
 class XiaodouStreamEvent {
   const XiaodouStreamEvent._({
@@ -18,6 +58,9 @@ class XiaodouStreamEvent {
     this.pendingCart = const [],
     this.roles = const [],
     this.vision,
+    this.batch,
+    this.action,
+    this.homeworkEntry,
   });
 
   factory XiaodouStreamEvent.text(String content) =>
@@ -26,8 +69,16 @@ class XiaodouStreamEvent {
   factory XiaodouStreamEvent.products(List<Product> products) =>
       XiaodouStreamEvent._(kind: XiaodouStreamKind.products, products: products);
 
-  factory XiaodouStreamEvent.fate(List<Product> products, List<String> roles) =>
-      XiaodouStreamEvent._(kind: XiaodouStreamKind.fate, products: products, roles: roles);
+  factory XiaodouStreamEvent.fate(List<Product> products, List<String> roles, {FateBatchMeta? batch}) =>
+      XiaodouStreamEvent._(kind: XiaodouStreamKind.fate, products: products, roles: roles, batch: batch);
+
+  // 办事清单条目（办成一条推一条，App 按 id 追加或覆盖同一条）。
+  factory XiaodouStreamEvent.action(AgentAction action) =>
+      XiaodouStreamEvent._(kind: XiaodouStreamKind.actions, action: action);
+
+  // 功课段条目（小豆做功课的过程，带真实数字）。
+  factory XiaodouStreamEvent.homework(HomeworkEntry entry) =>
+      XiaodouStreamEvent._(kind: XiaodouStreamKind.homework, homeworkEntry: entry);
 
   factory XiaodouStreamEvent.cartConfirm(List<Product> pendingCart) =>
       XiaodouStreamEvent._(kind: XiaodouStreamKind.cart, pendingCart: pendingCart);
@@ -52,6 +103,9 @@ class XiaodouStreamEvent {
   final List<Product> pendingCart;
   final List<String> roles;
   final Map<String, String>? vision;
+  final FateBatchMeta? batch;
+  final AgentAction? action;
+  final HomeworkEntry? homeworkEntry;
 }
 
 // 云端会话摘要（服务端 AiChatConversation）：和手机本地记录是两套，
@@ -212,9 +266,30 @@ class XiaodouChatService {
               yield XiaodouStreamEvent.cartConfirm(list);
             } else if (type == 'fate_cards') {
               final roles = (json['roles'] as List<dynamic>? ?? []).map((e) => '$e').toList();
-              yield XiaodouStreamEvent.fate(list, roles);
+              final rawBatch = json['batch'];
+              yield XiaodouStreamEvent.fate(
+                list,
+                roles,
+                batch: rawBatch is Map<String, dynamic> ? FateBatchMeta.fromJson(rawBatch) : null,
+              );
             } else {
               yield XiaodouStreamEvent.products(list);
+            }
+            continue;
+          }
+
+          if (type == 'actions') {
+            final rawAction = json['action'];
+            if (rawAction is Map<String, dynamic>) {
+              yield XiaodouStreamEvent.action(AgentAction.fromJson(rawAction));
+            }
+            continue;
+          }
+
+          if (type == 'homework') {
+            final rawEntry = json['entry'];
+            if (rawEntry is Map<String, dynamic>) {
+              yield XiaodouStreamEvent.homework(HomeworkEntry.fromJson(rawEntry));
             }
             continue;
           }
@@ -252,6 +327,43 @@ class XiaodouChatService {
         }
       }
     }
+  }
+
+  // 亮牌「下一批」：把抽牌条件与已展示的商品 id 发给服务端接着抽，
+  // 不经模型、没有等待思考的过程，点完就出牌。
+  Future<FateBatchResult> drawBatch({
+    required Map<String, dynamic> args,
+    required List<String> excludeIds,
+  }) async {
+    final base = await ApiConfig.baseUrl();
+    final token = await _tokenStorage.loadToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('请先登录后再使用小豆');
+    }
+    final response = await _client
+        .post(
+          Uri.parse('$base/api/chat/draw-batch'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({...args, 'excludeIds': excludeIds}),
+        )
+        .timeout(const Duration(seconds: 30));
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      throw Exception(decoded['message'] as String? ?? '抽牌失败 (${response.statusCode})');
+    }
+    final data = decoded['data'] as Map<String, dynamic>? ?? {};
+    final products = (data['products'] as List<dynamic>? ?? [])
+        .map((item) => Product.fromJson(item as Map<String, dynamic>))
+        .toList();
+    final roles = (data['roles'] as List<dynamic>? ?? []).map((e) => '$e').toList();
+    return FateBatchResult(
+      products: products,
+      roles: roles,
+      meta: FateBatchMeta.fromJson(data),
+    );
   }
 
   Map<String, String>? _stringMap(dynamic raw) {

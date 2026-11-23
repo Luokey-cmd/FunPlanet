@@ -56,7 +56,7 @@ function composeAddressDetail(address) {
 
 const router = Router();
 
-async function buildLineItemsFromRequest(requestedItems) {
+export async function buildLineItemsFromRequest(requestedItems) {
   const normalized = requestedItems
     .map((item) => ({
       productId: String(item?.productId ?? '').trim(),
@@ -102,7 +102,7 @@ async function buildLineItemsFromRequest(requestedItems) {
   return { lineItems };
 }
 
-async function resolveAddress(userId, addressId) {
+export async function resolveAddress(userId, addressId) {
   if (addressId) {
     return prisma.address.findFirst({ where: { id: addressId, userId } });
   }
@@ -112,7 +112,9 @@ async function resolveAddress(userId, addressId) {
   });
 }
 
-async function resolveDiscount(userId, couponTemplateId, subtotal, lineItems = []) {
+// 下面三个函数除了下单路由自己用，小豆的办事工具（生成待付款订单）也 import 它们，
+// 保证 Agent 下单与用户自己下单是同一套库存/地址/用券口径，不要在工具里另写一份。
+export async function resolveDiscount(userId, couponTemplateId, subtotal, lineItems = []) {
   if (!couponTemplateId) return { discount: 0, templateId: null };
 
   const userCoupon = await prisma.userCoupon.findUnique({

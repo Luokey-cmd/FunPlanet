@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../models/agent_records.dart';
 import '../models/chat_message.dart';
 import '../providers/cart_provider.dart';
+import '../providers/order_provider.dart';
 import '../providers/starwish_profile_provider.dart';
 import '../providers/xiaodou_chat_provider.dart';
 import '../theme/app_colors.dart';
@@ -19,7 +21,8 @@ import '../widgets/floating_ai_assistant.dart';
 import '../widgets/product_image.dart';
 import '../widgets/sparkle_background.dart';
 import '../widgets/starwish_dossier_sheet.dart';
-import '../widgets/xiaodou_fate_cards.dart';
+import '../widgets/xiaodou_agent_card.dart';
+import '../widgets/xiaodou_fate_section.dart';
 import '../widgets/xiaodou_home.dart';
 import '../widgets/xiaodou_product_card.dart';
 
@@ -470,11 +473,44 @@ class _MessageListState extends State<_MessageList> {
             final message = chat.messages[msgIndex];
             final showRecommend = message.hasProducts &&
                 !chat.messages.skip(msgIndex + 1).any((item) => item.hasProducts);
-            return _MessageBubble(message: message, showRecommendActions: showRecommend);
+            return _MessageBubble(message: message, msgIndex: msgIndex, showRecommendActions: showRecommend);
           },
         ),
       ),
     );
+  }
+}
+
+/// 清单卡里点「确认下单」：走订单原有的支付接口，付成后把清单
+/// 那条翻成已办好；付不成把原因如实弹给用户，订单仍是待付款、
+/// 可以去订单页再付。返回是否付成（卡片据此收起付款闸）。
+Future<bool> _payAgentOrder(BuildContext context, int msgIndex, AgentAction action) async {
+  final orderId = action.target['id'];
+  if (orderId == null || orderId.isEmpty) return false;
+  try {
+    await context.read<OrderProvider>().payOrder(orderId);
+    if (!context.mounted) return true;
+    context.read<XiaodouChatProvider>().markActionPaid(msgIndex, action.id);
+    showTopSnackBar(
+      context,
+      content: Text(
+        '付款成功，订单备货中',
+        style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600, color: Colors.white),
+      ),
+    );
+    return true;
+  } catch (e) {
+    if (context.mounted) {
+      showTopSnackBar(
+        context,
+        backgroundColor: const Color(0xFFDC2626),
+        content: Text(
+          '付款没成：${e.toString().replaceFirst('Exception: ', '')}',
+          style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600, color: Colors.white),
+        ),
+      );
+    }
+    return false;
   }
 }
 
@@ -487,9 +523,13 @@ String _thinkingTail(String thinking) {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, this.showRecommendActions = false});
+  const _MessageBubble({required this.message, required this.msgIndex, this.showRecommendActions = false});
 
   final ChatMessage message;
+
+  /// 这条消息在会话里的下标（不是列表下标，首页占位时差一位，
+  /// 由列表构建处换算好传进来）；亮牌翻页与清单付款都按它定位。
+  final int msgIndex;
   final bool showRecommendActions;
 
   @override
@@ -604,7 +644,27 @@ class _MessageBubble extends StatelessWidget {
                         if (message.awaitVisionChoice) _VisionChoice(message: message, enabled: !sending),
                         if (message.hasProducts) ...[
                           if (message.isFate)
-                            XiaodouFateBoard(products: message.products, roles: message.starRoles)
+                            XiaodouFateSection(
+                              message: message,
+                              loadingBatch: context.watch<XiaodouChatProvider>().isBatchLoading(msgIndex),
+                              onPrev: () => context
+                                  .read<XiaodouChatProvider>()
+                                  .setFateBatchIndex(msgIndex, message.fateIndex - 1),
+                              onNext: () {
+                                final chat = context.read<XiaodouChatProvider>();
+                                final batchCount = message.fateBatches.isNotEmpty
+                                    ? message.fateBatches.length
+                                    : 1;
+                                if (message.fateIndex < batchCount - 1) {
+                                  chat.setFateBatchIndex(msgIndex, message.fateIndex + 1);
+                                } else {
+                                  chat.nextFateBatch(msgIndex);
+                                }
+                              },
+                              onRefilter: ({int? maxPrice, String? sort}) => context
+                                  .read<XiaodouChatProvider>()
+                                  .refilterFate(msgIndex, maxPrice: maxPrice, sort: sort),
+                            )
                           else ...[
                             ...message.products.map((product) => XiaodouProductCard(product: product)),
                             if (showRecommendActions) _RecommendActions(enabled: !sending),
@@ -612,6 +672,13 @@ class _MessageBubble extends StatelessWidget {
                         ],
                         if (message.giftNote != null && message.giftNote!.isNotEmpty)
                           _GiftNote(text: message.giftNote!),
+                        if (message.hasAgentCard)
+                          XiaodouAgentCard(
+                            homework: message.homework,
+                            actions: message.actions,
+                            onTarget: (action) => openAgentActionTarget(context, action),
+                            onPay: (action) => _payAgentOrder(context, msgIndex, action),
+                          ),
                       ],
                     ),
             ),
