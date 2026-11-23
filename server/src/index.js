@@ -165,6 +165,50 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/changelog', changelogRoutes);
 
 // 小豆聊天历史：会话列表与某会话的消息（App 以后做「历史会话」页直接读这里；现在先保证数据有存）
+// 进门盘点（Agent 第三步「长记性」，hx 2026-11-23 定）：小豆页打开时
+// 先替用户盘一遍没办完的事——还没付款的订单、快要过期的券。
+// 只报数据库里真有的，没有就回空数组，App 那头没事就不出声、不打扰。
+app.get('/api/chat/briefing', authRequired, async (req, res) => {
+  const userId = req.user.sub;
+  const now = new Date();
+  const in72h = new Date(now.getTime() + 72 * 3600 * 1000);
+  const [pendingOrders, expiringCoupons] = await Promise.all([
+    prisma.order.findMany({
+      where: { userId, status: 'pending' },
+      orderBy: { createdAt: 'asc' },
+      take: 3,
+      include: { items: { select: { name: true, quantity: true } } },
+    }),
+    prisma.userCoupon.findMany({
+      where: {
+        userId,
+        used: false,
+        template: { expireAt: { gt: now, lte: in72h } },
+      },
+      orderBy: { template: { expireAt: 'asc' } },
+      take: 3,
+      include: { template: true },
+    }),
+  ]);
+  const matters = [
+    ...pendingOrders.map((o) => ({
+      kind: 'pending_order',
+      orderId: o.id,
+      orderNo: o.orderNo,
+      total: Number(o.total),
+      summary: o.items.map((i) => `${i.name} ×${i.quantity}`).join('、'),
+      createdAt: o.createdAt.toISOString(),
+    })),
+    ...expiringCoupons.map((c) => ({
+      kind: 'expiring_coupon',
+      title: c.template.title,
+      condition: c.template.condition,
+      expireAt: c.template.expireAt.toISOString(),
+    })),
+  ];
+  res.json({ code: 0, message: 'ok', data: { matters } });
+});
+
 app.get('/api/chat/conversations', authRequired, async (req, res) => {
   const rows = await prisma.aiChatConversation.findMany({
     where: { userId: req.user.sub },

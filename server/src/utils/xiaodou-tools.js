@@ -6,6 +6,8 @@ import { streamChatEvents } from './openai-compatible.js';
 import { CLAIM_GROUPS, claimCouponGroupForUser } from '../routes/coupons.js';
 import {
   buildLineItemsFromRequest,
+  cancelOrderForUser,
+  createAfterSaleForUser,
   resolveAddress,
   resolveDiscount,
 } from '../routes/orders.js';
@@ -239,6 +241,71 @@ export const XIAODOU_TOOLS = [
           },
         },
         required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_my_orders',
+      description:
+        '查用户自己的订单（最近 5 笔：状态、金额、买了什么、快递公司与单号）。用户问「我的订单」「快递到哪了」「买的东西发货没」时调用；订单只信这个工具，不要编。',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'cancel_order',
+      description:
+        '用户明确说要取消某一笔订单时调用：真的取消（待付款和已付款未发货的能取消，已付款的款会原路退回）。orderId 用 get_my_orders 返回的 id，先查再取消，别猜。取消是大事：用户没明说取消哪一笔时，先问清楚，不要自己挑一笔取消。',
+      parameters: {
+        type: 'object',
+        properties: {
+          orderId: { type: 'string', description: '订单 id（get_my_orders 返回的 id）' },
+          reason: { type: 'string', description: '取消原因，用户说了才填' },
+        },
+        required: ['orderId'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'apply_after_sale',
+      description:
+        '用户要给某一笔已付款/已发货/已完成的订单申请售后（退款、退货）时调用：真的提交售后申请等后台处理。orderId 用 get_my_orders 返回的 id；reason 必填，用户没说原因先问一句，别替他编。',
+      parameters: {
+        type: 'object',
+        properties: {
+          orderId: { type: 'string', description: '订单 id（get_my_orders 返回的 id）' },
+          type: {
+            type: 'string',
+            description: 'refund 仅退款 / return 退货退款，用户没明说默认 refund',
+          },
+          reason: { type: 'string', description: '售后原因，用户亲口说的' },
+          description: { type: 'string', description: '补充说明，可空' },
+        },
+        required: ['orderId', 'reason'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'suggest_options',
+      description:
+        '你这一轮要向用户提一个问题时，同时调用这个工具，把 3~4 个用户最可能点的短回答交出来，界面会把它们挂成按钮在他点选（省得打字）。规矩：只有提问的那一轮才调用，陈述、亮牌、办事的轮次绝不调用；一次只问一个问题，选项必须全是这一个问题的回答；每个选项不超过 8 个字、写成用户会说出口的话（如「送朋友」「自己留着」「100 元以内」）；结合他刚说的话和档案给，别给万金油选项。',
+      parameters: {
+        type: 'object',
+        properties: {
+          options: {
+            type: 'array',
+            description: '3~4 个短选项',
+            items: { type: 'string' },
+          },
+        },
+        required: ['options'],
       },
     },
   },
@@ -718,6 +785,30 @@ async function claimCoupon(args, context) {
       result.status === 409 && result.error === '已领取过'
         ? '这张券你已经领过了'
         : result.error;
+    // 换方案：想要的那张领不成（已领过/已领完）时，别把失败直接甩给
+    // 用户——把其他领券组挨个试一遍，第一张能领的自动换领，并在
+    // 清单和给模型的说明里如实交代换了（hx 2026-11-23 定的办事规矩）。
+    const swappable =
+      result.status === 409 || /领完|领取完|抢完/.test(String(result.error ?? ''));
+    if (swappable) {
+      for (const otherKey of Object.keys(CLAIM_GROUPS)) {
+        if (otherKey === groupKey) continue;
+        const alt = await claimCouponGroupForUser(userId, otherKey);
+        if (!alt.ok) continue;
+        const altTitles = alt.coupons.map((c) => c.title).join('、');
+        const altFirst = alt.coupons[0];
+        return {
+          ok: true,
+          action: makeAction(context, {
+            type: 'coupon',
+            title: '已领取优惠券',
+            detail: `${altTitles} · ${altFirst?.condition ?? ''} · ${altFirst?.expire ?? ''} 到期`,
+            target: { page: 'coupons' },
+          }),
+          note: `原想领的「${template.title}」没领成（${reason}），已自动换领上面这张可用券，正文里要如实告诉用户换了、别装作领的是原来那张。`,
+        };
+      }
+    }
     return {
       ok: false,
       action: failedAction(context, 'coupon', `领取${template.title}`, reason, { page: 'coupons' }),
@@ -762,13 +853,18 @@ async function addToCart(args, context) {
       data: { userId, productId, quantity, spec: product.spec ?? '' },
     });
   }
+  // 复查：写完回读购物车这一行，清单里的数量以库里真实存下的为准。
+  const savedRow = await prisma.cartItem.findFirst({
+    where: { userId, productId, spec: product.spec ?? '' },
+  });
+  const shownQty = savedRow?.quantity ?? finalQty;
   return {
     ok: true,
     fullProduct: serializeProduct(product),
     action: makeAction(context, {
       type: 'cart_add',
       title: '已加入购物车',
-      detail: `${product.name} ×${finalQty} · ¥${money(product.price)}`,
+      detail: `${product.name} ×${shownQty} · ¥${money(product.price)}`,
       target: { page: 'cart', productId },
     }),
   };
@@ -1033,6 +1129,31 @@ async function createOrder(args, context) {
   const couponRow = usedTemplateId
     ? await prisma.couponTemplate.findUnique({ where: { id: usedTemplateId } })
     : null;
+  // 复查：订单落库后回读一遍，汇报的金额以数据库里真实存下的为准——
+  // 办完不复查是开环；万一对不上，按库里的数改口并留一条警告日志。
+  let verifiedTotal = total;
+  let verifiedDiscount = discount;
+  try {
+    const saved = await prisma.order.findUnique({
+      where: { id: order.id },
+      select: { total: true, discount: true },
+    });
+    if (saved) {
+      verifiedTotal = Number(saved.total);
+      verifiedDiscount = Number(saved.discount);
+      if (
+        Math.abs(verifiedTotal - total) > 0.001 ||
+        Math.abs(verifiedDiscount - discount) > 0.001
+      ) {
+        log.warn(
+          '小豆',
+          `建单复查金额对不上：订单 ${orderNo} 本地算应付 ¥${total}，库里是 ¥${verifiedTotal}，按库里的汇报`,
+        );
+      }
+    }
+  } catch {
+    // 复查读不到不挡汇报，用本地算的数（与改造前的行为一致）
+  }
   const firstName = lineItems[0]?.name ?? '';
   const summary =
     lineItems.length > 1 ? `${firstName} 等 ${lineItems.length} 件` : firstName;
@@ -1040,7 +1161,7 @@ async function createOrder(args, context) {
     ok: true,
     orderId: order.id,
     orderNo,
-    total,
+    total: verifiedTotal,
     action: makeAction(context, {
       type: 'order_create',
       title: '已生成待付款订单',
@@ -1049,14 +1170,14 @@ async function createOrder(args, context) {
       saved: discount,
       payment: {
         subtotal,
-        discount,
+        discount: verifiedDiscount,
         freight,
-        total,
+        total: verifiedTotal,
         ...(couponRow ? { couponTitle: couponRow.title } : {}),
       },
       target: { page: 'order', id: order.id, orderNo },
     }),
-    note: '订单只是待付款，绝不能说已经付款或下单成功；把应付金额告诉用户，付款要他在清单卡里点「确认下单」。',
+    note: '订单只是待付款，绝不能说已经付款或下单成功；把应付金额告诉用户，付款要他在清单卡里点「确认下单」。金额已回读数据库复核过，照 total 说。',
   };
   turn.orderResult = result;
   return result;
@@ -1082,6 +1203,7 @@ const GUIDE_TOOL_NAMES = new Set([
   'get_product_detail',
   'get_promotions',
   'get_user_context',
+  'get_my_orders',
   'get_weather',
   'web_search',
 ]);
@@ -1103,9 +1225,144 @@ const TOOL_LABELS = {
   add_favorite: '收藏商品',
   set_order_note: '写订单备注',
   create_order: '生成订单',
+  get_my_orders: '查我的订单',
+  cancel_order: '取消订单',
+  apply_after_sale: '申请售后',
+  suggest_options: '给出选项',
   get_weather: '查天气',
   web_search: '联网搜索',
 };
+
+// 订单状态的人话说法：给模型和清单看，别把 pending 这种内部词漏出去。
+const ORDER_STATUS_TEXT = {
+  pending: '待付款',
+  paid: '待发货',
+  shipping: '已发货，运输中',
+  completed: '已完成',
+  cancelled: '已取消',
+};
+
+// 查我的订单：只读工具，不记办事清单。返回最近 5 笔的骨架信息，
+// 物流只报库里真有的快递公司和单号，没发货就没单号、如实说。
+async function getMyOrders(args, context) {
+  const userId = context.userId;
+  if (!userId) return { ok: false, error: '用户未登录，查不了订单' };
+  const rows = await prisma.order.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: 5,
+    include: { items: { select: { name: true, quantity: true } } },
+  });
+  const orders = rows.map((row) => ({
+    id: row.id,
+    orderNo: row.orderNo,
+    status: ORDER_STATUS_TEXT[row.status] ?? row.status,
+    total: money(row.total),
+    items: row.items.map((item) => `${item.name} ×${item.quantity}`).join('、'),
+    createdAt: row.createdAt.toISOString().slice(0, 16).replace('T', ' '),
+    ...(row.shippingCompany ? { shippingCompany: row.shippingCompany } : {}),
+    ...(row.trackingNo ? { trackingNo: row.trackingNo } : {}),
+  }));
+  return {
+    ok: true,
+    orders,
+    note: orders.length
+      ? '这就是他最近的订单，状态和物流只照这里说；要取消或售后，用对应订单的 id 调工具。'
+      : '他还没有任何订单，如实告诉他。',
+  };
+}
+
+// 取消订单：走订单路由抽出的同一份核心逻辑（cancelOrderForUser），
+// 回补库存、退款标记的口径与用户自己在订单页取消完全一致。
+async function cancelOrder(args, context) {
+  const userId = context.userId;
+  const orderId = String(args.orderId ?? '').trim();
+  if (!userId) {
+    return { ok: false, action: failedAction(context, 'order_cancel', '取消订单', '用户未登录，取消不了') };
+  }
+  if (!orderId) {
+    return { ok: false, action: failedAction(context, 'order_cancel', '取消订单', '没指明要取消哪一笔订单') };
+  }
+  const result = await cancelOrderForUser(userId, orderId, args.reason);
+  if (!result.ok) {
+    return {
+      ok: false,
+      action: failedAction(context, 'order_cancel', '取消订单', result.error, { page: 'order' }),
+    };
+  }
+  const order = result.order;
+  return {
+    ok: true,
+    action: makeAction(context, {
+      type: 'order_cancel',
+      title: '已取消订单',
+      detail: result.wasPaid
+        ? `订单 ${order.orderNo} · 已付款，款项已原路退回（模拟支付即时到账）`
+        : `订单 ${order.orderNo} · 待付款订单已作废`,
+      target: { page: 'order', id: order.id, orderNo: order.orderNo },
+    }),
+    note: '订单已真实取消，可以在正文里告诉用户。',
+  };
+}
+
+// 申请售后：同样走订单路由抽出的核心逻辑（createAfterSaleForUser），
+// 状态可申请范围、重复申请拦截与订单页里自己申请完全一致。
+async function applyAfterSale(args, context) {
+  const userId = context.userId;
+  const orderId = String(args.orderId ?? '').trim();
+  if (!userId) {
+    return { ok: false, action: failedAction(context, 'after_sale', '申请售后', '用户未登录，申请不了') };
+  }
+  if (!orderId) {
+    return { ok: false, action: failedAction(context, 'after_sale', '申请售后', '没指明要给哪一笔订单申请售后') };
+  }
+  const result = await createAfterSaleForUser(userId, orderId, {
+    type: args.type,
+    reason: args.reason,
+    description: args.description,
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      action: failedAction(context, 'after_sale', '申请售后', result.error, { page: 'order' }),
+    };
+  }
+  const order = result.order;
+  return {
+    ok: true,
+    action: makeAction(context, {
+      type: 'after_sale',
+      title: '已提交售后申请',
+      detail: `订单 ${order.orderNo} · ${result.request.type === 'return' ? '退货退款' : '仅退款'} · 等待处理`,
+      target: { page: 'order', id: order.id, orderNo: order.orderNo },
+    }),
+    note: '售后申请已真实提交，可以在正文里告诉用户等后台处理。',
+  };
+}
+
+// 给出选项：模型提问时自带短选项，服务端只做清洗（去空、去重、
+// 截断、限量），不记办事清单、不算办事。清洗后不足 2 个当没给，
+// 外层会走事后补生成的安全网。
+function suggestOptions(args) {
+  const seen = new Set();
+  const options = [];
+  for (const raw of Array.isArray(args.options) ? args.options : []) {
+    const text = String(raw ?? '').trim().replace(/\s+/g, ' ');
+    if (!text || text.length > 12 || seen.has(text)) continue;
+    seen.add(text);
+    options.push(text);
+    if (options.length >= 4) break;
+  }
+  if (options.length < 2) {
+    return { ok: false, quiet: true, error: '选项不足两个，已忽略' };
+  }
+  return {
+    ok: true,
+    quiet: true,
+    suggestedOptions: options,
+    note: '选项已收下，会挂在你这句问话下面给他点；正文里只管把问题问清楚，不要把选项再念一遍。',
+  };
+}
 
 // 工具统一入口：所有工具都从这里过，所以日志也只在这里打一处——
 // 小豆每办一件事留一行中文；没办成打警告并带上原因；抛错打报错后
@@ -1121,7 +1378,8 @@ export async function executeXiaodouTool(name, rawArgs, context = {}) {
   }
   if (result && result.ok === false) {
     log.warn('小豆', `办事没成：${label}——${result.error ?? '未知原因'}`);
-  } else {
+  } else if (!result?.quiet) {
+    // quiet 的工具（如给出选项）不是办事，不打「办了一件事」免得日志误导
     log.info('小豆', `办了一件事：${label}`);
   }
   return result;
@@ -1141,6 +1399,10 @@ async function dispatchXiaodouTool(name, rawArgs, context = {}) {
   if (name === 'add_favorite') return addFavorite(args, context);
   if (name === 'set_order_note') return setOrderNote(args, context);
   if (name === 'create_order') return createOrder(args, context);
+  if (name === 'get_my_orders') return getMyOrders(args, context);
+  if (name === 'cancel_order') return cancelOrder(args, context);
+  if (name === 'apply_after_sale') return applyAfterSale(args, context);
+  if (name === 'suggest_options') return suggestOptions(args);
   if (name === 'get_weather') return getWeather(args, context);
   if (name === 'web_search') return webSearch(args, context);
   return { ok: false, error: `未知工具 ${name}` };

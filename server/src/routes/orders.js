@@ -191,34 +191,38 @@ router.get('/after-sales', authRequired, async (req, res) => {
 });
 
 // 申请售后：仅退款 refund / 退货退款 return；同一订单同时只能有一条待处理的
-router.post('/:id/after-sale', authRequired, async (req, res) => {
+// 申请售后的核心逻辑：订单路由和小豆办事工具共用一份，规则只许有一处。
+// 输入：userId、orderId、{ type, reason, description, amount }
+// 输出：{ ok: true, request, order } 或 { ok: false, status, error }
+// 坑：同一订单同时只能有一条待处理申请；金额为空 = 按实付全额退，审核时核定。
+export async function createAfterSaleForUser(userId, orderId, input = {}) {
   const order = await prisma.order.findFirst({
-    where: { id: req.params.id, userId: req.user.sub },
+    where: { id: orderId, userId },
   });
-  if (!order) return fail(res, 404, '订单不存在');
+  if (!order) return { ok: false, status: 404, error: '订单不存在' };
   if (!['paid', 'shipping', 'completed'].includes(order.status)) {
-    return fail(res, 400, '当前订单状态不能申请售后');
+    return { ok: false, status: 400, error: '当前订单状态不能申请售后' };
   }
-  const type = AFTER_SALE_TYPES.includes(req.body?.type) ? req.body.type : 'refund';
-  const reason = String(req.body?.reason ?? '').trim();
-  if (!reason) return fail(res, 400, '请填写售后原因');
-  const description = String(req.body?.description ?? '').trim().slice(0, 500);
-  const amountRaw = req.body?.amount;
+  const type = AFTER_SALE_TYPES.includes(input.type) ? input.type : 'refund';
+  const reason = String(input.reason ?? '').trim();
+  if (!reason) return { ok: false, status: 400, error: '请填写售后原因' };
+  const description = String(input.description ?? '').trim().slice(0, 500);
+  const amountRaw = input.amount;
   const amount = amountRaw == null || amountRaw === '' ? null : Number(amountRaw);
   if (amount != null && (!Number.isFinite(amount) || amount <= 0)) {
-    return fail(res, 400, '退款金额不正确');
+    return { ok: false, status: 400, error: '退款金额不正确' };
   }
   const pending = await prisma.afterSaleRequest.findFirst({
-    where: { orderId: order.id, userId: req.user.sub, status: 'pending' },
+    where: { orderId: order.id, userId, status: 'pending' },
   });
-  if (pending) return fail(res, 409, '该订单已有待处理的售后申请');
+  if (pending) return { ok: false, status: 409, error: '该订单已有待处理的售后申请' };
 
   const row = await prisma.afterSaleRequest.create({
-    data: { orderId: order.id, userId: req.user.sub, type, reason, description, amount },
+    data: { orderId: order.id, userId, type, reason, description, amount },
   });
   await prisma.notification.create({
     data: {
-      userId: req.user.sub,
+      userId,
       title: '售后申请已提交',
       body: `订单 ${order.orderNo} 的售后申请已提交，等待处理`,
       type: 'order',
@@ -226,7 +230,14 @@ router.post('/:id/after-sale', authRequired, async (req, res) => {
       targetId: order.id,
     },
   });
-  log.info('订单', `收到售后申请，订单 id ${req.params.id}，售后单 id ${row.id}`);
+  log.info('订单', `收到售后申请，订单 id ${orderId}，售后单 id ${row.id}`);
+  return { ok: true, request: row, order };
+}
+
+router.post('/:id/after-sale', authRequired, async (req, res) => {
+  const result = await createAfterSaleForUser(req.user.sub, req.params.id, req.body ?? {});
+  if (!result.ok) return fail(res, result.status, result.error);
+  const row = result.request;
   ok(res, { request: { id: row.id, status: row.status, type: row.type } });
 });
 
@@ -511,17 +522,22 @@ router.post('/:id/pay', authRequired, async (req, res) => {
   ok(res, { order: serializeOrder(updated) });
 });
 
-router.put('/:id/cancel', authRequired, async (req, res) => {
+// 取消订单的核心逻辑：订单路由和小豆办事工具共用一份，规则只许有一处。
+// 输入：userId、orderId、reason（可空）
+// 输出：{ ok: true, order, wasPaid } 或 { ok: false, status, error }
+// 坑：只有已付款订单取消时才回补库存销量——待付款订单根本没扣过，
+// 回补会把库存越加越多（路由老口径，别改）。
+export async function cancelOrderForUser(userId, orderId, reason) {
   const order = await prisma.order.findFirst({
-    where: { id: req.params.id, userId: req.user.sub },
+    where: { id: orderId, userId },
     include: { items: true },
   });
-  if (!order) return fail(res, 404, '订单不存在');
+  if (!order) return { ok: false, status: 404, error: '订单不存在' };
   if (!['pending', 'paid'].includes(order.status)) {
-    return fail(res, 409, '当前状态不可取消');
+    return { ok: false, status: 409, error: '当前状态不可取消' };
   }
 
-  const cancelReason = String(req.body?.reason ?? '').trim().slice(0, 200) || null;
+  const cancelReason = String(reason ?? '').trim().slice(0, 200) || null;
   const wasPaid = order.paymentStatus === 'paid';
   const updated = await prisma.$transaction(async (tx) => {
     const next = await tx.order.update({
@@ -546,7 +562,13 @@ router.put('/:id/cancel', authRequired, async (req, res) => {
     return next;
   });
   log.info('订单', `订单已取消，订单号 ${updated.orderNo ?? updated.id}`);
-  ok(res, { order: serializeOrder(updated) });
+  return { ok: true, order: updated, wasPaid };
+}
+
+router.put('/:id/cancel', authRequired, async (req, res) => {
+  const result = await cancelOrderForUser(req.user.sub, req.params.id, req.body?.reason);
+  if (!result.ok) return fail(res, result.status, result.error);
+  ok(res, { order: serializeOrder(result.order) });
 });
 
 router.put('/:id/confirm', authRequired, async (req, res) => {

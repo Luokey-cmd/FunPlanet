@@ -18,6 +18,7 @@ import '../theme/app_scale.dart';
 import '../data/xiaodou_copy.dart';
 import '../pages/xiaodou_chat_history_page.dart';
 import '../services/voice_input_service.dart';
+import '../services/xiaodou_chat_service.dart';
 import '../utils/snackbar_utils.dart';
 import '../widgets/floating_ai_assistant.dart';
 import '../widgets/product_image.dart';
@@ -194,6 +195,11 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
   @override
   void initState() {
     super.initState();
+    // 进门盘点：每次打开小豆页都重新盘一遍没办完的事（待付款/将过期券）。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<XiaodouChatProvider>().refreshBriefing();
+    });
     // 普通进入：什么都不自动做——不再弹星愿档案问卷，首页区就是入口。
     // 只有为抽牌而来（autoDraw）时才保留原来的自动抽三翻。
     if (!widget.autoDraw) return;
@@ -449,13 +455,46 @@ class _MessageListState extends State<_MessageList> {
           itemCount: chat.messages.length + (showHome ? 1 : 0),
           itemBuilder: (context, index) {
             if (showHome && index == 0) {
-              return XiaodouHome(
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 进门盘点（长记性）：有没办完的事才出声，没事不占地方。
+                  if (chat.briefingMatters.isNotEmpty && !chat.briefingDismissed)
+                    _BriefingBanner(
+                      matters: chat.briefingMatters,
+                      onDismiss: chat.dismissBriefing,
+                      onOpenOrder: () => openAgentActionTarget(
+                        context,
+                        const AgentAction(
+                          id: 'briefing-order',
+                          type: 'briefing',
+                          title: '',
+                          detail: '',
+                          status: 'done',
+                          target: {'page': 'order'},
+                        ),
+                      ),
+                      onOpenCoupons: () => openAgentActionTarget(
+                        context,
+                        const AgentAction(
+                          id: 'briefing-coupons',
+                          type: 'briefing',
+                          title: '',
+                          detail: '',
+                          status: 'done',
+                          target: {'page': 'coupons'},
+                        ),
+                      ),
+                    ),
+                  XiaodouHome(
                 onDrawFate: widget.onDrawFate,
                 onSendText: widget.onSendText,
                 onPickImage: widget.onPickImage,
                 onFocusInput: widget.onFocusInput,
                 onOpenProfile: widget.onOpenProfile,
                 onVoice: widget.onVoice,
+                  ),
+                ],
               );
             }
             final msgIndex = showHome ? index - 1 : index;
@@ -702,6 +741,96 @@ class _MessageBubble extends StatelessWidget {
                       ],
                     ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 进门盘点卡（长记性）：小豆进门先替用户盘一遍没办完的事——
+/// 待付款订单、快过期的券，每条带一个能直接去办的按钮；点叉关掉
+/// 就不再打扰。没事时这张卡根本不出现，不许拿它刷存在感。
+class _BriefingBanner extends StatelessWidget {
+  const _BriefingBanner({
+    required this.matters,
+    required this.onDismiss,
+    required this.onOpenOrder,
+    required this.onOpenCoupons,
+  });
+
+  final List<BriefingMatter> matters;
+  final VoidCallback onDismiss;
+  final VoidCallback onOpenOrder;
+  final VoidCallback onOpenCoupons;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(bottom: _xs(12)),
+      padding: EdgeInsets.fromLTRB(_xs(14), _xs(10), _xs(8), _xs(12)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBF2),
+        borderRadius: BorderRadius.circular(_xs(14)),
+        border: Border.all(color: const Color(0xFFE8CF9A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '先帮你盘了盘，有几件事还没办完',
+                  style: TextStyle(
+                    fontSize: _xs(13) + AppScale.fontBump,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.foreground,
+                  ),
+                ),
+              ),
+              AppIconButton(
+                onPressed: onDismiss,
+                iconSize: _xs(16),
+                icon: Icon(Icons.close, color: AppColors.mutedForeground),
+              ),
+            ],
+          ),
+          for (final matter in matters) _row(matter),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(BriefingMatter matter) {
+    final isOrder = matter.isPendingOrder;
+    final expire = matter.expireAt?.toLocal();
+    final text = isOrder
+        ? '订单还没付款：${matter.summary} · 应付 ${formatYuan(matter.total)}'
+        : '「${matter.title}」${matter.condition}，'
+            '${expire == null ? '快到期了' : '${expire.month}月${expire.day}日到期'}，别浪费';
+    return Padding(
+      padding: EdgeInsets.only(top: _xs(6)),
+      child: Row(
+        children: [
+          Icon(
+            isOrder ? Icons.receipt_long_outlined : Icons.local_offer_outlined,
+            size: _xs(16),
+            color: const Color(0xFFB98A2F),
+          ),
+          SizedBox(width: _xs(8)),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: _xs(12) + AppScale.fontBump,
+                color: AppColors.foreground,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: isOrder ? onOpenOrder : onOpenCoupons,
+            child: Text(isOrder ? '去付款' : '去看看'),
           ),
         ],
       ),

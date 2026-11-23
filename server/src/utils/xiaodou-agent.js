@@ -317,7 +317,10 @@ function mergedSystemPrompt(starwish) {
       '3. 付款是唯一的闸：你最多把订单生成到待付款，绝不能说「已经下单成功/已经付款」；生成订单后把应付金额说清，并提醒他在清单卡里点「确认下单」付款。\n' +
       '4. 工具返回失败（action.status 是 failed）时如实转告原因，不要假装办成、不要换个说法糊弄过去；可以顺带给一个能点的下一步（如先加地址、先领别的券）。\n' +
       '5. 用户交代备注或贺卡内容时先 set_order_note 记下，同一轮里再 create_order 会自动带上，不用重复问。\n' +
-      '6. 下单前若有一张他能领、且明显能省钱的券（get_promotions 里查得到），可以先 claim_coupon 再 create_order，create_order 会自动挑最划算的已领券抵扣。',
+      '6. 下单前若有一张他能领、且明显能省钱的券（get_promotions 里查得到），可以先 claim_coupon 再 create_order，create_order 会自动挑最划算的已领券抵扣。\n' +
+      '7. 订单的事走订单工具：问订单到哪了、发货没，先 get_my_orders 查，只信它返回的状态和物流；取消订单用 cancel_order、申请售后用 apply_after_sale，都要先查到订单 id 再动手，用户没指明哪一笔时先问清楚，不许自己挑一笔。售后只是提交申请等后台处理，别说已经退款。\n' +
+      '8. 提问时带选项：你这一轮要向用户提问题时，同时调用 suggest_options，把 3~4 个他最可能点的短回答一起给出来（界面会挂成按钮给他点）；一次只问一个问题，选项只对这一个问题；陈述、亮牌、办事的轮次不要调用它，正文里也不要把选项再念一遍。\n' +
+      '9. 工具结果里的金额和数量都是服务端复查过的真实数据，汇报时照它说，不要自己再算一遍改口。',
   };
 }
 
@@ -354,9 +357,12 @@ function sentenceHasCodeId(sentence) {
 // 几个内部说法（规则带冒号、信息不够、用户说、槽位、未启程、
 // 只问 1 个问题）；正常旁白不会这么说话，误伤面小。注意「退货
 // 规则」这类用户话题不带冒号、不在判据里，不受影响。
-const THINKING_META_RE = /(规则[:：]|信息不够|用户说|槽位|未启程|档案暂|只问\s*1\s*个问题|问\s*1\s*个问题|问一个问题)/;
+const THINKING_META_RE = /(规则[:：]|信息不够|用户说|槽位|未启程|档案暂|只问\s*[一1]\s*个|问\s*[一1]\s*个问题|先问\s*[一1]\s*个问题|用户就是想|用户只是想|用户应该是想|可以理解为)/;
 function sentenceIsMetaNarration(sentence) {
-  return THINKING_META_RE.test(sentence);
+  if (THINKING_META_RE.test(sentence)) return true;
+  // 引着用户原话再下判断的（「翻三张牌」可以理解为……）也是盘算腔，
+  // 正常旁白不会这么引；带「」且在讲「理解/意思」的整句不展示。
+  return sentence.includes('「') && /(理解为|意思是)/.test(sentence);
 }
 function sanitizeThinking(text) {
   const parts = String(text).split(/(?<=[。！？!?；;\n])/);
@@ -596,6 +602,12 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
       if (call.name === 'propose_add_to_cart' && result.fullProduct) {
         pendingCart.push(result.fullProduct);
       }
+      // 模型自带选项：提问的那一轮它会顺手调 suggest_options，选项
+      // 先收进 turnState，整轮说完再发内部事件给外层定夺（亮了牌、
+      // 办了事的轮次不挂选项，免得用户分心）。
+      if (call.name === 'suggest_options' && Array.isArray(result?.suggestedOptions)) {
+        turnState.suggestedOptions = result.suggestedOptions;
+      }
       // 办事结果：办成或没办成都发一条 actions 事件，App 实时记进
       // 清单。改购物车数量同轮多次只占一行——把明细攒在 turnState
       // 里重写同一条记录（id 不变，App 按 id 覆盖）。
@@ -684,6 +696,12 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
   if (pendingCart.length > 0) {
     produced = true;
     yield { type: 'cart_confirm', products: pendingCart.slice(0, 3) };
+  }
+
+  // 模型自带选项：整轮说完再交出去，由外层 withQuestionOptions
+  // 决定发不发（内部事件，不直接给 App）。
+  if (turnState.suggestedOptions?.length) {
+    yield { type: 'suggested_options', options: turnState.suggestedOptions };
   }
 
   // 结尾查账：模型空转一整轮（只吐了被过滤掉的思考、正文为空、
@@ -961,27 +979,49 @@ async function generateQuestionOptions({ dashscope, question, userText }) {
   }
 }
 
-// 该不该带选项，只看两个硬条件：正文以问句收尾（问号结尾），且这一
-// 轮没亮过牌、没给过商品——有牌时用户的下一步是选牌，不该再被选项
-// 分心。带图鉴定那条路自带「找同款/同味道」的选择按钮，不走这里。
+// 该不该带选项，只看两个硬条件：这一轮在向用户提问，且没亮过牌、
+// 没给过商品——有牌时用户的下一步是选牌，不该再被选项分心。
+// 提问的判据不能只认「问号结尾」（2026-11-23 真机实锤）：模型常把
+// 问题包在中间、末尾再缀一句说明（「……还是送人？或者你直接说个
+// 品类也行，我好给你翻出对味的三张。」），只认结尾问号就漏了大半。
+// 改判：问号出现在正文最后 80 字内就算这一轮在提问；问号离结尾
+// 太远的（正文主体在讲别的事）不给选项，防误挂。
+// 带图鉴定那条路自带「找同款/同味道」的选择按钮，不走这里。
 function endsWithQuestion(text) {
   const trimmed = String(text ?? '').trim();
   if (trimmed.length < 4) return false;
-  return /[？?]\s*$/.test(trimmed);
+  if (/[？?]\s*$/.test(trimmed)) return true;
+  const lastQuestionAt = Math.max(trimmed.lastIndexOf('？'), trimmed.lastIndexOf('?'));
+  return lastQuestionAt >= 0 && trimmed.length - lastQuestionAt <= 80;
 }
 
-// 把一轮事件流原样透传，同时攒正文、记有没有出过牌；流正常走完后
-// 若符合条件，补生成选项并在最后多发一条 options 事件。源流抛错时
-// 直接往外抛（外层的降级守卫照常接住），不会补选项。
+// 提问选项的主路与安全网（hx 2026-11-23 晚定：要智能一点，别全靠猜）：
+// 主路——统一大脑提问时自己调 suggest_options 带上选项（最懂自己在
+// 问什么），本函数收到 suggested_options 内部事件先扣下，整轮结束
+// 确认没亮牌、没办事、没给商品，才转成 options 事件发给 App。
+// 安全网——模型忘了带（或保底路线压根没有这个工具）时，才用
+// endsWithQuestion 判据 + 事后补生成兜底。源流抛错时直接往外抛
+// （外层的降级守卫照常接住），不会补选项。
 async function* withQuestionOptions(source, { dashscope, userText }) {
   let fullText = '';
   let sawCards = false;
+  let sawActions = false;
+  let modelOptions = null;
   for await (const event of source) {
     if (event.type === 'text') fullText += String(event.content ?? '');
     if (event.type === 'fate_cards' || event.type === 'products' || event.type === 'cart_confirm') {
       sawCards = true;
     }
+    if (event.type === 'actions') sawActions = true;
+    if (event.type === 'suggested_options') {
+      modelOptions = Array.isArray(event.options) ? event.options : null;
+      continue;
+    }
     yield event;
+  }
+  if (modelOptions && modelOptions.length >= 2 && !sawCards && !sawActions) {
+    yield { type: 'options', options: modelOptions };
+    return;
   }
   if (sawCards || !endsWithQuestion(fullText)) return;
   const options = await generateQuestionOptions({
