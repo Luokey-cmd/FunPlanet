@@ -66,6 +66,9 @@ class _TagBadge extends StatelessWidget {
   }
 }
 
+// 卡片里的商品图一律铺满裁切（BoxFit.cover）：照片填满圆角框、四角由卡片圆角裁掉，
+// 不再露出照片自身的直角（hx 2026-11-24 要求）。代价是方形图在矮框里上下会裁掉一点，
+// 商品主体居中一般没事；详情页大图不受影响、仍是完整显示。
 class _GridCard extends StatelessWidget {
   const _GridCard({required this.product, required this.isFavorite});
 
@@ -92,7 +95,7 @@ class _GridCard extends StatelessWidget {
                   padding: EdgeInsets.fromLTRB(AppScale.s(8), AppScale.s(8), AppScale.s(8), 0),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(AppScale.s(12)),
-                    child: ProductThumbnail(product: product, height: AppScale.s(112), borderRadius: AppScale.s(12)),
+                    child: ProductThumbnail(product: product, height: AppScale.s(112), borderRadius: AppScale.s(12), fit: BoxFit.cover),
                   ),
                 ),
                 if (product.tag != null)
@@ -170,7 +173,7 @@ class _StaggeredCard extends StatelessWidget {
                   padding: EdgeInsets.fromLTRB(s(8), s(8), s(8), 0),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(s(12)),
-                    child: ProductThumbnail(product: product, height: h - s(8), borderRadius: s(12)),
+                    child: ProductThumbnail(product: product, height: h - s(8), borderRadius: s(12), fit: BoxFit.cover),
                   ),
                 ),
                 if (product.tag != null)
@@ -240,7 +243,7 @@ class _MallCard extends StatelessWidget {
                     padding: EdgeInsets.fromLTRB(s(8), s(8), s(8), 0),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(s(12)),
-                      child: ProductThumbnail(product: product, height: s(122), borderRadius: s(12)),
+                      child: ProductThumbnail(product: product, height: s(122), borderRadius: s(12), fit: BoxFit.cover),
                     ),
                   ),
                   if (product.tag != null)
@@ -315,6 +318,7 @@ class _ListCard extends StatelessWidget {
                   product: product,
                   width: AppScale.s(80),
                   height: AppScale.s(80),
+                  fit: BoxFit.cover,
                 ),
                 if (product.tag != null)
                   Positioned(top: AppScale.s(4), left: AppScale.s(4), child: _TagBadge(product: product)),

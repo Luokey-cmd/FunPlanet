@@ -41,7 +41,7 @@ class _MainScreenState extends State<MainScreen>
   // 滑动方向只比下标大小，中间插入消息页后天然适配，不用改逻辑。
   late final AnimationController _slideCtrl = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 300),
+    duration: const Duration(milliseconds: 240),
   );
   AppTab? _outgoingTab; // 正在滑出的页，动画结束即清空
   double _slideDir = 1; // +1 新页从右进来，-1 从左进来
@@ -216,6 +216,8 @@ class _KeepAlivePageState extends State<_KeepAlivePage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return widget.child;
+    // RepaintBoundary 把整页缓存成独立图层：标签滑动时只平移图层，
+    // 不再逐帧重画页面里的图片、阴影和渐变（2026-11-24 切换卡顿优化）。
+    return RepaintBoundary(child: widget.child);
   }
 }
