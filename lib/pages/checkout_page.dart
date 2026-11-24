@@ -62,9 +62,57 @@ class _CheckoutPageState extends State<CheckoutPage> {
   bool _submitting = false;
   String? _selectedCouponId;
   String? _selectedAddressId;
+  // 当前生效的满减档（服务端 /api/promotions/active）：只用于展示与
+  // 预估合计，真正减额在下单时由服务端按同一口径复算。
+  List<Map<String, dynamic>> _thresholds = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThresholds();
+  }
+
+  Future<void> _loadThresholds() async {
+    try {
+      final rows = await context.read<OrderProvider>().fetchActiveThresholds();
+      if (mounted) setState(() => _thresholds = rows);
+    } catch (_) {
+      // 拿不到活动就当没有：不挡下单，实付以服务端为准
+    }
+  }
 
   double get _subtotal =>
-      widget.items.fold(0, (sum, item) => sum + item.product.price * item.quantity);
+      widget.items.fold(0, (sum, item) => sum + item.product.effectivePrice * item.quantity);
+
+  // 已享的最优满减：满足门槛的档里取减得最多的（与服务端同口径）
+  Map<String, dynamic>? get _appliedPromo {
+    Map<String, dynamic>? best;
+    for (final t in _thresholds) {
+      final threshold = (t['thresholdAmount'] as num?)?.toDouble() ?? 0;
+      final discount = (t['discountAmount'] as num?)?.toDouble() ?? 0;
+      if (_subtotal >= threshold && discount > 0) {
+        if (best == null || discount > (best['discountAmount'] as num).toDouble()) best = t;
+      }
+    }
+    return best;
+  }
+
+  double get _promoDiscount =>
+      _appliedPromo == null ? 0 : (_appliedPromo!['discountAmount'] as num).toDouble();
+
+  // 还差多少能享到更大一档（没有更大档时为 null，提示行不显示）
+  ({double gap, double discount})? get _nextPromoGap {
+    ({double gap, double discount})? result;
+    for (final t in _thresholds) {
+      final threshold = (t['thresholdAmount'] as num?)?.toDouble() ?? 0;
+      final discount = (t['discountAmount'] as num?)?.toDouble() ?? 0;
+      if (discount > _promoDiscount && _subtotal < threshold) {
+        final gap = threshold - _subtotal;
+        if (result == null || gap < result.gap) result = (gap: gap, discount: discount);
+      }
+    }
+    return result;
+  }
 
   Coupon? _selectedCoupon(UserProvider user) {
     if (_selectedCouponId == null) return null;
@@ -154,7 +202,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
             Text('下单成功！预计2-3天送达', style: FeaturePageStyle.bodyBold()),
             Text('订单号：${order.orderNo}', style: FeaturePageStyle.secondary()),
             if (order.discount > 0)
-              Text('已优惠 ¥${order.discount.toStringAsFixed(2)}', style: FeaturePageStyle.secondary()),
+              Text('优惠券已优惠 ¥${order.discount.toStringAsFixed(2)}', style: FeaturePageStyle.secondary()),
+            if (order.promotionDiscount > 0)
+              Text('满减已优惠 ¥${order.promotionDiscount.toStringAsFixed(2)}', style: FeaturePageStyle.secondary()),
           ],
         ),
       );
@@ -185,7 +235,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
         if (mounted) setState(() => _selectedCouponId = null);
       });
     }
-    final payable = estimatedPayable(_subtotal, coupon);
+    final payable = (estimatedPayable(_subtotal, coupon) - _promoDiscount).clamp(0.0, double.infinity).toDouble();
     final address = _selectedAddress(user);
 
     return FeaturePageScaffold(
@@ -217,12 +267,23 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 : '${eligibleCoupons(user.coupons, _subtotal).length} 张可用',
             onTap: () => _pickCoupon(user),
           ),
+          if (_appliedPromo != null || _nextPromoGap != null) ...[
+            SizedBox(height: AppScale.s(8)),
+            _CheckoutOptionTile(
+              icon: Icons.discount_outlined,
+              title: '满减活动',
+              subtitle: _appliedPromo != null
+                  ? '已享「${_appliedPromo!['name']}」减 ¥${_promoDiscount.toStringAsFixed(0)}'
+                  : '再买 ¥${_nextPromoGap!.gap.toStringAsFixed(2)} 可减 ¥${_nextPromoGap!.discount.toStringAsFixed(0)}',
+              onTap: () {},
+            ),
+          ],
           SizedBox(height: AppScale.s(16)),
           Row(
             children: [
               Text('合计', style: FeaturePageStyle.secondary()),
               SizedBox(width: FeaturePageStyle.s(4)),
-              if (coupon != null) ...[
+              if (coupon != null || _promoDiscount > 0) ...[
                 Text(
                   '¥${_subtotal.toStringAsFixed(2)}',
                   style: FeaturePageStyle.secondary().copyWith(decoration: TextDecoration.lineThrough),
@@ -296,7 +357,7 @@ class _CheckoutItemTile extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('¥${item.product.price.toStringAsFixed(2)}', style: FeaturePageStyle.price()),
+                    Text('¥${item.product.effectivePrice.toStringAsFixed(2)}', style: FeaturePageStyle.price()),
                     Text('x${item.quantity}', style: FeaturePageStyle.secondary()),
                   ],
                 ),

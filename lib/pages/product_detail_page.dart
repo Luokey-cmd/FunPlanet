@@ -590,8 +590,11 @@ class _PriceTitleBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasDiscount = product.originalPrice != null && product.originalPrice! > product.price;
-    final discountZhe = hasDiscount ? (product.price / product.originalPrice! * 10) : null;
+    // 展示价统一走 effectivePrice（命中限时特价时是特价）；原价划线
+    // 与折扣角标都按展示价算，特价时另有「限时特价」角标和原价划线。
+    final displayPrice = product.effectivePrice;
+    final hasDiscount = product.originalPrice != null && product.originalPrice! > displayPrice;
+    final discountZhe = hasDiscount ? (displayPrice / product.originalPrice! * 10) : null;
     final soldOut = product.stock <= 0;
     final lowStock = !soldOut && product.stock <= 10;
 
@@ -605,7 +608,7 @@ class _PriceTitleBlock extends StatelessWidget {
             children: [
               Text('¥', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
               Text(
-                _priceText(product.price),
+                _priceText(displayPrice),
                 style: TextStyle(fontSize: AppScale.t(26), fontWeight: FontWeight.bold, color: AppColors.primaryDark, height: 1),
               ),
               if (hasDiscount) ...[
@@ -629,6 +632,28 @@ class _PriceTitleBlock extends StatelessWidget {
                     child: Text('${discountZhe.toStringAsFixed(1)}折', style: TextStyle(fontSize: AppScale.t(11), fontWeight: FontWeight.w600, color: AppColors.priceRed)),
                   ),
                 ],
+              ],
+              if (product.hasPromo) ...[
+                if (!hasDiscount) ...[
+                  SizedBox(width: AppScale.s(8)),
+                  Padding(
+                    padding: EdgeInsets.only(bottom: AppScale.s(2)),
+                    child: Text(
+                      '¥${_priceText(product.price)}',
+                      style: TextStyle(
+                        fontSize: AppScale.t(13),
+                        color: AppColors.mutedForeground,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                  ),
+                ],
+                SizedBox(width: AppScale.s(6)),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: AppScale.s(6), vertical: AppScale.s(2)),
+                  decoration: BoxDecoration(color: AppColors.priceRed, borderRadius: BorderRadius.circular(AppScale.s(4))),
+                  child: Text('限时特价', style: TextStyle(fontSize: AppScale.t(11), fontWeight: FontWeight.w600, color: Colors.white)),
+                ),
               ],
               const Spacer(),
               if (soldOut)
@@ -1029,7 +1054,7 @@ void _showPurchaseSheet(BuildContext context, Product product, {required bool bu
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '¥${_priceText(product.price)}',
+                              '¥${_priceText(product.effectivePrice)}',
                               style: TextStyle(fontSize: AppScale.t(19), fontWeight: FontWeight.bold, color: AppColors.primaryDark),
                             ),
                             SizedBox(height: AppScale.s(4)),
@@ -1306,7 +1331,7 @@ class _SeriesSectionState extends State<_SeriesSection> {
                         ),
                         SizedBox(height: AppScale.s(2)),
                         Text(
-                          '¥${_priceText(item.price)}',
+                          '¥${_priceText(item.effectivePrice)}',
                           style: TextStyle(fontSize: AppScale.t(12), fontWeight: FontWeight.bold, color: AppColors.primaryDark),
                         ),
                       ],

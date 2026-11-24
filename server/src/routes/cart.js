@@ -4,16 +4,17 @@ import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
 import { log } from '../utils/log.js';
 import { serializeProduct } from '../utils/product.js';
+import { getFlashPriceMap } from '../utils/promotions.js';
 
 const router = Router();
 
-function serializeCartItem(item) {
+function serializeCartItem(item, flash = null) {
   return {
     id: item.id,
     productId: item.productId,
     quantity: item.quantity,
     spec: item.spec,
-    product: serializeProduct(item.product),
+    product: serializeProduct(item.product, flash),
   };
 }
 
@@ -23,7 +24,8 @@ router.get('/', authRequired, async (req, res) => {
     include: { product: true },
     orderBy: { updatedAt: 'desc' },
   });
-  ok(res, { items: items.map(serializeCartItem) });
+  const flashMap = await getFlashPriceMap(items.map((item) => item.productId));
+  ok(res, { items: items.map((item) => serializeCartItem(item, flashMap.get(item.productId) ?? null)) });
 });
 
 router.post('/', authRequired, async (req, res) => {
@@ -71,7 +73,8 @@ router.post('/', authRequired, async (req, res) => {
   }
 
   log.info('购物车', `购物车已更新：商品 ${productId}，当前数量 ${item.quantity}`);
-  ok(res, { item: serializeCartItem(item) });
+  const flashMap = await getFlashPriceMap([item.productId]);
+  ok(res, { item: serializeCartItem(item, flashMap.get(item.productId) ?? null) });
 });
 
 router.put('/:productId', authRequired, async (req, res) => {
@@ -99,7 +102,8 @@ router.put('/:productId', authRequired, async (req, res) => {
     data: { quantity },
     include: { product: true },
   });
-  ok(res, { item: serializeCartItem(item) });
+  const flashMap = await getFlashPriceMap([item.productId]);
+  ok(res, { item: serializeCartItem(item, flashMap.get(item.productId) ?? null) });
 });
 
 router.delete('/:productId', authRequired, async (req, res) => {

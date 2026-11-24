@@ -125,6 +125,7 @@ model Product {
   reviews              ProductReview[]
   supportConversations SupportConversation[]
   guideRecommendations GuideRecommendation[]
+  promotionItems       PromotionItem[]
 
   @@index([majorCategory])
   @@index([category])
@@ -304,6 +305,10 @@ model Order {
   status            String               @default("pending")
   subtotal          Decimal              @db.Decimal(10, 2)
   discount          Decimal              @default(0) @db.Decimal(10, 2)
+  // 营销活动优惠（满减）：与优惠券 discount 分开记账，财务和订单详情要能拆出
+  // 「券减了多少、活动减了多少」；promotionName 是下单时的活动名快照
+  promotionDiscount Decimal              @default(0) @map("promotion_discount") @db.Decimal(10, 2)
+  promotionName     String?              @map("promotion_name")
   total             Decimal              @db.Decimal(10, 2)
   addressName       String?              @map("address_name")
   addressPhone      String?              @map("address_phone")
@@ -671,4 +676,39 @@ model GuideRecommendation {
   @@index([userId, createdAt(sort: Desc)])
   @@index([productId])
   @@map("ai_guide_recommendations")
+}
+
+/// 营销活动（2026-11-24 营销中心）：threshold 满减（全店满 X 减 Y）/
+/// flash 限时特价（明细行给单品定特价）；时间窗 + isActive 双闸，
+/// 窗外或停用都不生效。计价口径集中在 server/src/utils/promotions.js。
+model Promotion {
+  id              String          @id @default(cuid())
+  name            String
+  type            String
+  thresholdAmount Decimal?        @map("threshold_amount") @db.Decimal(10, 2)
+  discountAmount  Decimal?        @map("discount_amount") @db.Decimal(10, 2)
+  startsAt        DateTime        @map("starts_at")
+  endsAt          DateTime        @map("ends_at")
+  isActive        Boolean         @default(true) @map("is_active")
+  items           PromotionItem[]
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  @@index([type, isActive])
+  @@map("promotions")
+}
+
+/// 限时特价明细：一行 = 一件商品在某活动里的特价
+model PromotionItem {
+  id          String    @id @default(cuid())
+  promotionId String    @map("promotion_id")
+  productId   String    @map("product_id")
+  promoPrice  Decimal   @map("promo_price") @db.Decimal(10, 2)
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([promotionId, productId])
+  @@map("promotion_items")
 }

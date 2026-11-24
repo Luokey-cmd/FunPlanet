@@ -101,6 +101,8 @@ class OrderProvider extends ChangeNotifier {
     return null;
   }
 
+  Future<List<Map<String, dynamic>>> fetchActiveThresholds() => _api.fetchActiveThresholds();
+
   Future<Order> checkoutFromCart(CartProvider cart, {String? couponTemplateId, String? addressId}) async {
     if (cart.items.isEmpty) throw StateError('empty cart');
 

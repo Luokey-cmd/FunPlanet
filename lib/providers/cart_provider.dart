@@ -18,7 +18,7 @@ class CartProvider extends ChangeNotifier {
   int get totalCount => _items.fold(0, (sum, item) => sum + item.quantity);
 
   double get totalPrice =>
-      _items.fold(0, (sum, item) => sum + item.product.price * item.quantity);
+      _items.fold(0, (sum, item) => sum + item.product.effectivePrice * item.quantity);
 
   void setCloudSync(bool enabled) {
     _cloudSync = enabled;

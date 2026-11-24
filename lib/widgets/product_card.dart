@@ -126,7 +126,7 @@ class _GridCard extends StatelessWidget {
                   ],
                   SizedBox(height: AppScale.s(6)),
                   Text(
-                    '¥ ${product.price.toStringAsFixed(product.price == product.price.roundToDouble() ? 0 : 2)}',
+                    '¥ ${product.effectivePrice.toStringAsFixed(product.effectivePrice == product.effectivePrice.roundToDouble() ? 0 : 2)}',
                     style: TextStyle(
                       fontSize: AppScale.t(14),
                       fontWeight: FontWeight.bold,
@@ -198,7 +198,7 @@ class _StaggeredCard extends StatelessWidget {
                   ),
                   SizedBox(height: s(4)),
                   Text(
-                    '¥ ${product.price.toStringAsFixed(0)}',
+                    '¥ ${product.effectivePrice.toStringAsFixed(0)}',
                     style: TextStyle(
                       fontSize: AppScale.t(14),
                       fontWeight: FontWeight.bold,
@@ -276,7 +276,7 @@ class _MallCard extends StatelessWidget {
                     ],
                     SizedBox(height: s(6)),
                     Text(
-                      '¥ ${product.price.toStringAsFixed(2)}',
+                      '¥ ${product.effectivePrice.toStringAsFixed(2)}',
                       style: TextStyle(
                         fontSize: AppScale.t(14),
                         fontWeight: FontWeight.bold,
@@ -339,7 +339,7 @@ class _ListCard extends StatelessWidget {
                   ),
                   SizedBox(height: AppScale.s(8)),
                   Text(
-                    '¥ ${product.price.toStringAsFixed(0)}',
+                    '¥ ${product.effectivePrice.toStringAsFixed(0)}',
                     style: TextStyle(fontSize: AppScale.t(16), fontWeight: FontWeight.bold, color: AppColors.priceRed),
                   ),
                 ],

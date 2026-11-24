@@ -4,6 +4,7 @@ import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
 import { log } from '../utils/log.js';
 import { generateOrderNo, parseCouponMinAmount, serializeOrder } from '../utils/order.js';
+import { getFlashPriceMap, resolvePromotionDiscount } from '../utils/promotions.js';
 import { recordWalletLedger } from '../utils/wallet-ledger.js';
 import { AFTER_SALE_TYPES } from '../utils/status-values.js';
 
@@ -73,6 +74,9 @@ export async function buildLineItemsFromRequest(requestedItems) {
     where: { id: { in: normalized.map((item) => item.productId) } },
   });
   const productMap = new Map(products.map((product) => [product.id, product]));
+  // 限时特价：单价在组行时就换成特价，后面的小计、券门槛、满减门槛
+  // 全部自然按特价口径走，不用在每个算钱的地方再想一次
+  const flashMap = await getFlashPriceMap(normalized.map((item) => item.productId));
 
   const lineItems = [];
   for (const item of normalized) {
@@ -87,7 +91,7 @@ export async function buildLineItemsFromRequest(requestedItems) {
     if ((product.stock ?? 0) < item.quantity) {
       return { error: { status: 400, message: `商品「${product.name}」库存不足` } };
     }
-    const unitPrice = Number(product.price);
+    const unitPrice = flashMap.get(product.id)?.price ?? Number(product.price);
     lineItems.push({
       productId: product.id,
       name: product.name,
@@ -274,8 +278,9 @@ router.post('/', authRequired, async (req, res) => {
       cartItems.map((item) => ({ productId: item.productId, quantity: item.quantity })),
     );
     if (stockError) return fail(res, 400, stockError);
+    const flashMap = await getFlashPriceMap(cartItems.map((item) => item.productId));
     lineItems = cartItems.map((item) => {
-      const unitPrice = Number(item.product.price);
+      const unitPrice = flashMap.get(item.productId)?.price ?? Number(item.product.price);
       const subtotal = unitPrice * item.quantity;
       return {
         productId: item.productId,
@@ -296,10 +301,12 @@ router.post('/', authRequired, async (req, res) => {
     return fail(res, discountResult.error.status, discountResult.error.message);
   }
   const discount = discountResult?.discount ?? 0;
+  // 满减：门槛按小计（已含特价）判，与券可叠加，单独记账到 promotionDiscount
+  const promotion = await resolvePromotionDiscount(subtotal);
   // 运费：前端不传就是 0（包邮）；total 保持「最终实付」口径 = 小计 - 优惠 + 运费
   const freight = Math.max(0, Number(req.body?.freight) || 0);
   const remark = String(req.body?.remark ?? '').trim().slice(0, 200) || null;
-  const total = Math.max(0, subtotal - discount + freight);
+  const total = Math.max(0, subtotal - discount - promotion.amount + freight);
 
   const address = await resolveAddress(req.user.sub, addressId);
   if (!address) return fail(res, 400, '请先添加收货地址');
@@ -315,6 +322,8 @@ router.post('/', authRequired, async (req, res) => {
         status: payNow ? 'paid' : 'pending',
         subtotal,
         discount,
+        promotionDiscount: promotion.amount,
+        promotionName: promotion.name,
         total,
         addressName: address.name,
         addressPhone: address.phone,

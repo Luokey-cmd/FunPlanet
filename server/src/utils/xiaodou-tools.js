@@ -12,6 +12,7 @@ import {
   resolveDiscount,
 } from '../routes/orders.js';
 import { generateOrderNo } from './order.js';
+import { resolvePromotionDiscount } from './promotions.js';
 
 export const MAJOR_CATEGORIES = ['玩具', '文具', '手办', '公仔', '谷子', '小卡', '实用类周边'];
 const SEARCH_LIMIT = 3;
@@ -1035,7 +1036,9 @@ async function createOrder(args, context) {
   }
 
   const freight = 0;
-  const total = Math.max(0, subtotal - discount + freight);
+  // 满减与下单路由同一口径（utils/promotions.js），小豆代下单也享活动
+  const promotion = await resolvePromotionDiscount(subtotal);
+  const total = Math.max(0, subtotal - discount - promotion.amount + freight);
   const remark =
     String(args.note ?? '').trim().slice(0, 200) || turnStateOf(context).note || null;
   const orderNo = generateOrderNo();
@@ -1049,6 +1052,8 @@ async function createOrder(args, context) {
         status: 'pending',
         subtotal,
         discount,
+        promotionDiscount: promotion.amount,
+        promotionName: promotion.name,
         total,
         addressName: address.name,
         addressPhone: address.phone,

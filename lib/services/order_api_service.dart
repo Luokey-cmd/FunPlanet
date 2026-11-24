@@ -13,6 +13,15 @@ class OrderApiService {
         .toList();
   }
 
+  // 当前生效的满减档（结算页展示用）：只拿展示字段，真正减额由
+  // 服务端在下单时复算，这份数据算错也不影响实付金额。
+  Future<List<Map<String, dynamic>>> fetchActiveThresholds() async {
+    final data = await _client.get('/api/promotions/active');
+    return (data['thresholds'] as List<dynamic>? ?? [])
+        .map((e) => e as Map<String, dynamic>)
+        .toList();
+  }
+
   Future<Order> createFromCart({String? addressId, String? couponTemplateId, bool payNow = true}) async {
     final body = <String, dynamic>{'payNow': payNow};
     if (addressId != null && addressId.isNotEmpty) body['addressId'] = addressId;

@@ -145,7 +145,7 @@ class _CartItemTile extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '¥${(item.product.price * item.quantity).toStringAsFixed(2)}',
+                      '¥${(item.product.effectivePrice * item.quantity).toStringAsFixed(2)}',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: AppScale.t(14), color: AppColors.priceRed),
                     ),
                     Row(

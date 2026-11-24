@@ -30,6 +30,8 @@ export function serializeOrder(order) {
     })),
     subtotal: Number(order.subtotal),
     discount: Number(order.discount),
+    promotionDiscount: order.promotionDiscount == null ? 0 : Number(order.promotionDiscount),
+    promotionName: order.promotionName ?? null,
     // 运费单独给出：total 是含运费的最终实付，freight 让前端能把运费拆出来显示
     freight: order.freight == null ? 0 : Number(order.freight),
     total: Number(order.total),

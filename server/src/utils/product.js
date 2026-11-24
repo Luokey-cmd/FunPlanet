@@ -1,4 +1,7 @@
-export function serializeProduct(p) {
+// flash：这件商品当前命中的限时特价（utils/promotions.js 的
+// getFlashPriceMap 给出），没有就是 null，三个促销字段一律给空，
+// App 侧只认 promoPrice 有没有值，不用猜活动状态。
+export function serializeProduct(p, flash = null) {
   return {
     id: p.id,
     name: p.name,
@@ -28,5 +31,8 @@ export function serializeProduct(p) {
     rarity: p.rarity ?? null,
     suitableFor: p.suitableFor ?? null,
     sellingPoints: Array.isArray(p.sellingPoints) ? p.sellingPoints : [],
+    promoPrice: flash ? flash.price : null,
+    promotionName: flash ? flash.promotionName : null,
+    promoEndsAt: flash ? flash.endsAt.toISOString() : null,
   };
 }

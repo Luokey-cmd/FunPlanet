@@ -17,6 +17,8 @@ import AnalyticsPage from "./AnalyticsPage";
 import BannersPage from "./BannersPage";
 
 import CouponsPage from "./CouponsPage";
+import MarketingPage from "./MarketingPage";
+import FinancePage from "./FinancePage";
 
 import DashboardPage from "./DashboardPage";
 
@@ -179,6 +181,10 @@ export default function AdminLayout() {
           {effectivePage === "users" && <UsersPage />}
 
           {effectivePage === "coupons" && <CouponsPage />}
+
+          {effectivePage === "marketing" && <MarketingPage />}
+
+          {effectivePage === "finance" && <FinancePage />}
 
           {effectivePage === "banners" && <BannersPage />}
 

@@ -22,6 +22,8 @@ const pageTitles: Record<NavPage, string> = {
   moderation: "内容审核",
   users: "用户管理",
   coupons: "优惠券管理",
+  marketing: "营销中心",
+  finance: "财务账单",
   banners: "轮播图管理",
   changelog: "更新日志",
   admins: "管理员管理",

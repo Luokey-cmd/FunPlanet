@@ -31,6 +31,9 @@ class Product {
     this.rarity,
     this.suitableFor,
     this.sellingPoints = const [],
+    this.promoPrice,
+    this.promotionName,
+    this.promoEndsAt,
   });
 
   final String id;
@@ -64,6 +67,15 @@ class Product {
   final String? suitableFor;
   // 结构化卖点，一条一句，详情页「商品介绍」里逐条展示。
   final List<String> sellingPoints;
+  // 限时特价（营销中心）：接口命中活动时才有值，老接口没有就全空。
+  final double? promoPrice;
+  final String? promotionName;
+  final String? promoEndsAt;
+
+  // 全 App 唯一的价格口径：展示和算钱都用它，不要再直接拿 price 算钱，
+  // 否则卡片价、购物车总额和服务端实付会对不上。
+  double get effectivePrice => promoPrice ?? price;
+  bool get hasPromo => promoPrice != null;
 
   // 详情页图集：优先用多图，没有多图就退回主图一张。
   List<String> get galleryImages {
@@ -110,6 +122,9 @@ class Product {
           .map((e) => '$e')
           .where((e) => e.isNotEmpty)
           .toList(),
+      promoPrice: json['promoPrice'] == null ? null : (json['promoPrice'] as num).toDouble(),
+      promotionName: json['promotionName'] as String?,
+      promoEndsAt: json['promoEndsAt'] as String?,
     );
   }
 }
@@ -165,6 +180,8 @@ class Order {
     required this.time,
     this.subtotal,
     this.discount = 0,
+    this.promotionDiscount = 0,
+    this.promotionName,
     this.reviewedProductIds = const [],
     // 下面是后端字段整改后订单新增的信息，老订单没有时为空。
     this.freight = 0,
@@ -184,6 +201,9 @@ class Order {
   final String time;
   final double? subtotal;
   final double discount;
+  // 满减优惠（营销中心）：与券 discount 分开记，订单详情拆开显示
+  final double promotionDiscount;
+  final String? promotionName;
   final List<String> reviewedProductIds;
   final double freight;
   final String? remark;
@@ -214,6 +234,8 @@ class Order {
       time: time,
       subtotal: subtotal,
       discount: discount,
+      promotionDiscount: promotionDiscount,
+      promotionName: promotionName,
       reviewedProductIds: reviewedProductIds ?? this.reviewedProductIds,
       // copyWith 只换状态/评价记录，物流等字段必须原样带过去，漏一个就丢一个。
       freight: freight,
@@ -236,6 +258,8 @@ class Order {
       total: (json['total'] as num).toDouble(),
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? (json['total'] as num).toDouble(),
       discount: (json['discount'] as num?)?.toDouble() ?? 0,
+      promotionDiscount: (json['promotionDiscount'] as num?)?.toDouble() ?? 0,
+      promotionName: json['promotionName'] as String?,
       status: _orderStatusFromString(json['status'] as String),
       time: json['time'] as String,
       reviewedProductIds: (json['reviewedProductIds'] as List<dynamic>? ?? [])

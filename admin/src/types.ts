@@ -8,6 +8,8 @@ export type NavPage =
   | "users"
   | "analytics"
   | "coupons"
+  | "marketing"
+  | "finance"
   | "banners"
   | "settings"
   | "changelog"

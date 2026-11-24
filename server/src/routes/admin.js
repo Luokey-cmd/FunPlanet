@@ -79,6 +79,7 @@ function auditActionLabel(method, p) {
     return method === 'DELETE' ? '内容审核：删除内容' : '内容审核：调整可见状态';
   }
   if (head === 'users') return '编辑用户资料';
+  if (head === 'promotions') return `${verb}营销活动`;
   if (head === 'admins') return '调整管理员账号';
   if (head === 'support') return '客服中心操作';
   if (head === 'settings') {
@@ -1380,6 +1381,239 @@ router.delete('/banners/:id', adminAuthRequired, async (req, res) => {
   } catch {
     fail(res, 404, '轮播不存在');
   }
+});
+
+// 营销中心（2026-11-24 新增）：活动存取与校验；计价口径在
+// utils/promotions.js，这里不算钱。flash 明细随活动整存整取
+// （编辑时先删后建），活动与商品的特价关系以明细行为准。
+function serializePromotion(promo) {
+  return {
+    id: promo.id,
+    name: promo.name,
+    type: promo.type,
+    thresholdAmount: promo.thresholdAmount == null ? null : Number(promo.thresholdAmount),
+    discountAmount: promo.discountAmount == null ? null : Number(promo.discountAmount),
+    startsAt: promo.startsAt.toISOString(),
+    endsAt: promo.endsAt.toISOString(),
+    isActive: promo.isActive,
+    items: (promo.items ?? []).map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.product?.name ?? '',
+      productPrice: item.product ? Number(item.product.price) : null,
+      promoPrice: Number(item.promoPrice),
+    })),
+    createdAt: promo.createdAt.toISOString(),
+  };
+}
+
+// 校验并规整活动入参：通过返回 {data, items}，不过返回 {error}
+async function parsePromotionBody(body) {
+  const name = String(body?.name ?? '').trim();
+  const type = body?.type === 'flash' ? 'flash' : body?.type === 'threshold' ? 'threshold' : null;
+  const startsAt = new Date(String(body?.startsAt ?? ''));
+  const endsAt = new Date(String(body?.endsAt ?? ''));
+  if (!name) return { error: '活动名称不能为空' };
+  if (name.length > 50) return { error: '活动名称最多 50 字' };
+  if (!type) return { error: '活动类型无效' };
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) return { error: '活动时间无效' };
+  if (endsAt <= startsAt) return { error: '结束时间必须晚于开始时间' };
+
+  const data = { name, type, startsAt, endsAt, isActive: body?.isActive !== false };
+  if (type === 'threshold') {
+    const thresholdAmount = Number(body?.thresholdAmount);
+    const discountAmount = Number(body?.discountAmount);
+    if (!(thresholdAmount > 0)) return { error: '满减门槛必须大于 0' };
+    if (!(discountAmount > 0)) return { error: '满减金额必须大于 0' };
+    if (discountAmount >= thresholdAmount) return { error: '满减金额必须小于门槛' };
+    data.thresholdAmount = thresholdAmount;
+    data.discountAmount = discountAmount;
+    return { data, items: [] };
+  }
+
+  const rawItems = Array.isArray(body?.items) ? body.items : [];
+  if (rawItems.length === 0) return { error: '限时特价至少要选一件商品' };
+  const productIds = [...new Set(rawItems.map((item) => String(item?.productId ?? '').trim()).filter(Boolean))];
+  if (productIds.length !== rawItems.length) return { error: '特价商品有重复或为空' };
+  const products = await prisma.product.findMany({ where: { id: { in: productIds } } });
+  const productMap = new Map(products.map((prod) => [prod.id, prod]));
+  const items = [];
+  for (const raw of rawItems) {
+    const product = productMap.get(String(raw?.productId ?? '').trim());
+    if (!product) return { error: '特价商品不存在' };
+    const promoPrice = Number(raw?.promoPrice);
+    if (!(promoPrice > 0)) return { error: `商品「${product.name}」的特价必须大于 0` };
+    if (promoPrice >= Number(product.price)) {
+      return { error: `商品「${product.name}」的特价必须低于原价 ¥${Number(product.price)}` };
+    }
+    items.push({ productId: product.id, promoPrice });
+  }
+  data.thresholdAmount = null;
+  data.discountAmount = null;
+  return { data, items };
+}
+
+router.get('/promotions', adminAuthRequired, async (req, res) => {
+  const promotions = await prisma.promotion.findMany({
+    include: { items: { include: { product: { select: { name: true, price: true } } } } },
+    orderBy: { createdAt: 'desc' },
+  });
+  ok(res, { promotions: promotions.map(serializePromotion) });
+});
+
+router.post('/promotions', adminAuthRequired, async (req, res) => {
+  const parsed = await parsePromotionBody(req.body);
+  if (parsed.error) return fail(res, 400, parsed.error);
+  const created = await prisma.promotion.create({
+    data: { ...parsed.data, items: { create: parsed.items } },
+    include: { items: { include: { product: { select: { name: true, price: true } } } } },
+  });
+  log.info('后台', `新建营销活动「${created.name}」（${created.type === 'flash' ? '限时特价' : '满减'}）`);
+  ok(res, { promotion: serializePromotion(created) });
+});
+
+router.put('/promotions/:id', adminAuthRequired, async (req, res) => {
+  const existing = await prisma.promotion.findUnique({ where: { id: req.params.id } });
+  if (!existing) return fail(res, 404, '活动不存在');
+  const parsed = await parsePromotionBody(req.body);
+  if (parsed.error) return fail(res, 400, parsed.error);
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.promotionItem.deleteMany({ where: { promotionId: existing.id } });
+    return tx.promotion.update({
+      where: { id: existing.id },
+      data: { ...parsed.data, items: { create: parsed.items } },
+      include: { items: { include: { product: { select: { name: true, price: true } } } } },
+    });
+  });
+  ok(res, { promotion: serializePromotion(updated) });
+});
+
+router.delete('/promotions/:id', adminAuthRequired, async (req, res) => {
+  const existing = await prisma.promotion.findUnique({ where: { id: req.params.id } });
+  if (!existing) return fail(res, 404, '活动不存在');
+  await prisma.promotion.delete({ where: { id: existing.id } });
+  ok(res, { deleted: true });
+});
+
+// 财务账单（2026-11-24 新增）：钱只认 PaymentTransaction——
+// 收款腿看 paidAt（真付过款的时刻），退款腿看 status=refunded 的
+// updatedAt（退款生效时刻）。同一笔先收后退在流水里出现两行，
+// 是对账口径、不是重复计数：汇总的实收 = 收款 - 退款。
+function financeRange(req) {
+  const now = new Date();
+  let from = req.query.from ? new Date(String(req.query.from)) : new Date(now.getFullYear(), now.getMonth(), 1);
+  let to = req.query.to ? new Date(String(req.query.to)) : now;
+  if (Number.isNaN(from.getTime())) from = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (Number.isNaN(to.getTime())) to = now;
+  // 只给日期没给时刻时，to 补到当天最后一刻，不然当天的数据查不到
+  if (req.query.to && /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.to))) {
+    to.setHours(23, 59, 59, 999);
+  }
+  return { from, to };
+}
+
+async function financeEntries(from, to) {
+  const include = {
+    order: { select: { orderNo: true } },
+    user: { select: { nickname: true, phone: true } },
+  };
+  const [paidRows, refundedRows] = await Promise.all([
+    prisma.paymentTransaction.findMany({
+      where: { paidAt: { gte: from, lte: to } },
+      include,
+      orderBy: { paidAt: 'desc' },
+      take: 1000,
+    }),
+    prisma.paymentTransaction.findMany({
+      where: { status: 'refunded', updatedAt: { gte: from, lte: to } },
+      include,
+      orderBy: { updatedAt: 'desc' },
+      take: 1000,
+    }),
+  ]);
+  const entries = [
+    ...paidRows.map((row) => ({
+      id: `pay-${row.id}`,
+      kind: 'payment',
+      at: row.paidAt.toISOString(),
+      amount: Number(row.amount),
+      orderNo: row.order?.orderNo ?? '',
+      method: row.method,
+      userName: row.user?.nickname ?? '',
+      userPhone: row.user?.phone ?? '',
+    })),
+    ...refundedRows.map((row) => ({
+      id: `refund-${row.id}`,
+      kind: 'refund',
+      at: row.updatedAt.toISOString(),
+      amount: -Number(row.amount),
+      orderNo: row.order?.orderNo ?? '',
+      method: row.method,
+      userName: row.user?.nickname ?? '',
+      userPhone: row.user?.phone ?? '',
+    })),
+  ];
+  entries.sort((a, b) => (a.at < b.at ? 1 : -1));
+  return entries;
+}
+
+router.get('/finance/summary', adminAuthRequired, async (req, res) => {
+  const { from, to } = financeRange(req);
+  const entries = await financeEntries(from, to);
+  const income = entries.filter((e) => e.kind === 'payment').reduce((sum, e) => sum + e.amount, 0);
+  const refunds = entries.filter((e) => e.kind === 'refund').reduce((sum, e) => sum - e.amount, 0);
+  ok(res, {
+    summary: {
+      income,
+      refunds,
+      net: income - refunds,
+      paidCount: entries.filter((e) => e.kind === 'payment').length,
+      refundCount: entries.filter((e) => e.kind === 'refund').length,
+      from: from.toISOString(),
+      to: to.toISOString(),
+    },
+  });
+});
+
+router.get('/finance/transactions', adminAuthRequired, async (req, res) => {
+  const { from, to } = financeRange(req);
+  const type = ['payment', 'refund'].includes(String(req.query.type)) ? String(req.query.type) : 'all';
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
+  let entries = await financeEntries(from, to);
+  if (type !== 'all') entries = entries.filter((e) => e.kind === type);
+  const total = entries.length;
+  ok(res, {
+    transactions: entries.slice((page - 1) * pageSize, page * pageSize),
+    total,
+    page,
+    pageSize,
+  });
+});
+
+router.get('/finance/export', adminAuthRequired, async (req, res) => {
+  const { from, to } = financeRange(req);
+  const entries = await financeEntries(from, to);
+  const esc = (v) => `"${String(v ?? '').replaceAll('"', '""')}"`;
+  const lines = [
+    ['时间', '类型', '订单号', '用户', '手机号', '支付方式', '金额'].join(','),
+    ...entries.map((e) =>
+      [
+        e.at.replace('T', ' ').slice(0, 19),
+        e.kind === 'payment' ? '收款' : '退款',
+        e.orderNo,
+        e.userName,
+        e.userPhone,
+        e.method,
+        e.amount.toFixed(2),
+      ]
+        .map(esc)
+        .join(','),
+    ),
+  ];
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="finance.csv"');
+  res.send('\ufeff' + lines.join('\n'));
 });
 
 router.get('/settings', adminAuthRequired, (req, res) => {

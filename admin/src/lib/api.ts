@@ -60,6 +60,28 @@ async function downloadOrdersCsv(params?: { status?: string; keyword?: string })
   URL.revokeObjectURL(url);
 }
 
+async function downloadFinanceCsv(params?: { from?: string; to?: string }): Promise<void> {
+  const q = new URLSearchParams();
+  if (params?.from) q.set("from", params.from);
+  if (params?.to) q.set("to", params.to);
+  const qs = q.toString();
+  const token = getToken();
+  const res = await fetch(`/api/admin/finance/export${qs ? `?${qs}` : ""}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new ApiError(json.message || "导出失败", res.status);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `funplanet-finance-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export const adminApi = {
   login: (username: string, password: string) =>
     request<{ token: string; admin: AdminInfo }>("/auth/login", {
@@ -166,6 +188,32 @@ export const adminApi = {
     },
   ) => request(`/users/${id}/profile`, { method: "PATCH", body: JSON.stringify(body) }),
   coupons: () => request<{ coupons: AdminCoupon[] }>("/coupons"),
+  promotions: () => request<{ promotions: AdminPromotion[] }>("/promotions"),
+  createPromotion: (body: PromotionInput) =>
+    request<{ promotion: AdminPromotion }>("/promotions", { method: "POST", body: JSON.stringify(body) }),
+  updatePromotion: (id: string, body: PromotionInput) =>
+    request<{ promotion: AdminPromotion }>(`/promotions/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deletePromotion: (id: string) => request<{ deleted: boolean }>(`/promotions/${id}`, { method: "DELETE" }),
+  financeSummary: (params?: { from?: string; to?: string }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    const qs = q.toString();
+    return request<{ summary: AdminFinanceSummary }>(`/finance/summary${qs ? `?${qs}` : ""}`);
+  },
+  financeTransactions: (params?: { from?: string; to?: string; type?: string; page?: number; pageSize?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.from) q.set("from", params.from);
+    if (params?.to) q.set("to", params.to);
+    if (params?.type) q.set("type", params.type);
+    if (params?.page) q.set("page", String(params.page));
+    if (params?.pageSize) q.set("pageSize", String(params.pageSize));
+    const qs = q.toString();
+    return request<{ transactions: AdminFinanceEntry[]; total: number; page: number; pageSize: number }>(
+      `/finance/transactions${qs ? `?${qs}` : ""}`,
+    );
+  },
+  exportFinance: downloadFinanceCsv,
   createCoupon: (body: AdminCouponCreate) =>
     request<{ coupon: AdminCoupon }>("/coupons", { method: "POST", body: JSON.stringify(body) }),
   updateCoupon: (id: string, body: AdminCouponCreate) =>
@@ -570,6 +618,59 @@ export interface AdminCoupon {
   scope?: string;
   scopeValue?: string | null;
   claimType?: string | null;
+}
+
+export interface AdminPromotionItem {
+  id?: string;
+  productId: string;
+  productName?: string;
+  productPrice?: number | null;
+  promoPrice: number;
+}
+
+export interface AdminPromotion {
+  id: string;
+  name: string;
+  type: "threshold" | "flash";
+  thresholdAmount: number | null;
+  discountAmount: number | null;
+  startsAt: string;
+  endsAt: string;
+  isActive: boolean;
+  items: AdminPromotionItem[];
+  createdAt: string;
+}
+
+export interface PromotionInput {
+  name: string;
+  type: "threshold" | "flash";
+  thresholdAmount?: number;
+  discountAmount?: number;
+  startsAt: string;
+  endsAt: string;
+  isActive: boolean;
+  items?: { productId: string; promoPrice: number }[];
+}
+
+export interface AdminFinanceSummary {
+  income: number;
+  refunds: number;
+  net: number;
+  paidCount: number;
+  refundCount: number;
+  from: string;
+  to: string;
+}
+
+export interface AdminFinanceEntry {
+  id: string;
+  kind: "payment" | "refund";
+  at: string;
+  amount: number;
+  orderNo: string;
+  method: string;
+  userName: string;
+  userPhone: string;
 }
 
 export interface AdminCouponCreate {
