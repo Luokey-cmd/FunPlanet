@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../pages/cart_page.dart';
 import '../pages/home_page.dart';
 import '../pages/mall_page.dart';
+import '../pages/messages_page.dart';
 import '../pages/profile_page.dart';
 import '../pages/xiaodou_chat_page.dart';
 import '../providers/app_tab_provider.dart';
@@ -32,10 +33,12 @@ class _MainScreenState extends State<MainScreen>
 
   // 底部导航直达滑动（2026-11-23 hx 二次要求）：上一版用 PageView，
   // 相邻切换很顺，但从第 1 页跳到第 4 页时动画要拖着中间两页一起
-  // 滑，又卡又乱。改成两页直达：四页全部常驻（不在台前的用
+  // 滑，又卡又乱。改成两页直达：五页全部常驻（不在台前的用
   // Offstage 收起，状态与滚动位置都保住），切换时只有「离开的页」
   // 和「进来的页」两页参与滑动——出去一屏、进来一屏，距离多远
   // 都是同一种滑动、同一个时长，中间页不参与、不拖速度。
+  // 页序与 AppTab 枚举一一对应（首页/商城/消息/购物车/我的），
+  // 滑动方向只比下标大小，中间插入消息页后天然适配，不用改逻辑。
   late final AnimationController _slideCtrl = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 300),
@@ -46,6 +49,7 @@ class _MainScreenState extends State<MainScreen>
   late final List<Widget> _pages = const [
     _KeepAlivePage(key: ValueKey(AppTab.home), child: HomePage()),
     _KeepAlivePage(key: ValueKey(AppTab.mall), child: MallPage()),
+    _KeepAlivePage(key: ValueKey(AppTab.message), child: MessagesPage()),
     _KeepAlivePage(key: ValueKey(AppTab.cart), child: CartPage()),
     _KeepAlivePage(key: ValueKey(AppTab.profile), child: ProfilePage()),
   ];
@@ -122,7 +126,7 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
-  /// 四页在台上的摆法：当前页与滑出页按动画进度平移，其余页
+  /// 五页在台上的摆法：当前页与滑出页按动画进度平移，其余页
   /// Offstage 收起（不绘制、不响应，但状态保住）。
   Widget _pageLayer(int index, double width, double t) {
     final tab = AppTab.values[index];

@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/support_chat_provider.dart';
+import '../providers/user_provider.dart';
+import '../providers/xiaodou_chat_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../theme/app_theme.dart';
 
 import '../widgets/click_effect/app_pressable.dart';
 
-enum AppTab { home, mall, cart, profile }
+// 顺序即底部导航从左到右的顺序，也是 main_screen 里 _pages 的下标顺序，
+// 两边必须一一对应；「消息」固定在正中间（hx 2026-11-23 拍板）。
+enum AppTab { home, mall, message, cart, profile }
 
 class AppTabBar extends StatelessWidget {
   const AppTabBar({super.key, required this.active, required this.onChange});
@@ -30,6 +35,12 @@ class AppTabBar extends StatelessWidget {
       'assets/images/icon_nav_mall.png',
     ),
     (
+      AppTab.message,
+      '消息',
+      'assets/images/icon_nav_message_off.png',
+      'assets/images/icon_nav_message.png',
+    ),
+    (
       AppTab.cart,
       '购物车',
       'assets/images/icon_nav_cart_off.png',
@@ -46,6 +57,12 @@ class AppTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalCount = context.watch<CartProvider>().totalCount;
+    // 消息角标 = 消息页三行角标之和（hx 2026-11-23 定：内外必须一致）：
+    // 未读通知 + 客服未读 + 小豆盘点事项数（待付款笔数 + 快到期券张数）。
+    // 小豆事项办完/过期后盘点自然归零，角标跟着消，不会赖着不走。
+    final messageCount = context.watch<UserProvider>().unreadNotificationCount +
+        context.watch<SupportChatProvider>().supportUnreadTotal +
+        context.watch<XiaodouChatProvider>().briefingMatters.length;
 
     return Container(
       decoration: const BoxDecoration(
@@ -59,7 +76,13 @@ class AppTabBar extends StatelessWidget {
       child: Row(
         children: _tabs.map((tab) {
           final isActive = active == tab.$1;
-          final showBadge = tab.$1 == AppTab.cart && totalCount > 0;
+          // 角标数按格子分开算：购物车数件数、消息数三行之和，其余格子不挂。
+          final badgeCount = tab.$1 == AppTab.cart
+              ? totalCount
+              : tab.$1 == AppTab.message
+                  ? messageCount
+                  : 0;
+          final showBadge = badgeCount > 0;
           return Expanded(
             child: AppInkWell(
               onTap: () => onChange(tab.$1),
@@ -100,7 +123,7 @@ class AppTabBar extends StatelessWidget {
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                totalCount > 99 ? '99+' : '$totalCount',
+                                badgeCount > 99 ? '99+' : '$badgeCount',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: AppScale.t(11),

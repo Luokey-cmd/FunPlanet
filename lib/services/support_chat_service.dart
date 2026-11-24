@@ -26,6 +26,16 @@ class SupportChatService {
     return (conversation: conversation, messages: messages);
   }
 
+  // 拉当前用户的全部客服会话（服务端按 lastMessageAt 倒序）。
+  // 输入：无；输出：会话摘要列表（含 unreadUser 与 lastMessagePreview）。
+  // 只给消息中心做汇总用，不打开任何会话、不会触发已读。
+  Future<List<SupportConversation>> fetchConversations() async {
+    final data = await _client.get('/api/support/conversations', auth: true);
+    return (data['conversations'] as List<dynamic>? ?? [])
+        .map((e) => SupportConversation.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<SupportMessage>> fetchMessages(String conversationId, {DateTime? after}) async {
     final qs = after != null ? '?after=${Uri.encodeComponent(after.toUtc().toIso8601String())}' : '';
     final data = await _client.get('/api/support/conversations/$conversationId/messages$qs', auth: true);

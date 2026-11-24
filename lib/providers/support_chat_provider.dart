@@ -26,6 +26,33 @@ class SupportChatProvider extends ChangeNotifier {
 
   SupportConversation? get conversation => _conversation;
   List<SupportMessage> get messages => List.unmodifiable(_messages);
+
+  // 会话汇总（消息中心专用）：bindUser / 进消息页时只读拉一次列表，
+  // 不打开会话、不标已读。与正在聊的 _conversation 是两套数据，互不干扰。
+  List<SupportConversation> _conversationSummaries = [];
+
+  List<SupportConversation> get conversationSummaries =>
+      List.unmodifiable(_conversationSummaries);
+
+  /// 客服未读总数：全部会话 unreadUser 相加（通用会话 + 商品咨询会话都算，
+  /// 漏掉哪个都会出现「角标消了但里面还有红点」的对不上）。
+  int get supportUnreadTotal =>
+      _conversationSummaries.fold(0, (sum, c) => sum + c.unreadUser);
+
+  /// 最新一条客服消息预览：列表由服务端按 lastMessageAt 倒序，第一条即最新。
+  String? get latestSupportPreview =>
+      _conversationSummaries.isEmpty ? null : _conversationSummaries.first.lastMessagePreview;
+
+  /// 刷新会话汇总。拉不到就静默保留旧值（或空），不打扰用户、不弹错。
+  Future<void> refreshConversationSummaries() async {
+    if (_userKey == null) return;
+    try {
+      _conversationSummaries = await _service.fetchConversations();
+      notifyListeners();
+    } catch (_) {
+      // 静默：消息中心的行会按旧值/空显示，下次进来再拉。
+    }
+  }
   bool get loading => _loading;
   bool get sending => _sending;
   String? get error => _error;
@@ -47,6 +74,9 @@ class SupportChatProvider extends ChangeNotifier {
     if (userId != null) {
       await _restoreFromCache(sessionKey: 'general');
       unawaited(_open(productId: null, productName: null, subject: null));
+      // 顺带拉一次会话汇总，让底部「消息」角标一登录就有数；
+      // 不 await：汇总慢不能拖住聊天页打开。
+      unawaited(refreshConversationSummaries());
     }
     notifyListeners();
   }
@@ -117,6 +147,8 @@ class SupportChatProvider extends ChangeNotifier {
         ..clear()
         ..addAll(result.messages);
       await _service.markRead(result.conversation.id);
+      // 刚标完已读，顺手刷新汇总，不然消息中心的客服角标还挂着旧未读数。
+      unawaited(refreshConversationSummaries());
       await _persistCache();
       _startPolling();
       _error = null;
@@ -282,6 +314,7 @@ class SupportChatProvider extends ChangeNotifier {
     _userKey = null;
     _activeSessionKey = null;
     _conversation = null;
+    _conversationSummaries = [];
     _messages.clear();
     _loading = false;
     _sending = false;

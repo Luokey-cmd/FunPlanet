@@ -7,7 +7,6 @@ import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../utils/snackbar_utils.dart';
-import '../widgets/notification_sheet.dart';
 import '../widgets/product_image.dart';
 import '../widgets/starwish_dossier_sheet.dart';
 import '../widgets/sparkle_background.dart';
@@ -84,59 +83,14 @@ class _ProfileHeader extends StatelessWidget {
               ],
             ),
           ),
+          // 消息铃铛已撤（2026-11-23）：通知入口统一到底部导航「消息」页，
+          // 这里只留设置，避免两个入口各挂一套未读角标对不上。
           _HexIcon(
             icon: Icons.settings_outlined,
             onTap: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsPage()),
-              );
-            },
-          ),
-          SizedBox(width: _ps(10)),
-          // 消息铃铛带未读角标：数的是 UserProvider 里的未读通知数，
-          // 与首页顶栏用的是同一个数；0 条不显示，避免空角标占位。
-          Consumer<UserProvider>(
-            builder: (context, user, _) {
-              final unread = user.unreadNotificationCount;
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  _HexIcon(
-                    icon: Icons.notifications_outlined,
-                    onTap: () => NotificationSheet.show(context),
-                  ),
-                  if (unread > 0)
-                    Positioned(
-                      top: _ps(-4),
-                      right: _ps(-4),
-                      child: Container(
-                        constraints: BoxConstraints(
-                          minWidth: _ps(16),
-                          minHeight: _ps(16),
-                        ),
-                        padding: EdgeInsets.symmetric(horizontal: _ps(4)),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE53935),
-                          borderRadius: BorderRadius.circular(_ps(999)),
-                          border: Border.all(
-                            color: Colors.white,
-                            width: _ps(1.2),
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          unread > 99 ? '99+' : '$unread',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: _pt(9),
-                            fontWeight: FontWeight.bold,
-                            height: 1.1,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
               );
             },
           ),

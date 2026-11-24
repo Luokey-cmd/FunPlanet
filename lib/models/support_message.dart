@@ -67,6 +67,8 @@ class SupportConversation {
     this.productId,
     this.productName,
     this.unreadUser = 0,
+    this.lastMessagePreview,
+    this.lastMessageAt,
   });
 
   final String id;
@@ -76,6 +78,12 @@ class SupportConversation {
   final String? productName;
   final int unreadUser;
 
+  // 最后一条消息预览与时间：服务端 serializeConversation 一直有下发，
+  // 此前 App 侧没接。消息中心「客服中心」行靠它显示副标题，不用为了一行
+  // 预览去打开会话。老缓存里没有这两个字段，解析时按空处理（不炸）。
+  final String? lastMessagePreview;
+  final DateTime? lastMessageAt;
+
   factory SupportConversation.fromJson(Map<String, dynamic> json) {
     return SupportConversation(
       id: json['id'] as String,
@@ -84,6 +92,8 @@ class SupportConversation {
       productId: json['productId'] as String?,
       productName: json['productName'] as String?,
       unreadUser: json['unreadUser'] as int? ?? 0,
+      lastMessagePreview: json['lastMessagePreview'] as String?,
+      lastMessageAt: DateTime.tryParse(json['lastMessageAt'] as String? ?? ''),
     );
   }
 
@@ -94,5 +104,7 @@ class SupportConversation {
         if (productId != null) 'productId': productId,
         if (productName != null) 'productName': productName,
         'unreadUser': unreadUser,
+        if (lastMessagePreview != null) 'lastMessagePreview': lastMessagePreview,
+        if (lastMessageAt != null) 'lastMessageAt': lastMessageAt!.toUtc().toIso8601String(),
       };
 }
