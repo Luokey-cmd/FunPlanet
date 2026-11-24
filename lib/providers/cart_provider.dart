@@ -37,21 +37,24 @@ class CartProvider extends ChangeNotifier {
     }
   }
 
-  void addItem(Product product) {
+  /// 加入购物车。输入：商品 + 件数（详情页规格弹层可选数量，默认 1 件）。
+  /// 坑：云端同步必须把件数一起带过去，只同步 1 件的话弹层选 3 件、服务端只记 1 件。
+  void addItem(Product product, {int quantity = 1}) {
     AppLog.info('购物车', '加入购物车：${product.name}');
+    final count = quantity < 1 ? 1 : quantity;
     final index = _items.indexWhere((i) => i.product.id == product.id);
     if (index >= 0) {
-      _items[index] = _items[index].copyWith(quantity: _items[index].quantity + 1);
+      _items[index] = _items[index].copyWith(quantity: _items[index].quantity + count);
     } else {
-      _items.add(CartItem(product: product, quantity: 1, spec: product.spec));
+      _items.add(CartItem(product: product, quantity: count, spec: product.spec));
     }
     notifyListeners();
-    if (_cloudSync) unawaited(_syncAddItem(product.id));
+    if (_cloudSync) unawaited(_syncAddItem(product.id, count));
   }
 
-  Future<void> _syncAddItem(String productId) async {
+  Future<void> _syncAddItem(String productId, int quantity) async {
     try {
-      await _api.addItem(productId);
+      await _api.addItem(productId, quantity: quantity);
     } catch (_) {
       await loadFromRemote();
     }

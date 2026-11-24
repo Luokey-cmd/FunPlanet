@@ -42,12 +42,16 @@ Map<String, dynamic> _archiveOf(BuildContext context) {
 }
 
 class XiaodouChatPage extends StatefulWidget {
-  const XiaodouChatPage({super.key, this.autoDraw = false});
+  const XiaodouChatPage({super.key, this.autoDraw = false, this.initialPrompt});
 
   /// 进来就自动抽一次翻牌（小豆首页「翻牌推荐」卡用）。
   final bool autoDraw;
 
-  static Future<void> open(BuildContext context, {bool autoDraw = false}) {
+  /// 进来就替用户问的第一句话（商品详情页「小豆点评」卡用，带着商品名来问）。
+  /// 为空时什么都不自动发，和普通进入一致。
+  final String? initialPrompt;
+
+  static Future<void> open(BuildContext context, {bool autoDraw = false, String? initialPrompt}) {
     final chat = context.read<XiaodouChatProvider>();
     return Navigator.push<void>(
       context,
@@ -57,7 +61,7 @@ class XiaodouChatPage extends StatefulWidget {
             ChangeNotifierProvider.value(value: chat),
             ChangeNotifierProvider.value(value: context.read<StarwishProfileProvider>()),
           ],
-          child: XiaodouChatPage(autoDraw: autoDraw),
+          child: XiaodouChatPage(autoDraw: autoDraw, initialPrompt: initialPrompt),
         ),
       ),
     );
@@ -202,11 +206,22 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
     });
     // 普通进入：什么都不自动做——不再弹星愿档案问卷，首页区就是入口。
     // 只有为抽牌而来（autoDraw）时才保留原来的自动抽三翻。
-    if (!widget.autoDraw) return;
+    if (widget.autoDraw) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        if (!mounted) return;
+        _drawFateCards(context);
+      });
+      return;
+    }
+    // 带着问题进来（详情页小豆点评卡）：等页面站稳后替用户把这句问出去，
+    // 发送口径和首页区一致（带档案、忙碌时不发），用户也可以不理它自己聊。
+    final prompt = widget.initialPrompt?.trim() ?? '';
+    if (prompt.isEmpty) return;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await Future<void>.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
-      _drawFateCards(context);
+      _sendHomeText(context, prompt);
     });
   }
 

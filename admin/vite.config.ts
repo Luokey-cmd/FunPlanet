@@ -17,7 +17,7 @@ const lucideIconNames = Object.keys(lucide).filter(
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, "");
-  const apiTarget = env.VITE_API_PROXY_TARGET || "http://127.0.0.1:3000";
+  const apiTarget = env.VITE_API_PROXY_TARGET || "http://127.0.0.1:3200";
 
   return {
   plugins: [

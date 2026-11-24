@@ -41,13 +41,13 @@ class CheckoutPage extends StatefulWidget {
     );
   }
 
-  static void openBuyNow(BuildContext context, Product product) {
+  static void openBuyNow(BuildContext context, Product product, {int quantity = 1}) {
     Navigator.push<void>(
       context,
       MaterialPageRoute(
         builder: (_) => CheckoutPage(
           items: [
-            CartItem(product: product, quantity: 1, spec: product.spec),
+            CartItem(product: product, quantity: quantity < 1 ? 1 : quantity, spec: product.spec),
           ],
         ),
       ),

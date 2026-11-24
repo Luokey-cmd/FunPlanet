@@ -491,6 +491,8 @@ router.post('/products', adminAuthRequired, async (req, res) => {
       imagePath: String(body.imagePath ?? ''),
       // 多图与导购结构化字段（2026-11-20 新增）：后台传了才写；多图第一张默认与主图一致由前端保证
       imagePaths: Array.isArray(body.imagePaths) ? body.imagePaths.map((x) => String(x)).filter(Boolean).slice(0, 9) : [],
+      // 详情长图组：详情页介绍区纵向长图，最多 20 张
+      detailImages: Array.isArray(body.detailImages) ? body.detailImages.map((x) => String(x)).filter(Boolean).slice(0, 20) : [],
       videoPath: body.videoPath ? String(body.videoPath) : null,
       brand: body.brand ? String(body.brand) : null,
       series: body.series ? String(body.series) : null,
@@ -528,6 +530,9 @@ router.put('/products/:id', adminAuthRequired, async (req, res) => {
         imagePath: body.imagePath,
         imagePaths: Array.isArray(body.imagePaths)
           ? body.imagePaths.map((x) => String(x)).filter(Boolean).slice(0, 9)
+          : undefined,
+        detailImages: Array.isArray(body.detailImages)
+          ? body.detailImages.map((x) => String(x)).filter(Boolean).slice(0, 20)
           : undefined,
         videoPath: body.videoPath !== undefined ? (body.videoPath ? String(body.videoPath) : null) : undefined,
         brand: body.brand !== undefined ? (body.brand ? String(body.brand) : null) : undefined,

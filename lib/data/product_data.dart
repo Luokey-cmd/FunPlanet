@@ -24,6 +24,8 @@ class Product {
     this.imageIcon,
     // 下面是后端字段整改后新增的商品信息，老商品没有时为空，不影响原有展示。
     this.imagePaths = const [],
+    this.detailImages = const [],
+    this.stock = 100,
     this.videoPath,
     this.brand,
     this.rarity,
@@ -52,6 +54,10 @@ class Product {
   final IconData? imageIcon;
   // 多图列表（第一张应与 imagePath 主图一致）；为空时详情页只显示主图。
   final List<String> imagePaths;
+  // 详情长图列表（详情页介绍区纵向展示）；为空时整段不显示。
+  final List<String> detailImages;
+  // 库存：老接口没返回时按 100 兜底；详情页用它提示「仅剩 N 件」和售完置灰。
+  final int stock;
   final String? videoPath;
   final String? brand;
   final String? rarity;
@@ -91,6 +97,11 @@ class Product {
           .map((e) => '$e')
           .where((e) => e.isNotEmpty)
           .toList(),
+      detailImages: (json['detailImages'] as List<dynamic>? ?? [])
+          .map((e) => '$e')
+          .where((e) => e.isNotEmpty)
+          .toList(),
+      stock: (json['stock'] as num?)?.toInt() ?? 100,
       videoPath: json['videoPath'] as String?,
       brand: json['brand'] as String?,
       rarity: json['rarity'] as String?,

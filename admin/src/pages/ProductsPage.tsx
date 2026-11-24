@@ -28,6 +28,7 @@ const emptyForm: Partial<AdminProduct> & { id: string; name: string } = {
   rating: 5,
   imagePath: "",
   imagePaths: [],
+  detailImages: [],
   videoPath: null,
   brand: null,
   series: null,
@@ -371,6 +372,20 @@ export default function ProductsPage() {
                     setEditing({
                       ...editing,
                       imagePaths: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean),
+                    })
+                  }
+                  className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">详情长图路径（一行一张；详情页「商品介绍」区纵向展示用，可留空）</span>
+                <textarea
+                  rows={3}
+                  value={(editing.detailImages ?? []).join("\n")}
+                  onChange={(e) =>
+                    setEditing({
+                      ...editing,
+                      detailImages: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean),
                     })
                   }
                   className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"

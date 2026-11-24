@@ -102,6 +102,8 @@ model Product {
   imagePath            String                @map("image_path")
   // 商品多图：imagePath 仍是主图（老代码和 App 都读它），imagePaths 是详情页轮播的全部图，第一张应与主图一致
   imagePaths           String[]              @default([]) @map("image_paths")
+  // 详情长图：详情页「商品介绍」区纵向排列的图文长图组，和轮播多图分开维护；没填就不显示这一段
+  detailImages         String[]              @default([]) @map("detail_images")
   // 商品视频路径：没有视频就是空，详情页有值才显示视频位
   videoPath            String?               @map("video_path")
   // 品牌与 IP/系列：潮玩按 IP 找货是刚需，之前只能写进描述文字里、没法筛选

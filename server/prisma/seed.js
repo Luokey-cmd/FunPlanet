@@ -59,6 +59,8 @@ async function main() {
         imagePath: p.imagePath,
         // 多图先用主图兜底成一张，后台补图后自然变多
         imagePaths: [p.imagePath],
+        // 详情长图：数据文件里有就带上，没有就是空数组（后台可后续补）
+        detailImages: Array.isArray(p.detailImages) ? p.detailImages : [],
       },
       update: {
         name: p.name,
@@ -76,6 +78,7 @@ async function main() {
         rating: p.rating,
         imagePath: p.imagePath,
         imagePaths: [p.imagePath],
+        detailImages: Array.isArray(p.detailImages) ? p.detailImages : [],
       },
     });
   }

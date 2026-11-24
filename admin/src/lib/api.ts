@@ -414,6 +414,7 @@ export interface AdminProduct {
   imagePath: string;
   // 2026-11-20 后端新增：多图、视频、品牌/系列、稀有度、导购结构化卖点
   imagePaths?: string[];
+  detailImages?: string[];
   videoPath?: string | null;
   brand?: string | null;
   series?: string | null;
