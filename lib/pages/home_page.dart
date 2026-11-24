@@ -12,7 +12,7 @@ import '../widgets/app_tab_bar.dart';
 import '../widgets/banner_carousel.dart';
 import '../widgets/home_top_bar.dart';
 import '../widgets/sparkle_background.dart';
-import '../widgets/staggered_product_grid.dart';
+import '../widgets/product_card.dart';
 import 'user_feature_sheets.dart';
 
 import '../widgets/click_effect/app_pressable.dart';
@@ -24,6 +24,35 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  // 市集 tab 状态（原 _MarketSection 的状态上移到这里）：市集网格改
+  // 按需加载（见下方 build 的说明）后，标题行、榜单切换行、网格是
+  // CustomScrollView 里并列的几个 sliver，不再是一整个组件，状态
+  // 只能由页面统一持有。
+  MarketTab _marketTab = MarketTab.recommend;
+  RankingSubTab _rankingSub = RankingSubTab.sales;
+
+  void _selectMarketTab(MarketTab next) {
+    if (next == _marketTab) return;
+    setState(() => _marketTab = next);
+  }
+
+  void _selectRankingSub(RankingSubTab next) {
+    if (next == _rankingSub) return;
+    setState(() => _rankingSub = next);
+  }
+
+  /// 市集网格的一张卡：图高沿用原瀑布流的交错规则（偶数位看 id 哈希、
+  /// 奇数位反着来，在 130/160 之间交错），只是构建时机改成滚到才建。
+  Widget _marketCard(Product product, int index) {
+    final hashEven = product.id.hashCode.isEven;
+    final tall = index.isEven ? !hashEven : hashEven;
+    return ProductCard(
+      product: product,
+      layout: ProductCardLayout.staggered,
+      imageHeight: AppScale.s(tall ? 160 : 130),
+    );
+  }
+
   void _claimNewcomer(UserProvider user) {
     if (user.newcomerClaimed) {
       UserFeatureSheets.showCoupons(context);
@@ -39,6 +68,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final marketItems = productsByMarketTab(_marketTab, rankingSub: _rankingSub);
     return RepaintBoundary(
       child: SparkleBackground(
         child: CustomScrollView(
@@ -51,7 +81,82 @@ class _HomePageState extends State<HomePage> {
             SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
             SliverToBoxAdapter(child: _NewcomerSection(onClaim: _claimNewcomer)),
             SliverToBoxAdapter(child: SizedBox(height: AppScale.s(24))),
-            const SliverToBoxAdapter(child: RepaintBoundary(child: _MarketSection())),
+            SliverToBoxAdapter(
+              child: _MarketHeader(tab: _marketTab, onSelect: _selectMarketTab),
+            ),
+            if (_marketTab == MarketTab.ranking)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppScale.s(16)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          _RankingChip(
+                            label: '收藏排行榜单',
+                            active: _rankingSub == RankingSubTab.collect,
+                            onTap: () => _selectRankingSub(RankingSubTab.collect),
+                          ),
+                          SizedBox(width: AppScale.s(8)),
+                          _RankingChip(
+                            label: '售卖排行榜单',
+                            active: _rankingSub == RankingSubTab.sales,
+                            onTap: () => _selectRankingSub(RankingSubTab.sales),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: AppScale.s(12)),
+                    ],
+                  ),
+                ),
+              ),
+            // 市集网格按需加载（2026-11-24 治切页卡顿）：原来是
+            // StaggeredProductGrid 把全部商品卡塞进两列 Column 一次
+            // 建完——商品涨到 260 件后，一次构建实测 517 毫秒（性能
+            // 图 Build 阶段），切到首页必卡一帧大的。改成与商城页
+            // 同款的 SliverList 按行构建：滚到哪建到哪，首屏只建
+            // 看得见的约 6 张。代价：市集内部切 tab 时原先整块内容
+            // 的滑动淡入动画（AnimatedSwitcher）保不住了——内容成
+            // 了 sliver 就没有整块可换，hx 已确认简化掉。
+            if (marketItems.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppScale.s(16)),
+                  child: Text(
+                    '暂无推荐商品',
+                    style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground),
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: AppScale.s(16)),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, rowIndex) {
+                      final leftIndex = rowIndex * 2;
+                      final rightIndex = leftIndex + 1;
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: AppScale.s(10)),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: _marketCard(marketItems[leftIndex], leftIndex)),
+                            SizedBox(width: AppScale.s(10)),
+                            Expanded(
+                              child: rightIndex < marketItems.length
+                                  ? _marketCard(marketItems[rightIndex], rightIndex)
+                                  : const SizedBox.shrink(),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    childCount: (marketItems.length + 1) ~/ 2,
+                  ),
+                ),
+              ),
             SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
           ],
         ),
@@ -475,45 +580,17 @@ class _ChatBubblePainter extends CustomPainter {
       tailLength != oldDelegate.tailLength;
 }
 
-class _MarketSection extends StatefulWidget {
-  const _MarketSection();
+/// 市集标题行 + tab 条（原 _MarketSection 的上半截）：网格改按需
+/// 加载后，它只是 CustomScrollView 里并列的一个普通 sliver 盒子，
+/// tab 状态由 _HomePageState 持有、经参数传进来。
+class _MarketHeader extends StatelessWidget {
+  const _MarketHeader({required this.tab, required this.onSelect});
 
-  @override
-  State<_MarketSection> createState() => _MarketSectionState();
-}
-
-class _MarketSectionState extends State<_MarketSection> {
-  MarketTab _tab = MarketTab.recommend;
-  RankingSubTab _rankingSub = RankingSubTab.sales;
-
-  // 市集 tab 滑动切换（2026-11-23 hx 要求）：记住滑动方向——
-  // 往右边的 tab 走，新内容从右滑入；往左回，从左滑入。
-  int _slideDir = 1;
-
-  void _selectTab(MarketTab next) {
-    if (next == _tab) return;
-    final oldIndex = marketTabs.indexWhere((t) => t.$1 == _tab);
-    final newIndex = marketTabs.indexWhere((t) => t.$1 == next);
-    setState(() {
-      _slideDir = newIndex >= oldIndex ? 1 : -1;
-      _tab = next;
-    });
-  }
-
-  void _selectSub(RankingSubTab next) {
-    if (next == _rankingSub) return;
-    // 子榜单在行里的顺序是收藏在前、售卖在后，按这个顺序定方向。
-    const order = [RankingSubTab.collect, RankingSubTab.sales];
-    setState(() {
-      _slideDir = order.indexOf(next) >= order.indexOf(_rankingSub) ? 1 : -1;
-      _rankingSub = next;
-    });
-  }
+  final MarketTab tab;
+  final ValueChanged<MarketTab> onSelect;
 
   @override
   Widget build(BuildContext context) {
-    final items = productsByMarketTab(_tab, rankingSub: _rankingSub);
-
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: AppScale.s(16)),
       child: Column(
@@ -534,10 +611,10 @@ class _MarketSectionState extends State<_MarketSection> {
             height: AppScale.s(32),
             child: Row(
               children: marketTabs.map((t) {
-                final active = _tab == t.$1;
+                final active = tab == t.$1;
                 return Expanded(
                   child: AppGestureDetector(
-                    onTap: () => _selectTab(t.$1),
+                    onTap: () => onSelect(t.$1),
                     behavior: HitTestBehavior.opaque,
                     enablePressScale: false,
                     enableParticle: false,
@@ -571,48 +648,6 @@ class _MarketSectionState extends State<_MarketSection> {
             ),
           ),
           SizedBox(height: AppScale.s(12)),
-          // 内容区滑动切换：新内容按 _slideDir 从一侧滑入、旧的淡出，
-          // 不再整块瞬换。子榜单切换同走这条动画（key 带上子榜单）。
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 260),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeOutCubic,
-            transitionBuilder: (child, animation) {
-              final slide = Tween<Offset>(
-                begin: Offset(_slideDir * 0.16, 0),
-                end: Offset.zero,
-              ).animate(animation);
-              return SlideTransition(
-                position: slide,
-                child: FadeTransition(opacity: animation, child: child),
-              );
-            },
-            child: Column(
-              key: ValueKey('${_tab.name}-${_rankingSub.name}'),
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_tab == MarketTab.ranking) ...[
-                  Row(
-                    children: [
-                      _RankingChip(
-                        label: '收藏排行榜单',
-                        active: _rankingSub == RankingSubTab.collect,
-                        onTap: () => _selectSub(RankingSubTab.collect),
-                      ),
-                      SizedBox(width: AppScale.s(8)),
-                      _RankingChip(
-                        label: '售卖排行榜单',
-                        active: _rankingSub == RankingSubTab.sales,
-                        onTap: () => _selectSub(RankingSubTab.sales),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: AppScale.s(12)),
-                ],
-                StaggeredProductGrid(products: items),
-              ],
-            ),
-          ),
         ],
       ),
     );

@@ -25,9 +25,12 @@ void main() {
         statusBarIconBrightness: Brightness.dark,
       ),
     );
-    // 多商品页切 Tab 时尽量保住已解码图片，减少空白闪一下。
-    PaintingBinding.instance.imageCache.maximumSize = 300;
-    PaintingBinding.instance.imageCache.maximumSizeBytes = 120 << 20;
+    // 多商品页切 Tab 时尽量保住已解码图片，减少重复解码与空白闪一下。
+    // 商品图原图较大（1254×1254），原缓存（300 张 / 120MB）装不下几个
+    // 页面的图，先前页面的图被挤掉后切回来要重新整张解码、造成卡顿，
+    // 故把条数与总字节都放大（2026-11-24）。
+    PaintingBinding.instance.imageCache.maximumSize = 600;
+    PaintingBinding.instance.imageCache.maximumSizeBytes = 256 << 20;
     AppLog.info('系统', 'App 启动');
     runApp(const FunPlanetApp());
   });

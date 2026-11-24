@@ -40,8 +40,9 @@ class AppNetworkImage extends StatelessWidget {
       height: height,
       fit: fit,
       filterQuality: filterQuality,
+      // 与本地图同一条规矩：解码尺寸只给一个方向，宽高都给会被硬拉变形。
       memCacheWidth: memW,
-      memCacheHeight: memH,
+      memCacheHeight: memW == null ? memH : null,
       fadeInDuration: Duration.zero,
       fadeOutDuration: Duration.zero,
       placeholder: (_, __) => fallback,

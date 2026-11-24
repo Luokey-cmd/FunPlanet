@@ -83,8 +83,11 @@ class ProductImage extends StatelessWidget {
       fit: fit,
       filterQuality: FilterQuality.medium,
       gaplessPlayback: true,
+      // 解码尺寸只给一个方向：宽高都给具体数时，编解码器会把图硬拉成
+      // 目标尺寸、不保比例（方形商品图放进宽框会被拉宽压扁，2026-11-24
+      // 实锤）。只给宽度，另一方向按原图比例自动算，裁切交给 fit 管。
       cacheWidth: cacheW,
-      cacheHeight: cacheH,
+      cacheHeight: cacheW == null ? cacheH : null,
       errorBuilder: (context, error, stackTrace) => _assetFallback(path),
     );
   }

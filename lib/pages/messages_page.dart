@@ -110,6 +110,8 @@ class _MessagesPageState extends State<MessagesPage> {
               children: [
                 _EntryRow(
                   icon: Icons.notifications_outlined,
+                  imageAsset: 'assets/images/icon_pf_notice.png',
+                  imageSize: 46,
                   title: '交易通知',
                   subtitle: notifications.isEmpty
                       ? '暂无新通知'
@@ -122,6 +124,7 @@ class _MessagesPageState extends State<MessagesPage> {
                 SizedBox(height: AppScale.s(10)),
                 _EntryRow(
                   icon: Icons.support_agent_outlined,
+                  imageAsset: 'assets/images/icon_pf_support.png',
                   title: '客服中心',
                   subtitle: support.latestSupportPreview ?? '有问题随时找客服',
                   badgeCount: support.supportUnreadTotal,
@@ -172,6 +175,8 @@ class _MessagesPageState extends State<MessagesPage> {
 class _EntryRow extends StatelessWidget {
   const _EntryRow({
     required this.icon,
+    this.imageAsset,
+    this.imageSize = 40,
     required this.title,
     required this.subtitle,
     required this.badgeCount,
@@ -179,6 +184,14 @@ class _EntryRow extends StatelessWidget {
   });
 
   final IconData icon;
+
+  /// 珐琅徽章图（与「我的」页同一套图标风格）：传了就直接摆图、不套
+  /// 浅色圆圈；没传才用 icon 的线条图标老样式（小豆提醒行还在用）。
+  final String? imageAsset;
+
+  /// 徽章图显示边长（名义值）：铃铛图已去掉粉色底框、只剩本体，
+  /// 同尺寸下视觉偏小，交易通知一行单独放大到 46（hx 2026-11-24 定）。
+  final double imageSize;
   final String title;
   final String subtitle;
   final int badgeCount;
@@ -201,15 +214,22 @@ class _EntryRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: AppScale.s(40),
-              height: AppScale.s(40),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
+            if (imageAsset != null)
+              Image.asset(
+                imageAsset!,
+                width: AppScale.s(imageSize),
+                height: AppScale.s(imageSize),
+              )
+            else
+              Container(
+                width: AppScale.s(40),
+                height: AppScale.s(40),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: AppColors.primary, size: AppScale.s(21)),
               ),
-              child: Icon(icon, color: AppColors.primary, size: AppScale.s(21)),
-            ),
             SizedBox(width: AppScale.s(12)),
             Expanded(
               child: Column(
