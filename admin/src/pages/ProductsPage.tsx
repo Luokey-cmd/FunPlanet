@@ -4,6 +4,7 @@ import { SearchIcon, PlusIcon, EditIcon, TrashIcon, HeartIcon, XIcon } from "luc
 import { toast } from "sonner";
 import AdminImagePicker from "../components/AdminImagePicker";
 import ProductImageThumb from "../components/ProductImageThumb";
+import CategoriesPage from "./CategoriesPage";
 import { adminApi, type AdminProduct } from "../lib/api";
 
 // 分类改从「分类管理」接口读；接口不可用时用这组默认值兜底
@@ -43,6 +44,9 @@ export default function ProductsPage() {
   const [category, setCategory] = useState("全部");
   const [editing, setEditing] = useState<(Partial<AdminProduct> & { id: string; name: string }) | null>(null);
   const [isNew, setIsNew] = useState(false);
+  // 页签：商品列表 / 分类管理。分类管理原来是独立菜单，2026-11-24 合并进本页，
+  // 分类内容直接复用 CategoriesPage 的嵌入模式，增删改逻辑一份不改。
+  const [tab, setTab] = useState<"products" | "categories">("products");
 
   const { data: categoriesData } = useQuery({
     queryKey: ["admin-categories"],
@@ -120,6 +124,29 @@ export default function ProductsPage() {
 
   return (
     <div data-cmp="ProductsPage" className="p-6 flex flex-col gap-5">
+      <div className="flex gap-2">
+        {(
+          [
+            { key: "products", label: "商品列表" },
+            { key: "categories", label: "分类管理" },
+          ] as const
+        ).map((item) => (
+          <button
+            key={item.key}
+            onClick={() => setTab(item.key)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+              tab === item.key
+                ? "bg-primary text-primary-foreground"
+                : "bg-card border border-border text-muted-foreground hover:bg-accent"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "products" && (
+        <>
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-foreground">商品列表</h2>
@@ -260,6 +287,10 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
+        </>
+      )}
+
+      {tab === "categories" && <CategoriesPage embedded />}
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">

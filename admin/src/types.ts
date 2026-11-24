@@ -1,7 +1,6 @@
 export type NavPage =
   | "dashboard"
   | "products"
-  | "categories"
   | "afterSales"
   | "moderation"
   | "orders"

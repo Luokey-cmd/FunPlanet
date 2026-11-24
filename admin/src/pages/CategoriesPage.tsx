@@ -6,7 +6,9 @@ import { adminApi, ApiError, type AdminCategory, type CategoryInput } from "../l
 
 const emptyForm: CategoryInput = { name: "", sortOrder: undefined };
 
-export default function CategoriesPage() {
+// embedded：被商品管理页当「分类管理」页签嵌入时用——去掉整页外边距与标题
+// （页签上已有「分类管理」字样），说明文案、添加按钮与全部增删改逻辑保持不变。
+export default function CategoriesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState<AdminCategory | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -71,10 +73,10 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div data-cmp="CategoriesPage" className="p-6 flex flex-col gap-5">
+    <div data-cmp="CategoriesPage" className={embedded ? "flex flex-col gap-5" : "p-6 flex flex-col gap-5"}>
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">分类管理</h2>
+          {!embedded && <h2 className="text-lg font-semibold text-foreground">分类管理</h2>}
           <p className="text-sm text-muted-foreground">
             共 {categories.length} 个大分类。改名会自动同步到该分类下的商品；分类下还有商品时不能删除。
           </p>

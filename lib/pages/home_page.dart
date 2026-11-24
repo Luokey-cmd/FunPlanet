@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../data/product_data.dart';
 import '../providers/app_tab_provider.dart';
 import '../providers/user_provider.dart';
+import '../providers/product_catalog_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../utils/snackbar_utils.dart';
@@ -68,6 +69,9 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // watch 目录状态：断网顶上本地缓存时要在首页顶部出提示条，
+    // 顺带让目录数据刷新时首页跟着重建（原来只靠轮播图组件 watch）。
+    final catalog = context.watch<ProductCatalogProvider>();
     final marketItems = productsByMarketTab(_marketTab, rankingSub: _rankingSub);
     return RepaintBoundary(
       child: SparkleBackground(
@@ -75,6 +79,30 @@ class _HomePageState extends State<HomePage> {
           physics: const ClampingScrollPhysics(),
           slivers: [
             const SliverToBoxAdapter(child: HomeTopBar()),
+            if (catalog.showStaleHint)
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: EdgeInsets.fromLTRB(AppScale.s(16), AppScale.s(10), AppScale.s(16), 0),
+                  padding: EdgeInsets.symmetric(horizontal: AppScale.s(12), vertical: AppScale.s(8)),
+                  decoration: BoxDecoration(
+                    color: AppColors.muted,
+                    borderRadius: BorderRadius.circular(AppScale.s(10)),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.cloud_off_outlined, size: AppScale.s(15), color: AppColors.mutedForeground),
+                      SizedBox(width: AppScale.s(6)),
+                      Expanded(
+                        child: Text(
+                          '未连上服务端，正在显示上次打开时的数据',
+                          style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             const SliverToBoxAdapter(child: BannerCarousel()),
             SliverToBoxAdapter(child: SizedBox(height: AppScale.s(12))),
             const SliverToBoxAdapter(child: _QuickActions()),

@@ -16,7 +16,6 @@ const pageTitles: Record<NavPage, string> = {
   dashboard: "数据看板",
   analytics: "营收分析",
   products: "商品管理",
-  categories: "分类管理",
   orders: "订单管理",
   afterSales: "售后处理",
   moderation: "内容审核",

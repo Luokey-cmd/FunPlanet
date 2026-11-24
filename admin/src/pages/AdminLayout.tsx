@@ -28,7 +28,6 @@ import ModerationPage from "./ModerationPage";
 
 import ProductsPage from "./ProductsPage";
 
-import CategoriesPage from "./CategoriesPage";
 
 import AdminsPage from "./AdminsPage";
 
@@ -171,7 +170,6 @@ export default function AdminLayout() {
 
           {effectivePage === "products" && <ProductsPage />}
 
-          {effectivePage === "categories" && <CategoriesPage />}
 
           {effectivePage === "orders" && <OrdersPage />}
 

@@ -127,6 +127,41 @@ class Product {
       promoEndsAt: json['promoEndsAt'] as String?,
     );
   }
+
+  // 与 fromJson 一一对应的写回：本地缓存存盘时用（见 ProductCacheService）。
+  // imageColor / imageIcon 是界面用的临时值、不来自接口，不进缓存。
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'nameEn': nameEn,
+      'price': price,
+      'originalPrice': originalPrice,
+      'category': category,
+      'subCategory': subCategory,
+      'majorCategory': majorCategory,
+      'tag': tag,
+      'tagColor': tagColor,
+      'description': description,
+      'purchaseNotes': purchaseNotes,
+      'rating': rating,
+      'sales': sales,
+      'spec': spec,
+      'series': series,
+      'imagePath': imagePath,
+      'imagePaths': imagePaths,
+      'detailImages': detailImages,
+      'stock': stock,
+      'videoPath': videoPath,
+      'brand': brand,
+      'rarity': rarity,
+      'suitableFor': suitableFor,
+      'sellingPoints': sellingPoints,
+      'promoPrice': promoPrice,
+      'promotionName': promotionName,
+      'promoEndsAt': promoEndsAt,
+    };
+  }
 }
 
 class CartItem {
@@ -437,6 +472,14 @@ class BannerItem {
       imagePath: json['imagePath'] as String,
       productId: json['productId'] as String,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'imagePath': imagePath,
+      'productId': productId,
+    };
   }
 }
 
