@@ -90,7 +90,13 @@ class UserAvatarImage extends StatelessWidget {
 
   Widget _wrap(Widget child) {
     if (borderRadius != null) {
-      return ClipRRect(borderRadius: borderRadius!, child: child);
+      return Container(
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          border: Border.all(color: AppColors.border.withValues(alpha: 0.6), width: 1),
+        ),
+        child: ClipRRect(borderRadius: borderRadius!, child: child),
+      );
     }
     return child;
   }

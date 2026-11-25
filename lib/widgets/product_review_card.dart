@@ -135,7 +135,7 @@ class _ProductReviewCardState extends State<ProductReviewCard> {
                 path: _review.userAvatarPath,
                 width: AppScale.s(32),
                 height: AppScale.s(32),
-                borderRadius: BorderRadius.circular(AppScale.s(16)),
+                borderRadius: BorderRadius.circular(AppScale.s(999)),
               ),
               SizedBox(width: AppScale.s(8)),
               Expanded(
