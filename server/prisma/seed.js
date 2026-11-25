@@ -33,6 +33,17 @@ async function seedDemoUserData(userId) {
   await resetUserData(userId);
 }
 
+// 系列名提取：商品数据文件里没有 series 字段，系列名只写在描述开头「原创系列《XXX》」里，
+// 数据库的 series 列（详情页同系列图鉴、后台系列排行都读它）靠这里从描述提取回填。
+// 输入：数据文件里的一条商品；输出：系列名或 null。
+// 坑：update 时提取不到要传 undefined（Prisma 跳过该字段），不能传 null，
+// 否则会把管理员在后台手动填好的系列冲掉。
+function extractSeries(p) {
+  if (p.series) return String(p.series);
+  const m = /原创系列《([^》]+)》/.exec(p.description ?? '');
+  return m ? m[1] : null;
+}
+
 async function main() {
   const products = [...readJson('products.json'), ...readJson('inspired-products.json')];
   const banners = readJson('banners.json');
@@ -61,6 +72,7 @@ async function main() {
         imagePaths: [p.imagePath],
         // 详情长图：数据文件里有就带上，没有就是空数组（后台可后续补）
         detailImages: Array.isArray(p.detailImages) ? p.detailImages : [],
+        series: extractSeries(p),
       },
       update: {
         name: p.name,
@@ -79,6 +91,8 @@ async function main() {
         imagePath: p.imagePath,
         imagePaths: [p.imagePath],
         detailImages: Array.isArray(p.detailImages) ? p.detailImages : [],
+        // 提取不到传 undefined：保留后台手动维护的系列，不冲掉
+        series: extractSeries(p) ?? undefined,
       },
     });
   }

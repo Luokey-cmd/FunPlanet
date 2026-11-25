@@ -4,6 +4,9 @@ import RevenueChart from "../components/RevenueChart";
 import CategoryPieChart from "../components/CategoryPieChart";
 import ProvinceHeatMap from "../components/ProvinceHeatMap";
 import RecentOrders from "../components/RecentOrders";
+import ConversionFunnel from "../components/ConversionFunnel";
+import ActivityTrendChart from "../components/ActivityTrendChart";
+import SeriesRanking from "../components/SeriesRanking";
 import TopProducts from "../components/TopProducts";
 import { adminApi } from "../lib/api";
 import type { NavPage } from "../types";
@@ -34,7 +37,7 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
     );
   }
 
-  const { stats, revenueTrend, categoryStats, regionHeat = [], recentOrders, topProducts } = data;
+  const { stats, revenueTrend, categoryStats, regionHeat = [], recentOrders, topProducts, funnel = [], dailyActivity = [], seriesRanking = [] } = data;
 
   return (
     <div data-cmp="DashboardPage" className="p-6 flex flex-col gap-6">
@@ -86,6 +89,17 @@ export default function DashboardPage({ onNavigate }: DashboardPageProps) {
           <CategoryPieChart data={categoryStats} />
         </div>
       </div>
+
+      <div className="flex gap-4 flex-wrap items-stretch">
+        <div className="flex-1 min-w-[280px] basis-[48%]">
+          <ConversionFunnel data={funnel} />
+        </div>
+        <div className="flex-1 min-w-[280px] basis-[48%]">
+          <SeriesRanking data={seriesRanking} />
+        </div>
+      </div>
+
+      <ActivityTrendChart data={dailyActivity} />
 
       <div className="flex gap-4 flex-wrap items-stretch">
         <div className="flex-1 min-w-[280px] basis-[48%]">

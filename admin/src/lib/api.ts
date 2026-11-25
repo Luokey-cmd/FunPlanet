@@ -736,4 +736,7 @@ export interface DashboardData {
     address: string;
   }[];
   topProducts: { id: string; name: string; sales: number; price: number; majorCategory: string }[];
+  funnel?: { name: string; value: number }[];
+  dailyActivity?: { day: string; newUsers: number; orders: number; posts: number; chats: number }[];
+  seriesRanking?: { name: string; revenue: number; quantity: number }[];
 }

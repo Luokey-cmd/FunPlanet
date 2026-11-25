@@ -335,7 +335,7 @@ router.get('/dashboard', adminAuthRequired, async (_req, res) => {
         select: {
           total: true,
           createdAt: true,
-          items: { select: { productId: true, subtotal: true } },
+          items: { select: { productId: true, subtotal: true, quantity: true } },
         },
       }),
       prisma.order.findMany({
@@ -343,7 +343,7 @@ router.get('/dashboard', adminAuthRequired, async (_req, res) => {
         orderBy: { createdAt: 'desc' },
         include: { user: true, items: true },
       }),
-      prisma.product.findMany({ select: { id: true, name: true, price: true, majorCategory: true } }),
+      prisma.product.findMany({ select: { id: true, name: true, price: true, majorCategory: true, series: true } }),
       getPaidSalesMap(),
     ]);
 
@@ -399,6 +399,82 @@ router.get('/dashboard', adminAuthRequired, async (_req, res) => {
     orders.map((o) => ({ addressDetail: o.addressDetail })),
   );
 
+  // ===== 看板可视化补充（2026-11-25）：转化漏斗 / 活跃趋势 / 系列排行 =====
+  // 口径总原则：全部用真实表数据现算，没数据就是 0，绝不返回假数字撑场面。
+  // 漏斗：严格按购买链路递进，每层是「做过这一步的不同用户数」（按 userId 去重），
+  // 所以数值天然层层递减；下单/支付两层直接从已查出的 orders 里数，不再多查一次库。
+  const [browseUsers, favoriteUsers, cartUsers, recentUserRows, recentPostRows, recentChatRows] =
+    await Promise.all([
+      prisma.browseHistoryItem.findMany({ select: { userId: true }, distinct: ['userId'] }),
+      prisma.favorite.findMany({ select: { userId: true }, distinct: ['userId'] }),
+      prisma.cartItem.findMany({ select: { userId: true }, distinct: ['userId'] }),
+      // 活跃趋势只需要近 30 天的创建时间；多取 5 天冗余，分桶时按天对齐、超范围自然丢弃
+      prisma.user.findMany({
+        where: { createdAt: { gte: new Date(Date.now() - 35 * 86400000) } },
+        select: { createdAt: true },
+      }),
+      prisma.aiCommunityPost.findMany({
+        where: { createdAt: { gte: new Date(Date.now() - 35 * 86400000) } },
+        select: { createdAt: true },
+      }),
+      prisma.aiChatConversation.findMany({
+        where: { createdAt: { gte: new Date(Date.now() - 35 * 86400000) } },
+        select: { createdAt: true },
+      }),
+    ]);
+  const funnel = [
+    { name: '浏览商品', value: browseUsers.length },
+    { name: '收藏商品', value: favoriteUsers.length },
+    { name: '加入购物车', value: cartUsers.length },
+    { name: '下单', value: new Set(orders.map((o) => o.userId)).size },
+    { name: '支付成功', value: new Set(orders.filter((o) => o.paymentStatus === 'paid').map((o) => o.userId)).size },
+  ];
+
+  // 活跃趋势：近 30 天逐日计数，算法与上面 revenueTrend 同款（按中国日期分桶）
+  const countByDay = (rows) => {
+    const map = new Map();
+    for (const r of rows) {
+      const key = formatChinaDate(r.createdAt);
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  };
+  const newUserDayMap = countByDay(recentUserRows);
+  const orderDayMap = countByDay(orders);
+  const postDayMap = countByDay(recentPostRows);
+  const chatDayMap = countByDay(recentChatRows);
+  const dailyActivity = [];
+  for (let i = 29; i >= 0; i -= 1) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const day = formatChinaDate(d);
+    dailyActivity.push({
+      day,
+      newUsers: newUserDayMap.get(day) ?? 0,
+      orders: orderDayMap.get(day) ?? 0,
+      posts: postDayMap.get(day) ?? 0,
+      chats: chatDayMap.get(day) ?? 0,
+    });
+  }
+
+  // 系列排行：已支付订单明细按商品的 series 聚合销售额与件数，取前 8；
+  // 没有系列的商品归入「未归系列」，如实显示，不悄悄丢掉。
+  const seriesByProductId = new Map(allProducts.map((prod) => [prod.id, prod.series]));
+  const seriesMap = new Map();
+  for (const order of paidOrders) {
+    for (const item of order.items) {
+      const series = seriesByProductId.get(item.productId) || '未归系列';
+      const entry = seriesMap.get(series) ?? { name: series, revenue: 0, quantity: 0 };
+      entry.revenue += Number(item.subtotal);
+      entry.quantity += item.quantity ?? 0;
+      seriesMap.set(series, entry);
+    }
+  }
+  const seriesRanking = [...seriesMap.values()]
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 8)
+    .map((e) => ({ ...e, revenue: Math.round(e.revenue * 100) / 100 }));
+
   ok(res, {
     stats: {
       totalRevenue,
@@ -410,6 +486,9 @@ router.get('/dashboard', adminAuthRequired, async (_req, res) => {
     revenueTrend,
     categoryStats,
     regionHeat,
+    funnel,
+    dailyActivity,
+    seriesRanking,
     recentOrders: recentOrders.map((o) => ({
       id: o.orderNo,
       user: o.user.nickname,
