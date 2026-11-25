@@ -59,6 +59,8 @@ async function seedVirtualReviews(pwdHash) {
   }
   const userIdByKey = {};
   for (const [i, r] of data.reviewers.entries()) {
+    // 虚拟评价人头像：120 张各不相同的图（assets/images/vr-avatars/），按评价人顺序一一对应
+    const avatarPath = `assets/images/vr-avatars/vr${String(i + 1).padStart(3, '0')}.jpg`;
     const phone = `139${String(10000000 + i)}`;
     const user = await prisma.user.upsert({
       where: { phone },
@@ -67,9 +69,15 @@ async function seedVirtualReviews(pwdHash) {
         password: pwdHash,
         nickname: r.nickname,
         userId: String(88001 + i),
-        profile: { create: {} },
+        profile: { create: { avatarPath } },
       },
       update: { nickname: r.nickname },
+    });
+    // 已存在的虚拟用户也要补头像：单独 upsert 资料行，只改头像不动其他字段
+    await prisma.userProfile.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id, avatarPath },
+      update: { avatarPath },
     });
     userIdByKey[r.key] = user.id;
   }

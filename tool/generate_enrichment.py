@@ -116,17 +116,70 @@ def enrich_product(p):
     return n, rate
 
 # ---------- 评价文本 ----------
-PRAISE = {
-    '手办': ['实物比图片还惊艳，涂装一点没翻车，摆在柜子里天天看。', '细节拉满，头发和衣服的层次都做出来了，这个价位很值。', '等了几天终于到手，造型还原度很高，底座也稳。', '朋友来家里一眼就看中了这个，质感真的好。'],
-    '公仔': ['手感软乎乎的，抱着就不想撒手，做工也干净没线头。', '比想象中大只，填充很饱满，捏起来超治愈。', '买回来放床头了，每天看着心情都好，推荐。', '面料舒服不掉毛，孩子抱着睡了一周了。'],
-    '玩具': ['和朋友玩了一晚上，规则简单但是很上头。', '做工比预期结实，配件齐全，这个价很良心。', '宿舍聚会全靠它，气氛一下就起来了。', '买给家里小朋友的，大人玩着都觉得有意思。'],
-    '谷子': ['印刷超级清晰，实物颜色很正，覆膜手感也好。', '搭在痛包上效果绝了，出门被同担问链接了。', '包装很用心，到手完好无损，收藏党满意。', '比图上还好看，这个系列我准备集齐。'],
-    '小卡': ['卡面状态很好，没有划痕没有白边，收进卡册美美的。', '这张自拍角度绝了，覆膜在光下特别好看。', '一套都很貌美，色差比想象中小很多。', '冲着颜值买的，到手质感超出预期。'],
-    '文具': ['好看又实用，同事问我在哪买的。', '造型太可爱了，放桌上每天用心情都好。', '做工精细，一点不廉价，送人也拿得出手。', '已经用了一段时间了，质量没得说。'],
-    '实用类周边': ['质感很好，日常真的用得上，不是摆设。', '图案印得很清晰，用了两周也没有掉。', '比普通款多了点心思，每天用着都开心。', '买来送人的，对方很喜欢，做工对得起价格。'],
-}
-NEUTRAL = ['整体还行，就是包装盒有个角压到了，不影响使用。', '东西本身不错，物流等了四五天才到。', '和图片有一点点色差，能接受的范围。', '质量对得起价格吧，没有特别惊艳。']
-NEGATIVE = ['盒子压角有点严重，收藏的话会有点介意。', '实物颜色比图片暗一些，有点失望。', '有一处小瑕疵，懒得退了，将就用吧。', '发货有点慢，等了一周多才到。']
+# 粉丝向评价引擎：谷圈/同担口吻，聚焦角色与柄图；片段组合 + 全局去重，1688 条不重样
+import re as _re
+CHARACTERS = {'星屿邮局': ['岚音', '祁舟', '小满', '团团'], '山海小食堂': ['阿泽', '麟麟', '阿九'],
+              '月光马戏团': ['罗莎', '雪莉', '安珀'], '霓虹夜行': ['零七', '沈昼', '小电'],
+              '深海观测站': ['汐月', '月月', '沧'], '时光钟表店': ['怀瑾', '时砚', '咔哒'],
+              '樱庭花艺社': ['花梨', '青禾', '蜜蜜'], '极光观测队': ['极星', '凛冬', '霜霜']}
+NOUN = {'收藏小卡': '小卡', '拍立得相卡': '拍立得', '吧唧徽章': '吧唧', '金属徽章': '吧唧', '亚克力立牌': '立牌',
+        '亚克力挂件': '挂件', '色纸': '色纸', '比例手办': '手办', 'Q版手办': '手办', '桌面摆件': '摆件',
+        '毛绒玩偶': '娃', '毛绒挂偶': '挂偶', '潮玩公仔': '公仔', '棉花娃娃与娃衣': '棉花娃娃'}
+def series_of(p):
+    m = _re.search(r'《(.+?)》', p.get('description') or '')
+    return m.group(1) if m else ''
+def char_of(p, rnd):
+    chars = CHARACTERS.get(series_of(p), [])
+    for c in chars:
+        if c in (p.get('name') or ''): return c
+    return rnd.choice(chars) if chars else ''
+OPEN5 = ['貌美！！', '绝美', '啊啊啊到手了', '终于蹲到了', '我推来了', '神仙柄图', '一眼心动', '吃谷快乐拉满', '同担们快冲', '复数警告', '开箱那一刻我尖叫了', '等再贩等到了', '幸福', '太会出谷了', '一眼万年', '上头了']
+CORE = ['{c}这个立绘我直接心动', '{c}的眼神太戳我了', '为{c}而来，看一眼就下单了', '{c}的新柄太会了', '推的笑颜就是我的命', '{s}这个系列就没有难看的柄', '{c}这套造型封神了', '柄图比官图还好看', '{c}厨狂喜', '这张脸我能看一整年', '{c}的配色太绝了', '同担诚不欺我', '这柄图真的太神了', '{c}厨的钱包不保']
+DETAIL = {
+ '小卡': ['卡面没划痕没白边，状态超好', '覆膜在灯下闪得绝美', '透卡那张是隐藏的快乐', '卡背设计也用心了', '尺寸收进卡册刚刚好'],
+ '谷子': ['印刷超级清晰，实物颜色很正', '柄图印得一点不糊', '背面做工也干净', '覆膜手感好，搭痛包绝了', '包装用心，到手完好无损'],
+ '手办': ['涂装没翻车，脸超正', '头发层次和衣服褶皱都做出来了', '底座稳，摆柜里气场全开', '面相还原，监修没白等', '细节多到想拿放大镜看'],
+ '公仔': ['手感软乎乎，抱着不想撒手', '填充饱满，脸也没歪', '做工干净没线头', '比想象中大只，超治愈', '放床头每天看着心情好'],
+ '玩具': ['和同担拼团玩了一晚上', '配件齐全，做工比预期结实', '规则简单但很上头', '摆着也好看，玩着也有意思', '宿舍/漫展聚会全靠它'],
+ '文具': ['好看又实用，同担问我哪买的', '造型太戳了，放桌上每天用', '写感顺滑，颜值还高', '和我的手账本绝配', '用着都舍不得用'],
+ '实用类周边': ['图案印得清晰，用了两周没掉', '日常真的用得上，不是摆设', '图案一露出来就被同担认出来了', '质感对得起价格', '带着出门回头率很高']}
+BEHAVE = ['已经摆进展示柜了', '扎进痛包了，出门被同担问链接', '复数入了两套，一套收藏一套用', '和之前的谷摆了一个阵', '拍了返图发同担群了', '放办公桌上天天看', '卡册又满了一页', '准备再蹲一套送同担', '和官娃摆一起毫无违和感', '每天回家第一眼就看到它']
+TAIL5 = ['冲就完了', '同担闭眼入', '今年最值的一单', '等再贩还要入', '幸福感拉满', '入股不亏', '快乐这不就来了', '']
+NIT4 = ['就是盒角有点压', '美中不足是发货慢了点', '要是柄再多一张就完美了', '小贵但颜值扳回来了', '包装可以再扎实点']
+MID3 = ['柄是好看的，就是实物比想象中小一点', '冲着{c}买的，做工中规中矩吧', '色差有一点，能接受', '喜欢的会很喜欢，我一般般', '质感对得起价格，但没有特别惊艳', '等活动入的，这个价还行']
+MID_EXTRA = ['整体无功无过', '但冲着推还是留下了', '图个喜欢吧', '送同担她挺喜欢', '放着也不占地方', '等活动价再考虑复数', '拍照倒是挺上镜', '远看还行近看一般']
+NEG_EXTRA = ['客服态度还行，就是东西不行', '退货又麻烦，唉', '同担们避雷吧', '希望品控好好查查', '不会回购了', '图个教训', '心疼我的钱', '品控真的要抓一抓']
+NEG = ['柄图色差也太大了，跟官图不是一个色调', '卡面有划痕，收藏党真的会心梗', '背面有锈点，品控不行', '盒子压得厉害，吃谷最怕盒损', '等了半个月才发货，热情都等没了', '实物脸有点崩，推这么好看品控怎么这样', '印刷糊了一块，像盗版的一样', '到手有瑕疵，懒得退了将就吧']
+SHORT = ['貌美', '我推！！', '绝了', '复购了', '同担冲', '好吃，太好吃了', '{c}太美了', '神仙柄', '入了不亏', '快乐']
+def compose(p, stars, rnd, used):
+    c = char_of(p, rnd); s = series_of(p); noun = NOUN.get(p.get('subCategory') or '', '')
+    det_pool = DETAIL.get(p['majorCategory'], DETAIL['谷子'])
+    for _ in range(40):
+        if stars >= 5:
+            if rnd.random() < 0.12:
+                t = rnd.choice(SHORT).format(c=c)
+                if rnd.random() < 0.5: t += rnd.choice(['！', '～', '，冲', '，同担快来'])
+            else:
+                det = rnd.choice(det_pool)
+                bpool = BEHAVE if p['majorCategory'] in ('谷子', '小卡') else [b for b in BEHAVE if '卡册' not in b and '痛包' not in b]
+                if p['majorCategory'] not in ('公仔', '手办', '玩具', '谷子'): bpool = [b for b in bpool if '官娃' not in b]
+                if '痛包' in det: bpool = [b for b in bpool if '痛包' not in b]
+                t = rnd.choice(OPEN5) + '，' + rnd.choice(CORE).format(c=c, s=s) + '。' + det + '，' + rnd.choice(bpool) + '。'
+                tail = rnd.choice(TAIL5)
+                if tail: t += tail + '。'
+        elif stars == 4:
+            t = rnd.choice(CORE).format(c=c, s=s) + '，' + rnd.choice(det_pool) + '；' + rnd.choice(NIT4) + '，整体还是满意的。'
+        elif stars == 3:
+            t = rnd.choice(MID3).format(c=c, s=s) + rnd.choice(['。', '，' + rnd.choice(MID_EXTRA) + '。', '，' + rnd.choice(MID_EXTRA) + '。'])
+        else:
+            t = rnd.choice(NEG) + rnd.choice(['。', '，' + rnd.choice(NEG_EXTRA) + '。', '，' + rnd.choice(NEG_EXTRA) + '。'])
+        if t not in used:
+            used.add(t); return t
+    base = rnd.choice(CORE).format(c=c, s=s) + '，' + rnd.choice(det_pool) + '。'
+    for suf in ['！', '～', '，真的！', '，呜呜', '，姐妹们冲', '（复数了）', '，已安利给同担', '，嘿嘿']:
+        if base + suf not in used:
+            used.add(base + suf); return base + suf
+    used.add(base); return base
 
 NAME_A = ['星', '月', '奶', '茶', '云', '柚', '桃', '莓', '猫', '兔', '鹿', '柠', '橘', '栗', '芋', '葵']
 NAME_B = ['糖', '子', '酱', '喵', '丸', '团', '包', '卷', '饼', '冻', '露', '芽', '朵', '粒', '泡', '圈']
@@ -135,26 +188,31 @@ nrnd = random.Random(42)
 for i in range(120):
     reviewers.append({'key': f'vr{i+1:03d}', 'nickname': nrnd.choice(NAME_A) + nrnd.choice(NAME_B) + (nrnd.choice(['', '', '儿', '呀', str(nrnd.randint(1, 99))]))})
 
+_seen_nick = {}
+for r in reviewers:
+    if r['nickname'] in _seen_nick:
+        _seen_nick[r['nickname']] += 1
+        r['nickname'] = r['nickname'] + str(_seen_nick[r['nickname']])
+    else:
+        _seen_nick[r['nickname']] = 1
+
 for p in products: enrich_product(p)
 
 orders, reviews = [], []
+USED_TEXTS = set()  # 全店评价文本去重：任何两条评价不许一模一样
 order_seq = 0
 for p in products:
     n = p['reviewCount']; rate = p['positiveRate']; rnd = rng_for(p['id'])
-    pool = PRAISE[p['majorCategory']]
-    deck = pool * 3; rnd.shuffle(deck)  # 同一商品内评价文本尽量不重复
-    ndeck = NEUTRAL * 2; rnd.shuffle(ndeck)
-    def take_praise(): return deck.pop() if deck else rnd.choice(pool)
-    def take_neutral(): return ndeck.pop() if ndeck else rnd.choice(NEUTRAL)
     five_cut = rate - 13  # 5星占比；4星约9%、3星约3%、其余为1-2星差评，好评率≈5星+4星
     chosen = rnd.sample(reviewers, n)  # 同一商品不重复评价人：评价表有 (用户,订单,商品) 唯一约束，重复会被 upsert 吃掉一条
     for k in range(n):
         roll = rnd.random() * 100
-        if roll < five_cut: stars, text = 5, take_praise()
-        elif roll < five_cut + 9: stars, text = 4, (take_praise() if rnd.random() < 0.6 else take_neutral())
-        elif roll < five_cut + 12: stars, text = 3, take_neutral()
-        else: stars, text = rnd.choice([1, 2]), rnd.choice(NEGATIVE)
-        if k == 0 and n >= 5: stars, text = 5, take_praise()  # 第一条保好评，详情页首屏好看
+        if roll < five_cut: stars = 5
+        elif roll < five_cut + 9: stars = 4
+        elif roll < five_cut + 12: stars = 3
+        else: stars = rnd.choice([1, 2])
+        if k == 0 and n >= 5: stars = 5  # 第一条保好评，详情页首屏好看
+        text = compose(p, stars, rnd, USED_TEXTS)
         reviewer = chosen[k]
         days = rnd.randint(2, 175)
         reviews.append({'reviewer': reviewer['key'], 'productId': p['id'], 'rating': stars,
@@ -192,6 +250,13 @@ for key, rs in by_user.items():
                        'subtotal': total, 'total': total, 'items': items})
         for c in chunk: c['orderNo'] = ono
 for r in reviews: r.pop('_price'); r.pop('_name')
+
+from collections import defaultdict as _dd
+_by_p = _dd(list)
+for r in reviews: _by_p[r['productId']].append(r)
+for p in products:
+    rs = _by_p.get(p['id'], [])
+    if rs: p['positiveRate'] = round(sum(1 for r in rs if r['rating'] >= 4) / len(rs) * 100)
 
 enriched1 = [p for p in products if int(p['id'][1:]) <= 38]
 enriched2 = [p for p in products if int(p['id'][1:]) > 38]
