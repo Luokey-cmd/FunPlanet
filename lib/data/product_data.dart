@@ -31,6 +31,11 @@ class Product {
     this.rarity,
     this.suitableFor,
     this.sellingPoints = const [],
+    // 数据丰富化（2026-11-25）：结构化参数与口碑统计，老商品没有时为空/0，不影响展示。
+    this.attributes,
+    this.reviewCount = 0,
+    this.positiveRate,
+    this.favoriteCount = 0,
     this.promoPrice,
     this.promotionName,
     this.promoEndsAt,
@@ -67,6 +72,13 @@ class Product {
   final String? suitableFor;
   // 结构化卖点，一条一句，详情页「商品介绍」里逐条展示。
   final List<String> sellingPoints;
+  // 结构化参数（材质/尺寸/重量等键值对）：详情页参数表逐行展示，小豆比对也读它。
+  final Map<String, String>? attributes;
+  // 评价数与好评率：详情页价格区与评价区展示；评价数与接口拉到的评价条数同口径。
+  final int reviewCount;
+  final int? positiveRate;
+  // 收藏数：热度展示用。
+  final int favoriteCount;
   // 限时特价（营销中心）：接口命中活动时才有值，老接口没有就全空。
   final double? promoPrice;
   final String? promotionName;
@@ -122,6 +134,12 @@ class Product {
           .map((e) => '$e')
           .where((e) => e.isNotEmpty)
           .toList(),
+      attributes: (json['attributes'] as Map<String, dynamic>?)?.map(
+        (k, v) => MapEntry(k, '$v'),
+      ),
+      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
+      positiveRate: (json['positiveRate'] as num?)?.toInt(),
+      favoriteCount: (json['favoriteCount'] as num?)?.toInt() ?? 0,
       promoPrice: json['promoPrice'] == null ? null : (json['promoPrice'] as num).toDouble(),
       promotionName: json['promotionName'] as String?,
       promoEndsAt: json['promoEndsAt'] as String?,
@@ -157,6 +175,10 @@ class Product {
       'rarity': rarity,
       'suitableFor': suitableFor,
       'sellingPoints': sellingPoints,
+      'attributes': attributes,
+      'reviewCount': reviewCount,
+      'positiveRate': positiveRate,
+      'favoriteCount': favoriteCount,
       'promoPrice': promoPrice,
       'promotionName': promotionName,
       'promoEndsAt': promoEndsAt,

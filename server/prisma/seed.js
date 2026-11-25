@@ -44,6 +44,91 @@ function extractSeries(p) {
   return m ? m[1] : null;
 }
 
+// 虚拟评价与订单（2026-11-25 数据丰富化）：virtual-reviews.json 是生成好的
+// 120 位虚拟买家、近半年的已完成订单与逐件评价。评价表有订单外键，所以顺序是
+// 先建用户、再建订单与订单项、最后建评价；全部走 upsert，重复跑 seed 不翻倍。
+// 输入：生成文件三段（reviewers/orders/reviews）；输出：灌好的评价条数。
+// 坑：seed 结尾的 syncAllProductSales 会按已支付订单重算销量，生成器已按
+// 数据文件里的目标销量分摊了每单件数，落库销量与文件口径基本一致。
+async function seedVirtualReviews(pwdHash) {
+  let data;
+  try {
+    data = readJson('virtual-reviews.json');
+  } catch {
+    return 0; // 没有生成文件就跳过（老数据目录兼容）
+  }
+  const userIdByKey = {};
+  for (const [i, r] of data.reviewers.entries()) {
+    const phone = `139${String(10000000 + i)}`;
+    const user = await prisma.user.upsert({
+      where: { phone },
+      create: {
+        phone,
+        password: pwdHash,
+        nickname: r.nickname,
+        userId: String(88001 + i),
+        profile: { create: {} },
+      },
+      update: { nickname: r.nickname },
+    });
+    userIdByKey[r.key] = user.id;
+  }
+  const orderIdByNo = {};
+  for (const o of data.orders) {
+    const when = new Date(Date.now() - o.daysAgo * 86400000);
+    const order = await prisma.order.upsert({
+      where: { orderNo: o.orderNo },
+      create: {
+        orderNo: o.orderNo,
+        userId: userIdByKey[o.reviewer],
+        status: 'completed',
+        subtotal: o.subtotal,
+        total: o.total,
+        paymentStatus: 'paid',
+        paymentMethod: '微信支付',
+        paidAt: when,
+        createdAt: when,
+        items: {
+          create: o.items.map((it) => ({
+            productId: it.productId,
+            name: it.name,
+            quantity: it.quantity,
+            spec: it.spec ?? '',
+            unitPrice: it.price,
+            subtotal: Math.round(it.price * it.quantity * 100) / 100,
+          })),
+        },
+      },
+      update: {},
+    });
+    orderIdByNo[o.orderNo] = order.id;
+  }
+  let count = 0;
+  for (const r of data.reviews) {
+    const when = new Date(Date.now() - r.daysAgo * 86400000);
+    await prisma.productReview.upsert({
+      where: {
+        userId_orderId_productId: {
+          userId: userIdByKey[r.reviewer],
+          orderId: orderIdByNo[r.orderNo],
+          productId: r.productId,
+        },
+      },
+      create: {
+        userId: userIdByKey[r.reviewer],
+        orderId: orderIdByNo[r.orderNo],
+        productId: r.productId,
+        rating: r.rating,
+        content: r.content,
+        createdAt: when,
+      },
+      update: { rating: r.rating, content: r.content },
+    });
+    count++;
+  }
+  return count;
+}
+
 async function main() {
   const products = [...readJson('products.json'), ...readJson('inspired-products.json')];
   const banners = readJson('banners.json');
@@ -73,6 +158,16 @@ async function main() {
         // 详情长图：数据文件里有就带上，没有就是空数组（后台可后续补）
         detailImages: Array.isArray(p.detailImages) ? p.detailImages : [],
         series: extractSeries(p),
+        // 数据丰富化：库存/品牌/稀有度/适合人群/卖点/结构化参数/口碑统计，数据文件是准绳
+        stock: p.stock ?? 100,
+        brand: p.brand ?? null,
+        rarity: p.rarity ?? null,
+        suitableFor: p.suitableFor ?? null,
+        sellingPoints: Array.isArray(p.sellingPoints) ? p.sellingPoints : [],
+        attributes: p.attributes ?? null,
+        reviewCount: p.reviewCount ?? 0,
+        positiveRate: p.positiveRate ?? null,
+        favoriteCount: p.favoriteCount ?? 0,
       },
       update: {
         name: p.name,
@@ -93,6 +188,16 @@ async function main() {
         detailImages: Array.isArray(p.detailImages) ? p.detailImages : [],
         // 提取不到传 undefined：保留后台手动维护的系列，不冲掉
         series: extractSeries(p) ?? undefined,
+        // 数据丰富化字段：文件里有才覆盖（?? undefined），老数据文件不带这些键时不冲掉库里已有的
+        stock: p.stock ?? undefined,
+        brand: p.brand ?? undefined,
+        rarity: p.rarity ?? undefined,
+        suitableFor: p.suitableFor ?? undefined,
+        sellingPoints: Array.isArray(p.sellingPoints) ? p.sellingPoints : undefined,
+        attributes: p.attributes ?? undefined,
+        reviewCount: p.reviewCount ?? undefined,
+        positiveRate: p.positiveRate ?? undefined,
+        favoriteCount: p.favoriteCount ?? undefined,
       },
     });
   }
@@ -149,6 +254,9 @@ async function main() {
   });
 
   await seedDemoUserData(demoUser.id);
+
+  const virtualReviewCount = await seedVirtualReviews(demoHash);
+  console.log(`虚拟评价已灌入: ${virtualReviewCount} 条`);
 
   await syncAllProductSales(prisma);
   console.log('商品销量已同步为真实订单数据');

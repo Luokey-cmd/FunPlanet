@@ -15,7 +15,24 @@
     "purchaseNotes": "发货地：广州；收货后7天无理由退换（商品无磕碰破损、原包装完好可退）；水晶易碎，签收时开箱验货，破损凭照片补发；避免高处坠落、尖锐硬物刮擦球面。",
     "rating": 4.7,
     "sales": 937,
-    "imagePath": "assets/images/products/p01.png"
+    "imagePath": "assets/images/products/p01.png",
+    "positiveRate": 94,
+    "reviewCount": 7,
+    "favoriteCount": 584,
+    "stock": 14,
+    "attributes": {
+      "材质": "木质、塑料",
+      "适用年龄": "8岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "玩法耐玩、不容易腻",
+      "木质、塑料材质",
+      "做工结实、耐造"
+    ],
+    "suitableFor": "适合朋友聚会、宿舍一起玩，也适合送小朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p02",
@@ -33,7 +50,24 @@
     "purchaseNotes": "发货地：广州；7天无理由退换，饰品无划痕、宝石无脱落可退换；避免接触香水、汗液长时间浸泡，闲置擦拭后密封存放。",
     "rating": 4.8,
     "sales": 1374,
-    "imagePath": "assets/images/products/p02.png"
+    "imagePath": "assets/images/products/p02.png",
+    "positiveRate": 97,
+    "reviewCount": 8,
+    "favoriteCount": 482,
+    "stock": 16,
+    "attributes": {
+      "材质": "ABS环保塑料",
+      "适用年龄": "6岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "适合朋友聚会一起玩",
+      "ABS环保塑料材质",
+      "规则简单、上手快"
+    ],
+    "suitableFor": "适合朋友聚会、宿舍一起玩，也适合送小朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p03",
@@ -51,7 +85,25 @@
     "purchaseNotes": "发货地：广州；未拆封套装7天无理由退换；贴纸避免高温暴晒，胶带开封后避光保存防止闪粉脱落。",
     "rating": 4.8,
     "sales": 1211,
-    "imagePath": "assets/images/products/p03.png"
+    "imagePath": "assets/images/products/p03.png",
+    "positiveRate": 97,
+    "reviewCount": 9,
+    "favoriteCount": 723,
+    "stock": 39,
+    "attributes": {
+      "规格": "文具手账",
+      "材质": "塑料、纸质",
+      "适用年龄": "6岁以上",
+      "包装": "OPP袋装"
+    },
+    "sellingPoints": [
+      "实用又好看",
+      "塑料、纸质材质",
+      "造型独特、桌面出片"
+    ],
+    "suitableFor": "适合上课、办公日常用，也适合送同学、同事",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p04",
@@ -69,7 +121,25 @@
     "purchaseNotes": "发货地：广州；非人为损坏7天退换，质保3个月；避免进水，USB接口勿暴力插拔，远离潮湿浴室。",
     "rating": 4.9,
     "sales": 1648,
-    "imagePath": "assets/images/products/p04.png"
+    "imagePath": "assets/images/products/p04.png",
+    "positiveRate": 99,
+    "reviewCount": 9,
+    "favoriteCount": 1178,
+    "stock": 33,
+    "attributes": {
+      "规格": "艺术灯具",
+      "材质": "金属、塑料",
+      "适用年龄": "6岁以上",
+      "包装": "OPP袋装"
+    },
+    "sellingPoints": [
+      "日常使用频率高",
+      "金属、塑料材质",
+      "实用又好看"
+    ],
+    "suitableFor": "适合上课、办公日常用，也适合送同学、同事",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p05",
@@ -87,7 +157,24 @@
     "purchaseNotes": "发货地：广州；未拆配件包装7天无理由退换；细小配件请勿给低龄孩童单独玩耍防止误食。",
     "rating": 4.7,
     "sales": 2085,
-    "imagePath": "assets/images/products/p05.png"
+    "imagePath": "assets/images/products/p05.png",
+    "positiveRate": 93,
+    "reviewCount": 7,
+    "favoriteCount": 779,
+    "stock": 37,
+    "attributes": {
+      "材质": "优质纸板、塑料",
+      "适用年龄": "8岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "玩法耐玩、不容易腻",
+      "优质纸板、塑料材质",
+      "规则简单、上手快"
+    ],
+    "suitableFor": "适合朋友聚会、宿舍一起玩，也适合送小朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p06",
@@ -105,7 +192,24 @@
     "purchaseNotes": "发货地：广州；无破损7天可退换；3岁以下孩童需家长陪同玩耍，避免啃咬误食小块硅胶。",
     "rating": 4.7,
     "sales": 2522,
-    "imagePath": "assets/images/products/p06.png"
+    "imagePath": "assets/images/products/p06.png",
+    "positiveRate": 97,
+    "reviewCount": 7,
+    "favoriteCount": 1164,
+    "stock": 4,
+    "attributes": {
+      "材质": "ABS环保塑料",
+      "适用年龄": "8岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "规则简单、上手快",
+      "ABS环保塑料材质",
+      "做工结实、耐造"
+    ],
+    "suitableFor": "适合朋友聚会、宿舍一起玩，也适合送小朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p07",
@@ -123,7 +227,24 @@
     "purchaseNotes": "发货地：广州；缺片凭实拍免费补发，未拆封7天无理由；细小拼片妥善收纳，避免孩童误食。",
     "rating": 4.8,
     "sales": 2959,
-    "imagePath": "assets/images/products/p07.png"
+    "imagePath": "assets/images/products/p07.png",
+    "positiveRate": 98,
+    "reviewCount": 8,
+    "favoriteCount": 1682,
+    "stock": 3,
+    "attributes": {
+      "材质": "优质纸板、塑料",
+      "适用年龄": "3岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "适合朋友聚会一起玩",
+      "优质纸板、塑料材质",
+      "做工结实、耐造"
+    ],
+    "suitableFor": "适合朋友聚会、宿舍一起玩，也适合送小朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p08",
@@ -141,7 +262,26 @@
     "purchaseNotes": "发货地：广州；零散缺件免费补发，未拼装全新7天可退；零散颗粒收好，低龄儿童防止误食。",
     "rating": 4.8,
     "sales": 1896,
-    "imagePath": "assets/images/products/p08.png"
+    "imagePath": "assets/images/products/p08.png",
+    "positiveRate": 94,
+    "reviewCount": 8,
+    "favoriteCount": 1476,
+    "stock": 43,
+    "attributes": {
+      "高度": "20cm",
+      "材质": "ABS、PVC",
+      "涂装": "精细涂装",
+      "适用年龄": "15岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "收藏展示效果好",
+      "ABS、PVC材质",
+      "造型还原、比例舒服"
+    ],
+    "suitableFor": "适合放展示柜收藏，也适合送同好朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p09",
@@ -159,7 +299,26 @@
     "purchaseNotes": "发货地：广州；手办无掉漆破损、外盒完好7天退换；树脂摆件避免摔落磕碰，防尘盒防止尖锐划伤。",
     "rating": 4.9,
     "sales": 2333,
-    "imagePath": "assets/images/products/p09.png"
+    "imagePath": "assets/images/products/p09.png",
+    "positiveRate": 96,
+    "reviewCount": 8,
+    "favoriteCount": 1253,
+    "stock": 22,
+    "attributes": {
+      "高度": "24cm",
+      "材质": "PVC、ABS",
+      "涂装": "精细涂装",
+      "适用年龄": "15岁以上",
+      "包装": "OPP袋装"
+    },
+    "sellingPoints": [
+      "造型还原、比例舒服",
+      "PVC、ABS材质",
+      "底座稳固、摆放好看"
+    ],
+    "suitableFor": "适合放展示柜收藏，也适合送同好朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p10",
@@ -177,7 +336,24 @@
     "purchaseNotes": "发货地：广州；轴心无磕碰全新可7天退换；避免大力摔砸，防止轴心松动影响顺滑度。",
     "rating": 4.7,
     "sales": 3670,
-    "imagePath": "assets/images/products/p10.png"
+    "imagePath": "assets/images/products/p10.png",
+    "positiveRate": 96,
+    "reviewCount": 8,
+    "favoriteCount": 2131,
+    "stock": 15,
+    "attributes": {
+      "材质": "ABS环保塑料",
+      "适用年龄": "3岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "做工结实、耐造",
+      "ABS环保塑料材质",
+      "玩法耐玩、不容易腻"
+    ],
+    "suitableFor": "适合朋友聚会、宿舍一起玩，也适合送小朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p11",
@@ -195,7 +371,24 @@
     "purchaseNotes": "发货地：广州；全新未磨损7天无理由退换；避免长期接触香水汗液，尖锐物品勿刮擦宝石表面。",
     "rating": 4.7,
     "sales": 4107,
-    "imagePath": "assets/images/products/p11.png"
+    "imagePath": "assets/images/products/p11.png",
+    "positiveRate": 93,
+    "reviewCount": 7,
+    "favoriteCount": 2072,
+    "stock": 28,
+    "attributes": {
+      "材质": "优质纸板、塑料",
+      "适用年龄": "3岁以上",
+      "包装": "OPP袋装"
+    },
+    "sellingPoints": [
+      "玩法耐玩、不容易腻",
+      "优质纸板、塑料材质",
+      "规则简单、上手快"
+    ],
+    "suitableFor": "适合朋友聚会、宿舍一起玩，也适合送小朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p12",
@@ -213,7 +406,25 @@
     "purchaseNotes": "发货地：广州；吊牌完好无污损7天退换；不可高温水洗，建议局部擦拭，3岁以下孩童需成人看护。",
     "rating": 4.8,
     "sales": 2444,
-    "imagePath": "assets/images/products/p12.png"
+    "imagePath": "assets/images/products/p12.png",
+    "positiveRate": 97,
+    "reviewCount": 7,
+    "favoriteCount": 1160,
+    "stock": 43,
+    "attributes": {
+      "高度": "17cm",
+      "面料": "水晶超柔面料",
+      "填充": "PP棉",
+      "适用年龄": "3岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "填充饱满、不易变形",
+      "手感柔软、抱着舒服"
+    ],
+    "suitableFor": "适合抱着睡或放床头，也适合送闺蜜、送对象",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p13",
@@ -231,7 +442,26 @@
     "purchaseNotes": "发货地：广州；未拆塑封7天无理由退换；避免暴晒弯折，存放于卡套内防止磨损闪膜。",
     "rating": 4.8,
     "sales": 2581,
-    "imagePath": "assets/images/products/p13.png"
+    "imagePath": "assets/images/products/p13.png",
+    "positiveRate": 95,
+    "reviewCount": 8,
+    "favoriteCount": 1182,
+    "stock": 29,
+    "attributes": {
+      "尺寸": "60×90mm",
+      "材质": "珠光纸",
+      "数量": "明星小卡",
+      "适用年龄": "14岁以上",
+      "包装": "OPP袋装"
+    },
+    "sellingPoints": [
+      "卡面清晰、色差小",
+      "珠光纸材质",
+      "自拍角度很出片"
+    ],
+    "suitableFor": "适合收进卡册收藏，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p14",
@@ -249,7 +479,25 @@
     "purchaseNotes": "发货地：广州；无掉漆破损外盒完好7天退换；树脂材质易碎，避免摔落磕碰，远离尖锐硬物刮擦。",
     "rating": 4.9,
     "sales": 3018,
-    "imagePath": "assets/images/products/p14.png"
+    "imagePath": "assets/images/products/p14.png",
+    "positiveRate": 99,
+    "reviewCount": 9,
+    "favoriteCount": 2714,
+    "stock": 45,
+    "attributes": {
+      "高度": "34cm",
+      "面料": "棉花娃娃专用面料",
+      "填充": "PP棉",
+      "适用年龄": "3岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "手感柔软、抱着舒服",
+      "造型可爱、上镜出片"
+    ],
+    "suitableFor": "适合抱着睡或放床头，也适合送闺蜜、送对象",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p15",
@@ -267,7 +515,26 @@
     "purchaseNotes": "发货地：广州；礼盒未拆封7天可退换；卡牌防潮存放，避免泡水、高温烘烤造成纸张变形。",
     "rating": 4.7,
     "sales": 4955,
-    "imagePath": "assets/images/products/p15.png"
+    "imagePath": "assets/images/products/p15.png",
+    "positiveRate": 95,
+    "reviewCount": 9,
+    "favoriteCount": 2920,
+    "stock": 28,
+    "attributes": {
+      "材质": "木质、塑料",
+      "游戏人数": "2-6人",
+      "单局时长": "30-60分钟",
+      "适用年龄": "3岁以上",
+      "包装": "OPP袋装"
+    },
+    "sellingPoints": [
+      "适合朋友聚会一起玩",
+      "木质、塑料材质",
+      "玩法耐玩、不容易腻"
+    ],
+    "suitableFor": "适合朋友聚会、宿舍一起玩，也适合送小朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p16",
@@ -285,7 +552,25 @@
     "purchaseNotes": "发货地：广州；全新未拆笔芯7天无理由退换；避免高空摔落损坏笔尖，陀螺部件勿大力硬掰。",
     "rating": 4.7,
     "sales": 3592,
-    "imagePath": "assets/images/products/p16.png"
+    "imagePath": "assets/images/products/p16.png",
+    "positiveRate": 96,
+    "reviewCount": 9,
+    "favoriteCount": 2034,
+    "stock": 27,
+    "attributes": {
+      "规格": "文具笔类",
+      "材质": "金属、塑料",
+      "适用年龄": "6岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "做工精细、不廉价",
+      "金属、塑料材质",
+      "造型独特、桌面出片"
+    ],
+    "suitableFor": "适合上课、办公日常用，也适合送同学、同事",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p17",
@@ -303,7 +588,25 @@
     "purchaseNotes": "发货地：广州；无掉漆磕碰全新可7天退换；树脂摆件忌摔砸，日常用软布擦拭浮尘。",
     "rating": 4.8,
     "sales": 3729,
-    "imagePath": "assets/images/products/p17.png"
+    "imagePath": "assets/images/products/p17.png",
+    "positiveRate": 94,
+    "reviewCount": 9,
+    "favoriteCount": 3257,
+    "stock": 37,
+    "attributes": {
+      "高度": "29cm",
+      "面料": "棉花娃娃专用面料",
+      "填充": "PP棉",
+      "适用年龄": "3岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "造型可爱、上镜出片",
+      "做工扎实、线头少"
+    ],
+    "suitableFor": "适合抱着睡或放床头，也适合送闺蜜、送对象",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p18",
@@ -321,7 +624,26 @@
     "purchaseNotes": "发货地：广州；原塑封完好7天退换；远离潮湿环境，长期收纳建议装入专用卡套。",
     "rating": 4.8,
     "sales": 3566,
-    "imagePath": "assets/images/products/p18.png"
+    "imagePath": "assets/images/products/p18.png",
+    "positiveRate": 94,
+    "reviewCount": 8,
+    "favoriteCount": 3012,
+    "stock": 34,
+    "attributes": {
+      "尺寸": "55×85mm",
+      "材质": "镭射纸",
+      "数量": "明星小卡",
+      "适用年龄": "14岁以上",
+      "包装": "OPP袋装"
+    },
+    "sellingPoints": [
+      "收纳进卡册正合适",
+      "镭射纸材质",
+      "自拍角度很出片"
+    ],
+    "suitableFor": "适合收进卡册收藏，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p19",
@@ -339,7 +661,26 @@
     "purchaseNotes": "发货地：广州；配件齐全未拆封7天无理由；密胺材质勿用开水浸泡，细小麻将块防止孩童误食。",
     "rating": 4.9,
     "sales": 5803,
-    "imagePath": "assets/images/products/p19.png"
+    "imagePath": "assets/images/products/p19.png",
+    "positiveRate": 95,
+    "reviewCount": 7,
+    "favoriteCount": 3188,
+    "stock": 15,
+    "attributes": {
+      "材质": "木质、塑料",
+      "游戏人数": "3-5人",
+      "单局时长": "20-40分钟",
+      "适用年龄": "3岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "玩法耐玩、不容易腻",
+      "木质、塑料材质",
+      "适合朋友聚会一起玩"
+    ],
+    "suitableFor": "适合朋友聚会、宿舍一起玩，也适合送小朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p20",
@@ -357,7 +698,25 @@
     "purchaseNotes": "发货地：广州；未拆封全新7天退换；避免笔尖磕碰落地，存放阴凉处防止笔芯漏墨。",
     "rating": 4.7,
     "sales": 4440,
-    "imagePath": "assets/images/products/p20.png"
+    "imagePath": "assets/images/products/p20.png",
+    "positiveRate": 95,
+    "reviewCount": 9,
+    "favoriteCount": 1800,
+    "stock": 43,
+    "attributes": {
+      "规格": "文具笔类",
+      "材质": "金属、塑料",
+      "适用年龄": "6岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "造型独特、桌面出片",
+      "金属、塑料材质",
+      "实用又好看"
+    ],
+    "suitableFor": "适合上课、办公日常用，也适合送同学、同事",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p21",
@@ -375,7 +734,25 @@
     "purchaseNotes": "发货地：广州；全新无掉漆、原盒完好7天无理由退换；树脂摆件避免高空摔落，勿用尖锐硬物刮蹭漆面。",
     "rating": 4.7,
     "sales": 4577,
-    "imagePath": "assets/images/products/p21.png"
+    "imagePath": "assets/images/products/p21.png",
+    "positiveRate": 94,
+    "reviewCount": 9,
+    "favoriteCount": 3292,
+    "stock": 30,
+    "attributes": {
+      "高度": "20cm",
+      "面料": "短毛绒面料",
+      "填充": "PP棉",
+      "适用年龄": "3岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "填充饱满、不易变形",
+      "做工扎实、线头少"
+    ],
+    "suitableFor": "适合抱着睡或放床头，也适合送闺蜜、送对象",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p22",
@@ -393,7 +770,26 @@
     "purchaseNotes": "发货地：广州；未拆封全套配件齐全7天可退换；细小棋粒妥善收纳，3岁以下儿童避免误食。",
     "rating": 4.8,
     "sales": 6514,
-    "imagePath": "assets/images/products/p22.png"
+    "imagePath": "assets/images/products/p22.png",
+    "positiveRate": 95,
+    "reviewCount": 8,
+    "favoriteCount": 2518,
+    "stock": 29,
+    "attributes": {
+      "材质": "优质纸板、塑料",
+      "游戏人数": "2-6人",
+      "单局时长": "30-60分钟",
+      "适用年龄": "3岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "适合朋友聚会一起玩",
+      "优质纸板、塑料材质",
+      "做工结实、耐造"
+    ],
+    "suitableFor": "适合朋友聚会、宿舍一起玩，也适合送小朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p23",
@@ -411,7 +807,25 @@
     "purchaseNotes": "发货地：广州；外盒完好无破损7天退换；透明羽翼易碎，避免大力弯折磕碰，远离高温暴晒。",
     "rating": 4.8,
     "sales": 5151,
-    "imagePath": "assets/images/products/p23.png"
+    "imagePath": "assets/images/products/p23.png",
+    "positiveRate": 96,
+    "reviewCount": 9,
+    "favoriteCount": 1568,
+    "stock": 17,
+    "attributes": {
+      "高度": "18cm",
+      "面料": "水晶超柔面料",
+      "填充": "PP棉",
+      "适用年龄": "3岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "做工扎实、线头少",
+      "造型可爱、上镜出片"
+    ],
+    "suitableFor": "适合抱着睡或放床头，也适合送闺蜜、送对象",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p24",
@@ -429,7 +843,26 @@
     "purchaseNotes": "发货地：广州；礼盒未拆塑封7天无理由退换；卡牌防潮存放，避免泡水、高温导致纸张变形。",
     "rating": 4.9,
     "sales": 7088,
-    "imagePath": "assets/images/products/p24.png"
+    "imagePath": "assets/images/products/p24.png",
+    "positiveRate": 97,
+    "reviewCount": 8,
+    "favoriteCount": 2197,
+    "stock": 33,
+    "attributes": {
+      "材质": "优质纸板、塑料",
+      "游戏人数": "2-6人",
+      "单局时长": "15-30分钟",
+      "适用年龄": "8岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "做工结实、耐造",
+      "优质纸板、塑料材质",
+      "适合朋友聚会一起玩"
+    ],
+    "suitableFor": "适合朋友聚会、宿舍一起玩，也适合送小朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p25",
@@ -447,7 +880,25 @@
     "purchaseNotes": "发货地：广州；全新未拆封7天退换；避免笔尖落地磕碰损坏，存放阴凉处防止笔芯漏墨。",
     "rating": 4.7,
     "sales": 5425,
-    "imagePath": "assets/images/products/p25.png"
+    "imagePath": "assets/images/products/p25.png",
+    "positiveRate": 94,
+    "reviewCount": 7,
+    "favoriteCount": 2377,
+    "stock": 19,
+    "attributes": {
+      "规格": "文具笔类",
+      "材质": "塑料、纸质",
+      "适用年龄": "6岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "实用又好看",
+      "塑料、纸质材质",
+      "造型独特、桌面出片"
+    ],
+    "suitableFor": "适合上课、办公日常用，也适合送同学、同事",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p26",
@@ -465,7 +916,25 @@
     "purchaseNotes": "发货地：广州；新品无磕碰掉漆7天可退换；树脂摆件忌摔砸，日常用软布擦拭表面浮尘。",
     "rating": 4.7,
     "sales": 5862,
-    "imagePath": "assets/images/products/p26.png"
+    "imagePath": "assets/images/products/p26.png",
+    "positiveRate": 95,
+    "reviewCount": 9,
+    "favoriteCount": 4997,
+    "stock": 3,
+    "attributes": {
+      "高度": "20cm",
+      "面料": "棉花娃娃专用面料",
+      "填充": "PP棉",
+      "适用年龄": "3岁以上",
+      "包装": "OPP袋装"
+    },
+    "sellingPoints": [
+      "手感柔软、抱着舒服",
+      "填充饱满、不易变形"
+    ],
+    "suitableFor": "适合抱着睡或放床头，也适合送闺蜜、送对象",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p27",
@@ -483,7 +952,26 @@
     "purchaseNotes": "发货地：广州；原装塑封完好7天无理由退换；远离潮湿环境，长期存放建议装入专用保护卡套。",
     "rating": 4.8,
     "sales": 4499,
-    "imagePath": "assets/images/products/p27.png"
+    "imagePath": "assets/images/products/p27.png",
+    "positiveRate": 94,
+    "reviewCount": 9,
+    "favoriteCount": 1813,
+    "stock": 27,
+    "attributes": {
+      "尺寸": "55×85mm",
+      "材质": "铜版纸覆膜",
+      "数量": "明星小卡",
+      "适用年龄": "14岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "收纳进卡册正合适",
+      "铜版纸覆膜材质",
+      "覆膜手感好"
+    ],
+    "suitableFor": "适合收进卡册收藏，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p28",
@@ -501,7 +989,26 @@
     "purchaseNotes": "发货地：广州；未拆塑封全新7天无理由退换；避免尖锐硬物刮擦表面覆膜，存放避开潮湿环境。",
     "rating": 4.8,
     "sales": 4936,
-    "imagePath": "assets/images/products/p28.png"
+    "imagePath": "assets/images/products/p28.png",
+    "positiveRate": 96,
+    "reviewCount": 8,
+    "favoriteCount": 3434,
+    "stock": 6,
+    "attributes": {
+      "材质": "亚克力",
+      "尺寸": "14cm",
+      "工艺": "双面印刷",
+      "适用年龄": "14岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "覆膜防刮、好保存",
+      "亚克力材质",
+      "实物比图片还好看"
+    ],
+    "suitableFor": "适合搭痛包、放展示架，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p29",
@@ -519,7 +1026,26 @@
     "purchaseNotes": "发货地：广州；塑封完好未使用7天可退换；远离潮湿水汽，不要磕碰徽章边缘。",
     "rating": 4.9,
     "sales": 5373,
-    "imagePath": "assets/images/products/p29.png"
+    "imagePath": "assets/images/products/p29.png",
+    "positiveRate": 97,
+    "reviewCount": 8,
+    "favoriteCount": 3197,
+    "stock": 45,
+    "attributes": {
+      "材质": "马口铁",
+      "尺寸": "12cm",
+      "工艺": "覆膜防刮",
+      "适用年龄": "14岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "实物比图片还好看",
+      "马口铁材质",
+      "搭痛包很出效果"
+    ],
+    "suitableFor": "适合搭痛包、放展示架，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p30",
@@ -537,7 +1063,26 @@
     "purchaseNotes": "发货地：广州；全新原包装7天无理由退换；防止重物挤压变形，避免长期暴晒褪色。",
     "rating": 4.7,
     "sales": 5810,
-    "imagePath": "assets/images/products/p30.png"
+    "imagePath": "assets/images/products/p30.png",
+    "positiveRate": 95,
+    "reviewCount": 9,
+    "favoriteCount": 2971,
+    "stock": 18,
+    "attributes": {
+      "材质": "马口铁",
+      "尺寸": "8cm",
+      "工艺": "镭射工艺",
+      "适用年龄": "14岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "覆膜防刮、好保存",
+      "马口铁材质",
+      "印刷清晰、颜色正"
+    ],
+    "suitableFor": "适合搭痛包、放展示架，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p31",
@@ -555,7 +1100,26 @@
     "purchaseNotes": "发货地：广州；未拆封7天退换；避免磕碰铁皮边缘，潮湿环境密封存放。",
     "rating": 4.7,
     "sales": 6247,
-    "imagePath": "assets/images/products/p31.png"
+    "imagePath": "assets/images/products/p31.png",
+    "positiveRate": 96,
+    "reviewCount": 7,
+    "favoriteCount": 4434,
+    "stock": 21,
+    "attributes": {
+      "材质": "马口铁",
+      "尺寸": "11cm",
+      "工艺": "覆膜防刮",
+      "适用年龄": "14岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "搭痛包很出效果",
+      "马口铁材质",
+      "实物比图片还好看"
+    ],
+    "suitableFor": "适合搭痛包、放展示架，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p32",
@@ -573,7 +1137,26 @@
     "purchaseNotes": "发货地：广州；原塑封完好7天无理由；勿用硬物刮蹭画面，远离高温潮湿处。",
     "rating": 4.8,
     "sales": 6684,
-    "imagePath": "assets/images/products/p32.png"
+    "imagePath": "assets/images/products/p32.png",
+    "positiveRate": 94,
+    "reviewCount": 7,
+    "favoriteCount": 4386,
+    "stock": 35,
+    "attributes": {
+      "材质": "亚克力",
+      "尺寸": "13cm",
+      "工艺": "烫金工艺",
+      "适用年龄": "14岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "印刷清晰、颜色正",
+      "亚克力材质",
+      "覆膜防刮、好保存"
+    ],
+    "suitableFor": "适合搭痛包、放展示架，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p33",
@@ -591,7 +1174,26 @@
     "purchaseNotes": "发货地：广州；全新未拆7天退换；避免大力弯折徽章，防潮密封存放。",
     "rating": 4.8,
     "sales": 7121,
-    "imagePath": "assets/images/products/p33.png"
+    "imagePath": "assets/images/products/p33.png",
+    "positiveRate": 96,
+    "reviewCount": 7,
+    "favoriteCount": 2537,
+    "stock": 25,
+    "attributes": {
+      "材质": "马口铁",
+      "尺寸": "12cm",
+      "工艺": "烫金工艺",
+      "适用年龄": "14岁以上",
+      "包装": "OPP袋装"
+    },
+    "sellingPoints": [
+      "实物比图片还好看",
+      "马口铁材质",
+      "搭痛包很出效果"
+    ],
+    "suitableFor": "适合搭痛包、放展示架，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p34",
@@ -609,7 +1211,26 @@
     "purchaseNotes": "发货地：广州；未拆塑封7天无理由；边角易磕碰，收纳建议放入专用方形吧唧套。",
     "rating": 4.9,
     "sales": 7558,
-    "imagePath": "assets/images/products/p34.png"
+    "imagePath": "assets/images/products/p34.png",
+    "positiveRate": 98,
+    "reviewCount": 8,
+    "favoriteCount": 2905,
+    "stock": 23,
+    "attributes": {
+      "材质": "亚克力",
+      "尺寸": "9cm",
+      "工艺": "双面印刷",
+      "适用年龄": "14岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "覆膜防刮、好保存",
+      "亚克力材质",
+      "印刷清晰、颜色正"
+    ],
+    "suitableFor": "适合搭痛包、放展示架，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p35",
@@ -627,7 +1248,26 @@
     "purchaseNotes": "发货地：广州；全新原封7天退换；闪膜忌尖锐刮擦，避光存放防止闪粉老化。",
     "rating": 4.7,
     "sales": 7995,
-    "imagePath": "assets/images/products/p35.png"
+    "imagePath": "assets/images/products/p35.png",
+    "positiveRate": 93,
+    "reviewCount": 9,
+    "favoriteCount": 3831,
+    "stock": 20,
+    "attributes": {
+      "材质": "亚克力",
+      "尺寸": "6cm",
+      "工艺": "烫金工艺",
+      "适用年龄": "14岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "搭痛包很出效果",
+      "亚克力材质",
+      "印刷清晰、颜色正"
+    ],
+    "suitableFor": "适合搭痛包、放展示架，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p36",
@@ -645,7 +1285,26 @@
     "purchaseNotes": "发货地：广州；塑封完好7天无理由；避免弯折泡水，长期存放装入硬质卡套。",
     "rating": 4.7,
     "sales": 6332,
-    "imagePath": "assets/images/products/p36.png"
+    "imagePath": "assets/images/products/p36.png",
+    "positiveRate": 94,
+    "reviewCount": 9,
+    "favoriteCount": 2048,
+    "stock": 26,
+    "attributes": {
+      "尺寸": "55×85mm",
+      "材质": "镭射纸",
+      "数量": "收藏小卡",
+      "适用年龄": "14岁以上",
+      "包装": "独立彩盒"
+    },
+    "sellingPoints": [
+      "收纳进卡册正合适",
+      "镭射纸材质",
+      "自拍角度很出片"
+    ],
+    "suitableFor": "适合收进卡册收藏，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p37",
@@ -663,7 +1322,26 @@
     "purchaseNotes": "发货地：广州；未拆封全新7天退换；远离潮湿，避免重物挤压变形。",
     "rating": 4.8,
     "sales": 8569,
-    "imagePath": "assets/images/products/p37.png"
+    "imagePath": "assets/images/products/p37.png",
+    "positiveRate": 98,
+    "reviewCount": 8,
+    "favoriteCount": 5463,
+    "stock": 21,
+    "attributes": {
+      "材质": "PET、纸质",
+      "尺寸": "11cm",
+      "工艺": "覆膜防刮",
+      "适用年龄": "14岁以上",
+      "包装": "OPP袋装"
+    },
+    "sellingPoints": [
+      "覆膜防刮、好保存",
+      "PET、纸质材质",
+      "印刷清晰、颜色正"
+    ],
+    "suitableFor": "适合搭痛包、放展示架，也适合送同担朋友",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   },
   {
     "id": "p38",
@@ -681,6 +1359,24 @@
     "purchaseNotes": "发货地：广州；吊牌完整无污损 7 天无理由退换；不可高温机洗，建议局部手洗擦拭，3 岁以下孩童需成人陪同玩耍。",
     "rating": 4.8,
     "sales": 6006,
-    "imagePath": "assets/images/products/p38.png"
+    "imagePath": "assets/images/products/p38.png",
+    "positiveRate": 97,
+    "reviewCount": 8,
+    "favoriteCount": 2982,
+    "stock": 16,
+    "attributes": {
+      "高度": "29cm",
+      "面料": "棉花娃娃专用面料",
+      "填充": "PP棉",
+      "适用年龄": "3岁以上",
+      "包装": "礼盒装"
+    },
+    "sellingPoints": [
+      "手感柔软、抱着舒服",
+      "填充饱满、不易变形"
+    ],
+    "suitableFor": "适合抱着睡或放床头，也适合送闺蜜、送对象",
+    "rarity": "热门",
+    "brand": "趣玩星球"
   }
 ]

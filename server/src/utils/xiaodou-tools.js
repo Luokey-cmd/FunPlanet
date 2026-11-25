@@ -37,8 +37,8 @@ export const XIAODOU_TOOLS = [
           maxPrice: { type: 'number', description: '最高价格（元）' },
           sort: {
             type: 'string',
-            enum: ['sales', 'price_asc', 'price_desc', 'rating'],
-            description: '默认按销量',
+            enum: ['sales', 'price_asc', 'price_desc', 'rating', 'positive_rate', 'reviews'],
+            description: '默认按销量；用户看重口碑传 positive_rate（好评率）或 rating，看重省钱传 price_asc',
           },
           skip: { type: 'number', description: '换一批时跳过前几条，例如 4、8' },
           excludeIds: {
@@ -65,8 +65,8 @@ export const XIAODOU_TOOLS = [
           maxPrice: { type: 'number' },
           sort: {
             type: 'string',
-            enum: ['sales', 'price_asc', 'price_desc', 'rating'],
-            description: '默认按销量；用户看重口碑传 rating，看重省钱传 price_asc',
+            enum: ['sales', 'price_asc', 'price_desc', 'rating', 'positive_rate', 'reviews'],
+            description: '默认按销量；用户看重口碑传 positive_rate（好评率）或 rating，看重省钱传 price_asc',
           },
           excludeIds: { type: 'array', items: { type: 'string' } },
         },
@@ -323,6 +323,8 @@ function parseArgs(raw) {
 }
 
 function orderByFor(sort) {
+  if (sort === 'positive_rate') return [{ positiveRate: 'desc' }, { rating: 'desc' }, { id: 'asc' }];
+  if (sort === 'reviews') return [{ reviewCount: 'desc' }, { sales: 'desc' }, { id: 'asc' }];
   if (sort === 'price_asc') return [{ price: 'asc' }, { id: 'asc' }];
   if (sort === 'price_desc') return [{ price: 'desc' }, { id: 'asc' }];
   if (sort === 'rating') return [{ rating: 'desc' }, { sales: 'desc' }, { id: 'asc' }];
@@ -338,6 +340,16 @@ function compactProduct(p) {
     price: full.price,
     tag: full.tag,
     sales: full.sales,
+    // 数据丰富化：口碑与可比参数一起给模型，比对时有据可依，不用现编
+    rating: full.rating,
+    reviewCount: full.reviewCount,
+    positiveRate: full.positiveRate,
+    favoriteCount: full.favoriteCount,
+    stock: full.stock,
+    rarity: full.rarity,
+    sellingPoints: full.sellingPoints,
+    suitableFor: full.suitableFor,
+    attributes: full.attributes,
   };
 }
 
@@ -449,13 +461,18 @@ function computeTraits(picked) {
   const minPrice = Math.min(...picked.map((x) => Number(x.price ?? 0)));
   const maxPrice = Math.max(...picked.map((x) => Number(x.price ?? 0)));
   const bestSales = Math.max(...picked.map((x) => Number(x.sales ?? 0)));
+  const bestPositive = Math.max(...picked.map((x) => Number(x.positiveRate ?? 0)));
   for (const item of picked) {
     const rating = Number(item.rating ?? 0);
     const price = Number(item.price ?? 0);
     const sales = Number(item.sales ?? 0);
+    const positive = Number(item.positiveRate ?? 0);
     if (rating > 0 && rating === bestRating && !used.has('rating')) {
       used.add('rating');
       traits.set(item.id, `口碑最好，评分 ${rating}`);
+    } else if (positive === bestPositive && positive >= 95 && !used.has('positive')) {
+      used.add('positive');
+      traits.set(item.id, `好评率最高，${positive}% 的买家给了好评`);
     } else if (price === minPrice && maxPrice > minPrice && !used.has('price')) {
       used.add('price');
       traits.set(item.id, `价格最低，比最贵的省 ¥${Math.round(maxPrice - minPrice)}`);
@@ -485,7 +502,7 @@ async function drawStarCards(args) {
     ...(Number.isFinite(Number(args.maxPrice)) && args.maxPrice != null
       ? { maxPrice: Number(args.maxPrice) }
       : {}),
-    sort: ['price_asc', 'price_desc', 'rating'].includes(args.sort) ? args.sort : 'sales',
+    sort: ['price_asc', 'price_desc', 'rating', 'positive_rate', 'reviews'].includes(args.sort) ? args.sort : 'sales',
   };
   if (list.length === 0) {
     return { ...result, cards: [], fate: true, drawArgs, hasMore: false };

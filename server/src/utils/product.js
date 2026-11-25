@@ -31,6 +31,11 @@ export function serializeProduct(p, flash = null) {
     rarity: p.rarity ?? null,
     suitableFor: p.suitableFor ?? null,
     sellingPoints: Array.isArray(p.sellingPoints) ? p.sellingPoints : [],
+    // 数据丰富化：结构化参数与口碑统计，老数据没有就给空/默认，App 侧为空不显示
+    attributes: p.attributes ?? null,
+    reviewCount: p.reviewCount ?? 0,
+    positiveRate: p.positiveRate ?? null,
+    favoriteCount: p.favoriteCount ?? 0,
     promoPrice: flash ? flash.price : null,
     promotionName: flash ? flash.promotionName : null,
     promoEndsAt: flash ? flash.endsAt.toISOString() : null,

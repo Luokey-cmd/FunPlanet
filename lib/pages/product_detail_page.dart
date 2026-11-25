@@ -664,7 +664,7 @@ class _PriceTitleBlock extends StatelessWidget {
           ),
           SizedBox(height: AppScale.s(6)),
           Text(
-            '已售 ${product.sales} 件 · 评分 ${product.rating.toStringAsFixed(1)}${reviewCount == null ? '' : ' · $reviewCount 条评价'}',
+            '已售 ${product.sales} 件 · 评分 ${product.rating.toStringAsFixed(1)}${reviewCount == null ? '' : ' · $reviewCount 条评价'}${product.positiveRate == null ? '' : ' · 好评率 ${product.positiveRate}%'}',
             style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground),
           ),
           SizedBox(height: AppScale.s(10)),
@@ -1478,6 +1478,9 @@ class _DetailSection extends StatelessWidget {
       if (product.series != null && product.series!.isNotEmpty) ('系列', product.series!),
       if (product.rarity != null && product.rarity!.isNotEmpty) ('稀有度', product.rarity!),
       if (product.spec != null && product.spec!.isNotEmpty) ('规格', product.spec!),
+      // 数据丰富化：结构化参数（材质/尺寸/重量等）逐行进参数表，没有就不加行
+      if (product.attributes != null)
+        for (final e in product.attributes!.entries) (e.key, e.value),
       ('分类', '${product.majorCategory} · ${product.subCategory}'),
     ];
     final width = MediaQuery.sizeOf(context).width;

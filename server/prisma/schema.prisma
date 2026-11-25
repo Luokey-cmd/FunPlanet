@@ -115,6 +115,13 @@ model Product {
   suitableFor          String?               @map("suitable_for") @db.Text
   // 结构化卖点列表：一条一句，如「亚克力高透」「可发光」，详情页卖点区和导购对比都读它
   sellingPoints        String[]              @default([]) @map("selling_points")
+  // 数据丰富化（2026-11-25）：结构化参数（材质/尺寸/重量等键值对），详情页参数表和小豆横向比对都读它
+  attributes           Json?                 @map("attributes")
+  // 口碑统计：评价数与评价表条数对齐、好评率按星级分布生成，都由数据文件维护，详情页与小豆排序用
+  reviewCount          Int                   @default(0) @map("review_count")
+  positiveRate         Int?                  @map("positive_rate")
+  // 收藏数：热度展示用（与销量同为数据文件维护的虚拟热度）
+  favoriteCount        Int                   @default(0) @map("favorite_count")
   createdAt            DateTime              @default(now()) @map("created_at")
   updatedAt            DateTime              @updatedAt @map("updated_at")
   banners              Banner[]
