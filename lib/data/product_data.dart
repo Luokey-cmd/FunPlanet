@@ -803,25 +803,28 @@ void bumpProductShuffleEpoch() {
   productShuffleEpoch++;
 }
 
+// 当前编织代次的种子：当天日期 + 下拉刷新代次。
+// 同一代次内不变（列表重建顺序稳定），下拉一次或隔天就换一套。
+int _productShuffleSeed() {
+  final now = DateTime.now();
+  return now.year * 10000 + now.month * 100 + now.day + productShuffleEpoch * 100000;
+}
+
 // 名次窗口扰动（2026-11-27 hx 拍板「下拉真换一批」）：
-// 实测过两种做法——只换编织顺序，前 12 件一件都换不掉（面孔被综合分
-// 铁序锁死）；给分数加随机扰动，又因为全店分数挤在很窄的区间里，
-// 一扰动连第 100 名都能跳上首屏、质量崩掉。最后定的是名次窗口：
-// 每件商品的有效名次 = 原名次 ± 15 名内的一个确定性偏移，再按有效
-// 名次重排。效果（305 件真实数据模拟）：下拉一次前 12 件约换 6 件、
-// 前 30 约换 12 件，且任何商品最多挪 15 名，高分商品不会被甩出前排、
-// 低分商品也跳不上首屏。偏移由「种子 + 商品编号」杂凑算出，
-// 同一种子下每次重建结果一致，列表不会滚着滚着自己跳。
+// 每件商品的有效名次 = 原名次 ± 15 名内的一个随机偏移，再按有效
+// 名次重排；任何商品最多挪 15 名，高分商品不会被甩出前排、低分
+// 商品也跳不上首屏。
+// 坑（2026-11-27 二次修正）：第一版偏移用「编号杂凑 + 种子」手算，
+// 种子只以 +seed×40503 进杂凑、再过一轮乘法取模——相邻种子的偏移
+// 几乎整体平移（每件只差约 0.02），排序结果基本不变，下拉了跟没
+// 拉一样（hx 真机连拉三次首屏同一件）。改用 math.Random(种子)
+// 依次取偏移：同种子序列确定、重建稳定，换种子才真正洗牌。
 List<Product> jitterRankedByWindow(List<Product> ranked, {int window = 15}) {
   if (ranked.length < 2) return ranked;
-  final now = DateTime.now();
-  final seed = now.year * 10000 + now.month * 100 + now.day + productShuffleEpoch * 100000;
+  final rng = math.Random(_productShuffleSeed());
   final keyed = <(double, Product)>[];
   for (var i = 0; i < ranked.length; i++) {
-    var x = (_productIdNum(ranked[i].id) * 2654435761 + seed * 40503 + 97) & 0x7fffffff;
-    x = (x * 1103515245 + 12345) & 0x7fffffff;
-    final unit = x / 0x7fffffff;
-    keyed.add((i + (unit * 2 - 1) * window, ranked[i]));
+    keyed.add((i + (rng.nextDouble() * 2 - 1) * window, ranked[i]));
   }
   keyed.sort((a, b) => a.$1.compareTo(b.$1));
   return keyed.map((e) => e.$2).toList();
@@ -833,8 +836,7 @@ List<Product> interleaveNewProducts(List<Product> sorted) {
   final fresh = sorted.where((p) => _productIdNum(p.id) >= 62).toList();
   if (fresh.isEmpty || fresh.length == sorted.length) return sorted;
   final main = sorted.where((p) => _productIdNum(p.id) < 62).toList();
-  final now = DateTime.now();
-  final rng = math.Random(now.year * 10000 + now.month * 100 + now.day + productShuffleEpoch * 100000);
+  final rng = math.Random(_productShuffleSeed());
   final result = <Product>[];
   var mi = 0;
   var fi = 0;
@@ -851,6 +853,38 @@ List<Product> interleaveNewProducts(List<Product> sorted) {
   while (mi < main.length) {
     result.add(main[mi++]);
   }
+  return result;
+}
+
+// 首屏防重复（2026-11-27 hx 二次反馈「下拉了还是那几张脸」）：
+// 只靠窗口扰动，池头几件高分商品换来换去还是它们。这里记住每个
+// 出口上一代次首屏露过的前 12 件，下一代次算完序后把它们整体挪到
+// 第 24 位之后——下拉一次，首屏保证全换新脸；再下一代次它们又能
+// 回来，不永久消失。同一代次内按 scope 缓存结果，滚动重建不跳序；
+// 目录被 replaceProducts 换成新列表对象时缓存自动失效。
+final Map<String, List<Product>> _noRepeatCache = {};
+final Map<String, Set<String>> _lastScreenIds = {};
+
+List<Product> avoidImmediateRepeats(List<Product> list, {required String scope}) {
+  final cacheKey = '$scope|${_productShuffleSeed()}|${identityHashCode(products)}';
+  final cached = _noRepeatCache[cacheKey];
+  if (cached != null) return cached;
+  final shown = _lastScreenIds[scope];
+  var result = list;
+  if (shown != null && shown.isNotEmpty && list.length > 24) {
+    final kept = <Product>[];
+    final demoted = <Product>[];
+    for (final p in list) {
+      (shown.contains(p.id) ? demoted : kept).add(p);
+    }
+    if (demoted.isNotEmpty) {
+      result = [...kept.take(24), ...kept.skip(24), ...demoted];
+    }
+  }
+  _lastScreenIds[scope] = result.take(12).map((p) => p.id).toSet();
+  _noRepeatCache
+    ..removeWhere((k, _) => k.startsWith('$scope|') && k != cacheKey)
+    ..[cacheKey] = result;
   return result;
 }
 
@@ -893,7 +927,7 @@ List<Product> productsByMarketTab(MarketTab tab, {RankingSubTab? rankingSub}) {
       // 综合分排完先做名次窗口扰动（不然面孔被铁序锁死、下拉刷新
       // 换不了几件），再做偏向新品的随机穿插（见 interleaveNewProducts），
       // 不然前两屏被老爆款占满、hx 看不到新系列。
-      return interleaveNewProducts(jitterRankedByWindow(list));
+      return avoidImmediateRepeats(interleaveNewProducts(jitterRankedByWindow(list)), scope: 'recommend');
     case MarketTab.hot:
       // 近期热销：按近 30 天真实销量 recentSales 排（服务端按订单明细汇总，
       // 虚拟订单也在订单表里、同样计入）——这才和人气榜单·售卖榜（累计总销量）拉开区别，

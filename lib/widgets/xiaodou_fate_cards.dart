@@ -22,7 +22,7 @@ import '../widgets/product_image.dart';
 /// 1. 卡从小卡脸起转：整圈旋转 + 放大，转到背面时是专门的**牌背美术图**
 ///    （fate_card_back.webp：照开场动画翻牌那一帧做的——深紫星空、金雕花框、
 ///    月牙四角、中央发光星座椭圆、金翅膀放射光；v3 没有牌背、转过去是正面的
-///    镜像，hx 点名不满意），一圈半落点停在牌背（hx 00:29 换成他发来的开场同款牌背图：金边深蓝卡、四角月牙、几何星座、翅膀张开，透明底、上面没有商品），停约 0.95 秒；
+///    镜像，hx 点名不满意），一圈半落点停在牌背（hx 00:29 换成他发来的开场同款牌背图：金边深蓝卡、四角月牙、几何星座、翅膀张开，透明底、上面没有商品），停约 0.5 秒；
 /// 2. 再半转落成奶油底**详细卡**（价格/评分/特点/双按钮的静态版）；
 /// 3. 停住等用户点任意处（点卡上、点卡外都算）才关掉全屏层，详细卡落回
 ///    聊天消息里变可点正式版，下方有「回到三张牌」可以重选。
@@ -201,7 +201,7 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
 }
 
 /// 全屏翻牌层（v4 新增）：在 rootNavigator 顶层演完整套变身，不受聊天框约束。
-/// 时序：spin1 一圈半（小卡脸 ↔ 牌背，落点背对）1150ms → 牌背停 0.95s →
+/// 时序：spin1 一圈半（小卡脸 ↔ 牌背，落点背对）1150ms → 牌背停 0.5s →
 /// spin2 半转落成详细卡 880ms → 落定等点按（点任意处 pop 回 true）。
 /// 输入：商品与特点句；输出：路由返回值 bool（true = 落回聊天变详细卡，
 /// false = 取消回三张牌）。返回键：落定前取消、落定后等同点按落定。
@@ -281,7 +281,7 @@ class _FateFlipOverlayState extends State<_FateFlipOverlay>
       await _spin1.forward();
       if (!mounted) return;
       setState(() => _phase = _FlipPhase.hold);
-      await Future.delayed(const Duration(milliseconds: 950));
+      await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted || _phase != _FlipPhase.hold) return;
       await _startSpin2();
     } on TickerCanceled {

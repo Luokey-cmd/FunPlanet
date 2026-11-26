@@ -73,7 +73,7 @@ class _MallPageState extends State<MallPage> {
     // 不然销量悬殊时前几屏全是老爆款（2026-11-27 hx 定稿）。
     // 先名次窗口扰动再穿插：与首页推荐同口径，下拉刷新能真换一批
     // （见 product_data 的 jitterRankedByWindow）。
-    return interleaveNewProducts(jitterRankedByWindow(list));
+    return avoidImmediateRepeats(interleaveNewProducts(jitterRankedByWindow(list)), scope: 'mall:$_activeCategory');
   }
 
   // 商品编号取数字部分（p123 → 123），取不到按 0 算。
