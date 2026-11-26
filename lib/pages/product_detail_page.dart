@@ -312,7 +312,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               ),
             ),
         ],
-      ),
+    ),
     );
   }
 }
@@ -409,7 +409,7 @@ class _VideoSlideState extends State<_VideoSlide> {
             onTap: () {
         if (controller.value.isPlaying) {
           controller.pause();
-        } else {
+              } else {
           controller.play();
         }
         setState(() {});
@@ -432,7 +432,7 @@ class _VideoSlideState extends State<_VideoSlide> {
                 decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), shape: BoxShape.circle),
                 child: Icon(Icons.play_arrow, color: Colors.white, size: AppScale.s(28)),
               ),
-            ),
+          ),
         ],
       ),
     );
@@ -467,7 +467,7 @@ class _TopChrome extends StatelessWidget {
     final user = context.read<UserProvider>();
     if (user.completeDailyShare()) {
       showTopSnackBar(
-        context,
+      context,
         content: Text(shown ? '分享成功，获得 20 趣玩币' : '文案已复制，分享任务完成，获得 20 趣玩币', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
       );
     } else {
@@ -484,7 +484,7 @@ class _TopChrome extends StatelessWidget {
     final isFavorite = context.watch<UserProvider>().isFavorite(product.id);
 
     if (!showAnchors) {
-      return Padding(
+    return Padding(
         padding: EdgeInsets.fromLTRB(AppScale.s(12), top + AppScale.s(8), AppScale.s(12), AppScale.s(8)),
         child: Row(
           children: [
@@ -505,7 +505,7 @@ class _TopChrome extends StatelessWidget {
     const labels = ['商品', '评价', '详情', '推荐'];
     return Container(
       padding: EdgeInsets.only(top: top),
-      decoration: BoxDecoration(
+          decoration: BoxDecoration(
         color: AppColors.card,
         border: Border(bottom: BorderSide(color: AppColors.border)),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: AppScale.s(8), offset: Offset(0, AppScale.s(2)))],
@@ -525,9 +525,9 @@ class _TopChrome extends StatelessWidget {
                     onTap: () => onAnchorTap(i),
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: AppScale.s(10), horizontal: AppScale.s(6)),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
                           Text(
                             labels[i],
                             style: TextStyle(
@@ -540,7 +540,7 @@ class _TopChrome extends StatelessWidget {
                           Container(
                             width: AppScale.s(18),
                             height: AppScale.s(2.5),
-                            decoration: BoxDecoration(
+                              decoration: BoxDecoration(
                               color: i == activeAnchor ? AppColors.primary : Colors.transparent,
                               borderRadius: BorderRadius.circular(AppScale.s(2)),
                             ),
@@ -549,18 +549,18 @@ class _TopChrome extends StatelessWidget {
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
+                        ],
+                      ),
+                    ),
           IconButton(
             icon: Icon(
               isFavorite ? Icons.favorite : Icons.favorite_border,
               size: AppScale.s(22),
               color: isFavorite ? AppColors.priceRed : AppColors.foreground,
-            ),
+                  ),
             onPressed: () => context.read<UserProvider>().toggleFavorite(product.id),
-          ),
-        ],
+                ),
+            ],
       ),
     );
   }
@@ -576,7 +576,7 @@ class _CircleBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppGestureDetector(
-      onTap: onTap,
+        onTap: onTap,
       child: Container(
         width: AppScale.s(34),
         height: AppScale.s(34),
@@ -612,13 +612,13 @@ class _PriceTitleBlock extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(AppScale.s(16), AppScale.s(14), AppScale.s(16), AppScale.s(14)),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
             crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
+              children: [
               Text('¥', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
-              Text(
+                      Text(
                 _priceText(displayPrice),
                 style: TextStyle(fontSize: AppScale.t(26), fontWeight: FontWeight.bold, color: AppColors.primaryDark, height: 1),
               ),
@@ -628,7 +628,7 @@ class _PriceTitleBlock extends StatelessWidget {
                   padding: EdgeInsets.only(bottom: AppScale.s(2)),
                   child: Text(
                     '¥${_priceText(product.originalPrice!)}',
-                    style: TextStyle(
+                        style: TextStyle(
                       fontSize: AppScale.t(13),
                       color: AppColors.mutedForeground,
                       decoration: TextDecoration.lineThrough,
@@ -672,12 +672,12 @@ class _PriceTitleBlock extends StatelessWidget {
               else if (lowStock)
                 Text('仅剩 ${product.stock} 件', style: TextStyle(fontSize: AppScale.t(12), fontWeight: FontWeight.w600, color: AppColors.tagHot)),
             ],
-          ),
-          SizedBox(height: AppScale.s(6)),
-          Text(
+                      ),
+                      SizedBox(height: AppScale.s(6)),
+                      Text(
             '已售 ${product.sales} 件 · 评分 ${product.rating.toStringAsFixed(1)}${reviewCount == null ? '' : ' · $reviewCount 条评价'}${product.positiveRate == null ? '' : ' · 好评率 ${product.positiveRate}%'}',
-            style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground),
-          ),
+                        style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground),
+                      ),
           SizedBox(height: AppScale.s(10)),
           Text(
             product.name,
@@ -690,7 +690,7 @@ class _PriceTitleBlock extends StatelessWidget {
             Row(
               children: [
                 if (product.series != null && product.series!.isNotEmpty)
-                  Text(
+                Text(
                     '${product.series} 系列',
                     style: TextStyle(fontSize: AppScale.t(12), color: AppColors.primaryDark, fontWeight: FontWeight.w600),
                   ),
@@ -767,8 +767,8 @@ class _CouponStrip extends StatelessWidget {
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: AppScale.s(12), vertical: AppScale.s(9)),
           decoration: BoxDecoration(color: AppColors.secondary, borderRadius: BorderRadius.circular(AppScale.s(10))),
-          child: Row(
-            children: [
+                  child: Row(
+                    children: [
               Icon(Icons.local_offer_outlined, size: AppScale.s(16), color: AppColors.primaryDark),
               SizedBox(width: AppScale.s(6)),
               Expanded(
@@ -870,9 +870,9 @@ class _XiaodouCard extends StatelessWidget {
         child: Container(
           padding: EdgeInsets.all(AppScale.s(12)),
           decoration: BoxDecoration(color: AppColors.secondary, borderRadius: BorderRadius.circular(AppScale.s(14))),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
               Row(
                 children: [
                   Container(
@@ -888,7 +888,7 @@ class _XiaodouCard extends StatelessWidget {
                   Icon(Icons.chevron_right, size: AppScale.s(15), color: AppColors.primaryDark),
                 ],
               ),
-              SizedBox(height: AppScale.s(8)),
+          SizedBox(height: AppScale.s(8)),
               ...lines.map(
                 (line) => Padding(
                   padding: EdgeInsets.only(bottom: AppScale.s(2)),
@@ -1465,8 +1465,8 @@ class _AllReviewsPage extends StatelessWidget {
         children: reviews
             .map(
               (review) => Padding(
-                padding: EdgeInsets.only(bottom: AppScale.s(12)),
-                child: ProductReviewCard(review: review),
+            padding: EdgeInsets.only(bottom: AppScale.s(12)),
+            child: ProductReviewCard(review: review),
               ),
             )
                 .toList(),
