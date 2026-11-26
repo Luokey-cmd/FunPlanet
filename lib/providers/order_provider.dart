@@ -123,6 +123,8 @@ class OrderProvider extends ChangeNotifier {
     List<CartItem> items, {
     String? couponTemplateId,
     String? addressId,
+    bool payNow = true,
+    bool autoCoupon = false,
   }) async {
     if (items.isEmpty) throw StateError('empty items');
 
@@ -131,6 +133,8 @@ class OrderProvider extends ChangeNotifier {
         items: items,
         couponTemplateId: couponTemplateId,
         addressId: addressId,
+        payNow: payNow,
+        autoCoupon: autoCoupon,
       );
       _orders.insert(0, order);
       notifyListeners();

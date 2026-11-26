@@ -589,9 +589,13 @@ class UserFeatureSheets {
     );
   }
 
-  // 我的盒柜：把已发货 / 已完成的订单商品汇成藏品陈列。
-  // 只收这两种状态——待付款、待发货的还没到手，不算藏品；已取消的不收。
-  // 商品图通过 productId 回查商品库，查不到（商品已删）就用占位图，不整行丢弃。
+  // 我的盒柜（真收藏柜版，hx 2026-11-27 定）：只收已发货 / 已完成的订单
+  // 商品——待付款、待发货的还没到手，不算藏品；已取消的不收。
+  // 与「我的订单」的区别：订单按单看流水，这里按件看收藏——按系列
+  // 分组陈列，每组显示集齐进度（已集款数 / 该系列在售总款数），顶部
+  // 汇总总件数、点亮系列数、集齐系列数。没系列的老商品归「其他藏品」，
+  // 只列件、不算进度。商品图通过 productId 回查商品库，查不到（商品
+  // 已删）就用占位图，不整行丢弃。
   static void showCollectionCabinet(BuildContext context) {
     _showSheet(
       context,
@@ -607,55 +611,157 @@ class UserFeatureSheets {
             }
           }
           if (owned.isEmpty) return _empty('盒柜还是空的，下单的宝贝发货后会出现在这里');
-          return ListView.separated(
-            // padding 显式归零：不写时 ListView 会自带一份顶部安全区
-            // 留白，和页面外框的间距叠加，列表顶部会空出一大截。
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            itemCount: owned.length,
-            separatorBuilder: (_, _) => SizedBox(height: AppScale.s(10)),
-            itemBuilder: (context, index) {
-              final (order, item) = owned[index];
-              final product = item.productId == null ? null : productById(item.productId!);
-              final cfg = orderStatusConfig(order.status);
-              return Container(
+
+          // 按系列分组（键为系列名，无系列归「其他藏品」）
+          final groups = <String, List<(Order, OrderItem)>>{};
+          for (final e in owned) {
+            final product = e.$2.productId == null ? null : productById(e.$2.productId!);
+            final series = product?.series;
+            final key = (series != null && series.isNotEmpty) ? series : '其他藏品';
+            groups.putIfAbsent(key, () => []).add(e);
+          }
+          // 集齐进度的分母：该系列当前在售总款数，按商品库现算
+          int seriesTotal(String name) => products.where((p) => p.series == name).length;
+          // 已集款数：同一件买两件只算一款（凑套看的是款，不是件）
+          int ownedKinds(List<(Order, OrderItem)> list) =>
+              list.map((e) => e.$2.productId).whereType<String>().toSet().length;
+
+          final totalPieces = owned.fold<int>(0, (sum, e) => sum + e.$2.quantity);
+          final seriesNames = groups.keys.where((k) => k != '其他藏品').toList()
+            ..sort((a, b) => ownedKinds(groups[b]!).compareTo(ownedKinds(groups[a]!)));
+          final completedSeries = seriesNames
+              .where((n) => seriesTotal(n) > 0 && ownedKinds(groups[n]!) >= seriesTotal(n))
+              .length;
+
+          Widget itemRow((Order, OrderItem) e) {
+            final (order, item) = e;
+            final product = item.productId == null ? null : productById(item.productId!);
+            final cfg = orderStatusConfig(order.status);
+            return Container(
+              margin: EdgeInsets.only(bottom: AppScale.s(10)),
+              padding: FeaturePageStyle.cardPadding,
+              decoration: BoxDecoration(
+                color: AppColors.muted,
+                borderRadius: BorderRadius.circular(FeaturePageStyle.cardRadius),
+              ),
+              child: Row(
+                children: [
+                  if (product != null)
+                    ProductThumbnail(product: product, width: FeaturePageStyle.thumbSize, height: FeaturePageStyle.thumbSize)
+                  else
+                    Container(
+                      width: FeaturePageStyle.thumbSize,
+                      height: FeaturePageStyle.thumbSize,
+                      decoration: BoxDecoration(
+                        color: AppColors.border.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(AppScale.s(8)),
+                      ),
+                      child: Icon(Icons.inventory_2_outlined, color: AppColors.mutedForeground),
+                    ),
+                  SizedBox(width: AppScale.s(12)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: FeaturePageStyle.bodyBold()),
+                        SizedBox(height: AppScale.s(6)),
+                        Text('x${item.quantity} · ${cfg.label}', style: FeaturePageStyle.secondary()),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          Widget seriesHeader(String name) {
+            final list = groups[name]!;
+            final kinds = ownedKinds(list);
+            if (name == '其他藏品') {
+              return Padding(
+                padding: EdgeInsets.only(top: AppScale.s(14), bottom: AppScale.s(10)),
+                child: Text('其他藏品 · ${list.length} 件', style: FeaturePageStyle.sectionTitle()),
+              );
+            }
+            final total = seriesTotal(name);
+            final done = total > 0 && kinds >= total;
+            return Padding(
+              padding: EdgeInsets.only(top: AppScale.s(14), bottom: AppScale.s(10)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text(name, style: FeaturePageStyle.sectionTitle())),
+                      if (done)
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: AppScale.s(8), vertical: AppScale.s(3)),
+                          decoration: BoxDecoration(
+                            color: AppColors.gold.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(AppScale.s(999)),
+                          ),
+                          child: Text('已集齐', style: TextStyle(fontSize: AppScale.t(11), fontWeight: FontWeight.w700, color: AppColors.goldDark)),
+                        ),
+                      SizedBox(width: AppScale.s(8)),
+                      Text('已集 $kinds/$total', style: FeaturePageStyle.secondary()),
+                    ],
+                  ),
+                  SizedBox(height: AppScale.s(6)),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppScale.s(3)),
+                    child: LinearProgressIndicator(
+                      value: total > 0 ? kinds / total : 0,
+                      minHeight: AppScale.s(6),
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                      valueColor: AlwaysStoppedAnimation<Color>(done ? AppColors.gold : AppColors.primary),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 顶部汇总：总件数 / 点亮系列 / 集齐系列
+              Container(
                 padding: FeaturePageStyle.cardPadding,
                 decoration: BoxDecoration(
-                  color: AppColors.muted,
+                  color: AppColors.secondary,
                   borderRadius: BorderRadius.circular(FeaturePageStyle.cardRadius),
                 ),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    if (product != null)
-                      ProductThumbnail(product: product, width: FeaturePageStyle.thumbSize, height: FeaturePageStyle.thumbSize)
-                    else
-                      Container(
-                        width: FeaturePageStyle.thumbSize,
-                        height: FeaturePageStyle.thumbSize,
-                        decoration: BoxDecoration(
-                          color: AppColors.border.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(AppScale.s(8)),
-                        ),
-                        child: Icon(Icons.inventory_2_outlined, color: AppColors.mutedForeground),
-                      ),
-                    SizedBox(width: AppScale.s(12)),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(item.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: FeaturePageStyle.bodyBold()),
-                          SizedBox(height: AppScale.s(6)),
-                          Text('x${item.quantity} · ${cfg.label}', style: FeaturePageStyle.secondary()),
-                        ],
-                      ),
-                    ),
+                    _cabinetStat('$totalPieces', '件藏品'),
+                    _cabinetStat('${seriesNames.length}', '点亮系列'),
+                    _cabinetStat('$completedSeries', '集齐系列'),
                   ],
                 ),
-              );
-            },
+              ),
+              for (final name in seriesNames) ...[
+                seriesHeader(name),
+                for (final e in groups[name]!) itemRow(e),
+              ],
+              if (groups.containsKey('其他藏品')) ...[
+                seriesHeader('其他藏品'),
+                for (final e in groups['其他藏品']!) itemRow(e),
+              ],
+            ],
           );
         },
       ),
+    );
+  }
+
+  static Widget _cabinetStat(String value, String label) {
+    return Column(
+      children: [
+        Text(value, style: TextStyle(fontSize: AppScale.t(18), fontWeight: FontWeight.w800, color: AppColors.primary)),
+        SizedBox(height: AppScale.s(2)),
+        Text(label, style: FeaturePageStyle.caption()),
+      ],
     );
   }
 
@@ -1615,9 +1721,29 @@ class UserFeatureSheets {
               child: Text(actionLabel, style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600, color: Colors.white)),
             )
           else
-            AppTextButton(
-              onPressed: onAction,
-              child: Text(actionLabel, style: FeaturePageStyle.action(color: done || onAction == null ? AppColors.mutedForeground : null)),
+            // 状态文字套圆角胶囊（hx 2026-11-27 点名）：裸文字看不出能点，
+            // 去完成/签到用浅紫底紫字，已完成/已领取用浅灰底灰字，一眼是按钮。
+            // onAction 为空（已完成态）时手势不注册，胶囊只是状态徽章。
+            GestureDetector(
+              onTap: onAction,
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppScale.s(14),
+                  vertical: AppScale.s(7),
+                ),
+                decoration: BoxDecoration(
+                  color: done || onAction == null
+                      ? AppColors.mutedForeground.withValues(alpha: 0.10)
+                      : AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppScale.s(999)),
+                ),
+                child: Text(
+                  actionLabel,
+                  style: FeaturePageStyle.action(
+                    color: done || onAction == null ? AppColors.mutedForeground : null,
+                  ),
+                ),
+              ),
             ),
         ],
       ),

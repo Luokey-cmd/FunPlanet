@@ -514,17 +514,26 @@ class BannerItem {
     required this.id,
     required this.imagePath,
     required this.productId,
+    this.linkType = 'product',
+    this.linkTarget,
   });
 
   final String id;
   final String imagePath;
   final String productId;
 
+  // 跳转类型：product 点开 productId 那件商品（老横幅）；
+  // series 点开系列页，linkTarget 存系列名（2026-11-27 系列横幅）。
+  final String linkType;
+  final String? linkTarget;
+
   factory BannerItem.fromJson(Map<String, dynamic> json) {
     return BannerItem(
       id: json['id'] as String,
       imagePath: json['imagePath'] as String,
       productId: json['productId'] as String,
+      linkType: json['linkType'] as String? ?? 'product',
+      linkTarget: json['linkTarget'] as String?,
     );
   }
 
@@ -533,6 +542,8 @@ class BannerItem {
       'id': id,
       'imagePath': imagePath,
       'productId': productId,
+      'linkType': linkType,
+      'linkTarget': linkTarget,
     };
   }
 }
@@ -595,7 +606,20 @@ const fallbackBanners = [
   ),
 ];
 
-var appBanners = List<BannerItem>.from(fallbackBanners);
+// 系列横幅的内置兜底（与服务端 banners.json 同一批）：离线/老服务端时
+// 首页轮播也出得了系列横幅，点开同样进系列页。
+const fallbackSeriesBanners = [
+  BannerItem(id: 's1', imagePath: 'assets/images/banners/banner-series-canteen.jpg', productId: 'p62', linkType: 'series', linkTarget: '山海小食堂'),
+  BannerItem(id: 's2', imagePath: 'assets/images/banners/banner-series-postoffice.jpg', productId: 'p76', linkType: 'series', linkTarget: '星屿邮局'),
+  BannerItem(id: 's3', imagePath: 'assets/images/banners/banner-series-circus.jpg', productId: 'p89', linkType: 'series', linkTarget: '月光马戏团'),
+  BannerItem(id: 's4', imagePath: 'assets/images/banners/banner-series-neon.jpg', productId: 'p103', linkType: 'series', linkTarget: '霓虹夜行'),
+  BannerItem(id: 's5', imagePath: 'assets/images/banners/banner-series-deepsea.jpg', productId: 'p221', linkType: 'series', linkTarget: '深海观测站'),
+  BannerItem(id: 's6', imagePath: 'assets/images/banners/banner-series-clockshop.jpg', productId: 'p227', linkType: 'series', linkTarget: '时光钟表店'),
+  BannerItem(id: 's7', imagePath: 'assets/images/banners/banner-series-flower.jpg', productId: 'p233', linkType: 'series', linkTarget: '樱庭花艺社'),
+  BannerItem(id: 's8', imagePath: 'assets/images/banners/banner-series-aurora.jpg', productId: 'p239', linkType: 'series', linkTarget: '极光观测队'),
+];
+
+var appBanners = List<BannerItem>.from([...fallbackBanners, ...fallbackSeriesBanners]);
 
 void replaceBanners(List<BannerItem> next) {
   appBanners = List<BannerItem>.from(next);
@@ -762,6 +786,74 @@ List<Product> productsByCategory(String categoryId) {
 int _productIdNum(String id) =>
     int.tryParse(id.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 
+// 新品穿插（2026-11-27 hx 定稿）：综合分再准也压不住老爆款的销量
+// （p22～p38 销量 5500～8600、新系列只有几百），前两屏仍会全是老货；
+// 而且 hx 明确更喜欢新商品、不要老商品占大头。所以排完综合分后做一次
+// 「偏向新品的随机编织」：新品池与老商品各自保持综合分顺序，
+// 合并时每一步约 70% 概率先出新品、30% 出老商品，
+// 直到一池用完、另一池依次补齐——新品占多数、位置又不机械。
+// 随机种子按当天日期 + 下拉刷新代次定：同一天内不下拉顺序稳定
+// （列表重建不会跳来跳去），隔天自动换一套编织；
+// 首页/商城下拉刷新一次也会立刻换一套新的（hx 2026-11-27 追加）。
+// 只用于推荐流与商城综合列表；热销/收藏/售卖这类榜单是真实名次，不穿插。
+// 下拉刷新换序代次：首页与商城下拉刷新时 +1，穿插种子随之改变。
+int productShuffleEpoch = 0;
+
+void bumpProductShuffleEpoch() {
+  productShuffleEpoch++;
+}
+
+// 名次窗口扰动（2026-11-27 hx 拍板「下拉真换一批」）：
+// 实测过两种做法——只换编织顺序，前 12 件一件都换不掉（面孔被综合分
+// 铁序锁死）；给分数加随机扰动，又因为全店分数挤在很窄的区间里，
+// 一扰动连第 100 名都能跳上首屏、质量崩掉。最后定的是名次窗口：
+// 每件商品的有效名次 = 原名次 ± 15 名内的一个确定性偏移，再按有效
+// 名次重排。效果（305 件真实数据模拟）：下拉一次前 12 件约换 6 件、
+// 前 30 约换 12 件，且任何商品最多挪 15 名，高分商品不会被甩出前排、
+// 低分商品也跳不上首屏。偏移由「种子 + 商品编号」杂凑算出，
+// 同一种子下每次重建结果一致，列表不会滚着滚着自己跳。
+List<Product> jitterRankedByWindow(List<Product> ranked, {int window = 15}) {
+  if (ranked.length < 2) return ranked;
+  final now = DateTime.now();
+  final seed = now.year * 10000 + now.month * 100 + now.day + productShuffleEpoch * 100000;
+  final keyed = <(double, Product)>[];
+  for (var i = 0; i < ranked.length; i++) {
+    var x = (_productIdNum(ranked[i].id) * 2654435761 + seed * 40503 + 97) & 0x7fffffff;
+    x = (x * 1103515245 + 12345) & 0x7fffffff;
+    final unit = x / 0x7fffffff;
+    keyed.add((i + (unit * 2 - 1) * window, ranked[i]));
+  }
+  keyed.sort((a, b) => a.$1.compareTo(b.$1));
+  return keyed.map((e) => e.$2).toList();
+}
+
+List<Product> interleaveNewProducts(List<Product> sorted) {
+  // 新旧的线按 hx 的口径：编号 1～61 是 App 最早的老商品，
+  // 62 起（八个原创系列）都算新商品、新商品优先出。
+  final fresh = sorted.where((p) => _productIdNum(p.id) >= 62).toList();
+  if (fresh.isEmpty || fresh.length == sorted.length) return sorted;
+  final main = sorted.where((p) => _productIdNum(p.id) < 62).toList();
+  final now = DateTime.now();
+  final rng = math.Random(now.year * 10000 + now.month * 100 + now.day + productShuffleEpoch * 100000);
+  final result = <Product>[];
+  var mi = 0;
+  var fi = 0;
+  while (mi < main.length && fi < fresh.length) {
+    if (rng.nextDouble() < 0.7) {
+      result.add(fresh[fi++]);
+    } else {
+      result.add(main[mi++]);
+    }
+  }
+  while (fi < fresh.length) {
+    result.add(fresh[fi++]);
+  }
+  while (mi < main.length) {
+    result.add(main[mi++]);
+  }
+  return result;
+}
+
 // 市集四个页签的取数与排序（2026-11-26 hx 拍板修正版）。
 // 输入：全局 products（服务端按编号正序返回全店商品）；输出：排好序的新列表，不动原列表。
 // 坑：全店评分只有 4.6～4.9 四档，只按评分排会有上百件同分、同分顺序等于编号序，
@@ -798,7 +890,10 @@ List<Product> productsByMarketTab(MarketTab tab, {RankingSubTab? rankingSub}) {
         final byScore = score(b).compareTo(score(a));
         return byScore != 0 ? byScore : _productIdNum(b.id).compareTo(_productIdNum(a.id));
       });
-      return list;
+      // 综合分排完先做名次窗口扰动（不然面孔被铁序锁死、下拉刷新
+      // 换不了几件），再做偏向新品的随机穿插（见 interleaveNewProducts），
+      // 不然前两屏被老爆款占满、hx 看不到新系列。
+      return interleaveNewProducts(jitterRankedByWindow(list));
     case MarketTab.hot:
       // 近期热销：按近 30 天真实销量 recentSales 排（服务端按订单明细汇总，
       // 虚拟订单也在订单表里、同样计入）——这才和人气榜单·售卖榜（累计总销量）拉开区别，

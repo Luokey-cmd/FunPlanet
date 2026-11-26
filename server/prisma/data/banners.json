@@ -13,5 +13,69 @@
     "imagePath": "assets/images/banners/banner3.png",
     "productId": "p28",
     "sortOrder": 3
+  },
+  {
+    "imagePath": "assets/images/banners/banner-series-canteen.jpg",
+    "productId": "p62",
+    "sortOrder": 4,
+    "title": "山海小食堂",
+    "linkType": "series",
+    "linkTarget": "山海小食堂"
+  },
+  {
+    "imagePath": "assets/images/banners/banner-series-postoffice.jpg",
+    "productId": "p76",
+    "sortOrder": 5,
+    "title": "星屿邮局",
+    "linkType": "series",
+    "linkTarget": "星屿邮局"
+  },
+  {
+    "imagePath": "assets/images/banners/banner-series-circus.jpg",
+    "productId": "p89",
+    "sortOrder": 6,
+    "title": "月光马戏团",
+    "linkType": "series",
+    "linkTarget": "月光马戏团"
+  },
+  {
+    "imagePath": "assets/images/banners/banner-series-neon.jpg",
+    "productId": "p103",
+    "sortOrder": 7,
+    "title": "霓虹夜行",
+    "linkType": "series",
+    "linkTarget": "霓虹夜行"
+  },
+  {
+    "imagePath": "assets/images/banners/banner-series-deepsea.jpg",
+    "productId": "p221",
+    "sortOrder": 8,
+    "title": "深海观测站",
+    "linkType": "series",
+    "linkTarget": "深海观测站"
+  },
+  {
+    "imagePath": "assets/images/banners/banner-series-clockshop.jpg",
+    "productId": "p227",
+    "sortOrder": 9,
+    "title": "时光钟表店",
+    "linkType": "series",
+    "linkTarget": "时光钟表店"
+  },
+  {
+    "imagePath": "assets/images/banners/banner-series-flower.jpg",
+    "productId": "p233",
+    "sortOrder": 10,
+    "title": "樱庭花艺社",
+    "linkType": "series",
+    "linkTarget": "樱庭花艺社"
+  },
+  {
+    "imagePath": "assets/images/banners/banner-series-aurora.jpg",
+    "productId": "p239",
+    "sortOrder": 11,
+    "title": "极光观测队",
+    "linkType": "series",
+    "linkTarget": "极光观测队"
   }
 ]

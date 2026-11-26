@@ -793,6 +793,8 @@ class _MessageBubble extends StatelessWidget {
                             optionSet: message.optionSet!,
                             onPick: (text) =>
                                 context.read<XiaodouChatProvider>().chooseOption(msgIndex, text),
+                            onMemory: (byLabel) =>
+                                context.read<StarwishProfileProvider>().rememberFromOptions(byLabel),
                           )
                         else if (message.options.isNotEmpty && !message.optionsUsed && isLastMessage && !sending)
                           _QuestionOptions(
@@ -1075,10 +1077,14 @@ class _QuestionOptions extends StatelessWidget {
 /// · anyOption（你帮我定）：单独一颗，点它直接发送、不等选组。
 /// 选中态是实心紫，未选是白底紫边（与单组 _QuestionOptions 同款）。
 class _GroupedQuestionOptions extends StatefulWidget {
-  const _GroupedQuestionOptions({required this.optionSet, required this.onPick});
+  const _GroupedQuestionOptions({required this.optionSet, required this.onPick, this.onMemory});
 
   final XiaodouOptionSet optionSet;
   final ValueChanged<String> onPick;
+
+  /// 提交时把「组标签 -> 选项原话」一并交出去，供小豆记得你沉淀偏好；
+  /// 不传时不记（别处复用这个组件不会被误记）。
+  final ValueChanged<Map<String, String>>? onMemory;
 
   @override
   State<_GroupedQuestionOptions> createState() => _GroupedQuestionOptionsState();
@@ -1115,6 +1121,12 @@ class _GroupedQuestionOptionsState extends State<_GroupedQuestionOptions> {
       for (var i = 0; i < widget.optionSet.groups.length; i++)
         if (_picked[i] != null) _picked[i]!,
     ];
+    // 沉淀记忆：挑礼物问答里点过的送给谁/预算/类型/系列，顺手记进
+    // 「小豆记得你」，下次不用再问一遍（hx 2026-11-27 定版）。
+    widget.onMemory?.call({
+      for (var i = 0; i < widget.optionSet.groups.length; i++)
+        if (_picked[i] != null) widget.optionSet.groups[i].label: _picked[i]!,
+    });
     widget.onPick(parts.join('，'));
   }
 

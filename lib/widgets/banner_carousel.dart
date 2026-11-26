@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../data/product_data.dart';
 import '../providers/product_catalog_provider.dart';
 import '../pages/product_detail_page.dart';
+import '../pages/series_page.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import 'product_thumbnail.dart';
@@ -91,6 +92,21 @@ class _BannerCarouselState extends State<BannerCarousel> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => ProductDetailPage(product: product)));
   }
 
+  // 横幅点按分发：系列横幅（linkType=series）进系列页，其余照旧进商品详情。
+  void _openBanner(BuildContext context, BannerItem item) {
+    final target = item.linkTarget;
+    if (item.linkType == 'series' && target != null && target.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SeriesPage(seriesName: target, bannerImagePath: item.imagePath),
+        ),
+      );
+      return;
+    }
+    _openBannerProduct(context, item.productId);
+  }
+
   @override
   Widget build(BuildContext context) {
     context.watch<ProductCatalogProvider>();
@@ -133,7 +149,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                   onPageChanged: _onPageChanged,
                   itemBuilder: (context, idx) {
                     return AppGestureDetector(
-                      onTap: () => _openBannerProduct(context, items[idx].productId),
+                      onTap: () => _openBanner(context, items[idx]),
                       child: BannerVisual(
                         banner: items[idx],
                         scale: scale,

@@ -156,10 +156,19 @@ export async function generateFriendComment(friend, post, config) {
   const prompt = `以下是社区里的一条朋友圈：
 ${post.content}
 ${post.imagePath ? '（含配图）' : '（纯文字）'}
+${post.imagePath ? '' : '注意：这是纯文字帖，根本没有图片。不许提画面、图片、照片、构图、配色、光影这些和图有关的东西，就当面对着这段文字接话。'}
 
 请以「${friend.name}」的身份写一条评论，直接输出评论正文，不要引号、不要「${friend.name}：」前缀，10～60 字，帖子短就往短了写。必须点名帖子里一个具体细节；不许抒情、不许升华收尾。`;
   const text = await generateText(friend.systemPrompt, prompt, config);
-  return text || pickRandom(FALLBACK_COMMENTS[friend.id] || ['说得真好！']);
+  if (text) return text;
+  // 兜底文案里有不少默认有图的说法（画面/构图/这张…）：纯文字帖抽到会穿帮，
+  // 先滤掉图味重的，滤空了才用原池（hx 2026-11-27 点名）。
+  const pool = FALLBACK_COMMENTS[friend.id] || ['说得真好！'];
+  if (!post.imagePath) {
+    const textOnly = pool.filter((c) => !/画面|构图|光影|留白|机位|这张|这图|配色/.test(c));
+    if (textOnly.length > 0) return pickRandom(textOnly);
+  }
+  return pickRandom(pool);
 }
 
 export async function generateFriendReply(friend, post, userComment, userName, config, contextComments = []) {
@@ -169,6 +178,7 @@ export async function generateFriendReply(friend, post, userComment, userName, c
     .join('\n');
   const prompt = `朋友圈原文：
 ${post.content}
+${post.imagePath ? '（含配图）' : '（纯文字，没有图片：回复里不许提画面、图片、构图、配色、光影，就针对文字接话）'}
 ${contextText ? `\n这条朋友圈下已有的评论（按时间先后）：\n${contextText}\n` : ''}
 用户「${userName}」最新评论说：
 ${userComment}

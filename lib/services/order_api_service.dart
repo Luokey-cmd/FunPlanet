@@ -32,14 +32,18 @@ class OrderApiService {
     return Order.fromJson(data['order'] as Map<String, dynamic>);
   }
 
+  // payNow=false 只生成待付款订单（小豆代买用：办好一切、只留用户点付款）；
+  // autoCoupon=true 且没指定券时，服务端按代下单同口径自动挑最划算的可用券。
   Future<Order> createDirect({
     required List<CartItem> items,
     String? addressId,
     String? couponTemplateId,
     bool payNow = true,
+    bool autoCoupon = false,
   }) async {
     final body = <String, dynamic>{
       'payNow': payNow,
+      if (autoCoupon) 'autoCoupon': true,
       'lineItems': items
           .map((item) => {
                 'productId': item.product.id,

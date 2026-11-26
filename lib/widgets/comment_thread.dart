@@ -185,10 +185,6 @@ class CommentTile extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (comment.isAi) ...[
-                          SizedBox(width: AppScale.s(4)),
-                          Text('AI', style: TextStyle(fontSize: AppScale.t(10), color: AppColors.primary, fontWeight: FontWeight.w600)),
-                        ],
                       ],
                     ),
                     Text(comment.createdAtLabel, style: TextStyle(fontSize: AppScale.t(11), color: AppColors.mutedForeground)),

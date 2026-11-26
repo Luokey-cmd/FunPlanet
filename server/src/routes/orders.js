@@ -316,7 +316,25 @@ router.post('/', authRequired, async (req, res) => {
     select: { vipLevel: true },
   });
   const vipLevel = buyerProfile?.vipLevel ?? 1;
-  const discountResult = await resolveDiscount(req.user.sub, couponTemplateId, subtotal, lineItems);
+  // 小豆代买（聊天卡片「立即购买」）会带 autoCoupon：没指定券时按工具代下单
+  // 同一口径，把未用的券挨个用 resolveDiscount 试算、挑减得最多的一张。
+  let chosenCouponTemplateId = couponTemplateId;
+  if (!chosenCouponTemplateId && req.body?.autoCoupon === true) {
+    const unusedCoupons = await prisma.userCoupon.findMany({
+      where: { userId: req.user.sub, used: false },
+      include: { template: true },
+    });
+    let bestDiscount = 0;
+    for (const row of unusedCoupons) {
+      if (row.template.expireAt && new Date() > row.template.expireAt) continue;
+      const trial = await resolveDiscount(req.user.sub, row.templateId, subtotal, lineItems);
+      if (!trial.error && (trial.discount ?? 0) > bestDiscount) {
+        bestDiscount = trial.discount ?? 0;
+        chosenCouponTemplateId = trial.templateId ?? null;
+      }
+    }
+  }
+  const discountResult = await resolveDiscount(req.user.sub, chosenCouponTemplateId, subtotal, lineItems);
   if (discountResult.error) {
     return fail(res, discountResult.error.status, discountResult.error.message);
   }

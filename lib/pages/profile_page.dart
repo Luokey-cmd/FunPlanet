@@ -880,20 +880,20 @@ class _ServiceSection extends StatelessWidget {
 }
 
 // 「我的内容」栏（2026-11-20 定稿新加）：放用户自己产生的内容——
-// 社区帖子、AI 绘画、小豆的星愿档案、买到手的盒柜、写过的评价。
+// 社区帖子、AI 绘画、小豆记得你、买到手的盒柜、写过的评价。
 // 以前 AI 社区/绘画只有页面最底下两张大图卡，进了社区也找不到「我的」东西；
 // 现在收成一行 5 个入口，大图卡已删除（一处入口只出现一次）。
 class _ContentSection extends StatelessWidget {
   static const _items = [
     ('assets/images/icon_pf_community.png', 'AI 社区'),
     ('assets/images/icon_pf_ai_paint.png', 'AI绘画'),
-    ('assets/images/icon_pf_starwish.png', '星愿档案'),
+    ('assets/images/icon_pf_starwish.png', '小豆记得你'),
     ('assets/images/icon_pf_cabinet.png', '我的盒柜'),
     ('assets/images/icon_pf_my_reviews.png', '我的评价'),
   ];
 
   // 每个入口都落到已有的页面/弹层，不新建页面：
-  // 社区和绘画是现成整页；星愿档案复用小豆聊天页同款档案弹层；
+  // 社区和绘画是现成整页；小豆记得你复用小豆聊天页同款记忆弹层；
   // 盒柜是按订单汇藏品的弹层；我的评价复用订单列表（只看已评价订单）。
   void _handleTap(BuildContext context, String label) {
     switch (label) {
@@ -907,7 +907,7 @@ class _ContentSection extends StatelessWidget {
           context,
           MaterialPageRoute(builder: (_) => const AiPaintPage()),
         );
-      case '星愿档案':
+      case '小豆记得你':
         showStarwishDossierSheet(context);
       case '我的盒柜':
         UserFeatureSheets.showCollectionCabinet(context);

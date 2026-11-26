@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/product_data.dart';
+import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
@@ -26,6 +27,10 @@ class _AddressEditPageState extends State<AddressEditPage> {
   late final TextEditingController _detailController;
   late bool _isDefault;
 
+  // 新增地址时收货人预填的后缀提示：只是告诉用户这名字能改，
+  // 保存时会自动摘掉，不会把提示存进地址里（见 _save）。
+  static const _prefillHint = '（可修改）';
+
   @override
   void initState() {
     super.initState();
@@ -33,6 +38,26 @@ class _AddressEditPageState extends State<AddressEditPage> {
     _phoneController = TextEditingController(text: widget.address?.phone ?? '');
     _detailController = TextEditingController(text: widget.address?.detail ?? '');
     _isDefault = widget.address?.isDefault ?? false;
+  }
+
+  bool _prefilled = false;
+
+  // 新增地址才预填：收货人先写用户昵称、手机号先写注册手机号，
+  // 都是「先替他填上、他想改再改」；编辑已有地址不碰原值。
+  // 放在 didChangeDependencies 里读账号信息（此时 Provider 已就绪），只跑一次。
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_prefilled || widget.address != null) return;
+    _prefilled = true;
+    final user = context.read<AuthProvider>().currentUser;
+    if (user == null) return;
+    if (_nameController.text.isEmpty && user.nickname.isNotEmpty) {
+      _nameController.text = '${user.nickname}$_prefillHint';
+    }
+    if (_phoneController.text.isEmpty && user.phone.isNotEmpty) {
+      _phoneController.text = user.phone;
+    }
   }
 
   @override
@@ -44,9 +69,15 @@ class _AddressEditPageState extends State<AddressEditPage> {
   }
 
   Future<void> _save() async {
+    // 收货人末尾若还挂着预填提示，说明用户没动这格：存纯昵称，别把提示存进去；
+    // 用户自己改过（提示已被删改）就按他写的内容原样存。
+    var name = _nameController.text.trim();
+    if (name.endsWith(_prefillHint)) {
+      name = name.substring(0, name.length - _prefillHint.length).trim();
+    }
     final error = await context.read<UserProvider>().saveAddress(
           id: widget.address?.id,
-          name: _nameController.text.trim(),
+          name: name,
           phone: _phoneController.text.trim(),
           detail: _detailController.text.trim(),
           isDefault: _isDefault,

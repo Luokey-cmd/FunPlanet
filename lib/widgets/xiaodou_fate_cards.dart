@@ -5,9 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/product_data.dart';
-import '../pages/checkout_page.dart';
+import '../pages/address_edit_page.dart';
+import '../pages/orders_sheet.dart';
 import '../pages/product_detail_page.dart';
 import '../providers/cart_provider.dart';
+import '../providers/order_provider.dart';
+import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../utils/snackbar_utils.dart';
@@ -1155,7 +1158,7 @@ class _DetailCard extends StatelessWidget {
         SizedBox(width: AppScale.s(9)),
         Expanded(
           child: GestureDetector(
-            onTap: () => CheckoutPage.openBuyNow(context, product),
+            onTap: () => _agentBuy(context),
             child: Container(
               padding: EdgeInsets.symmetric(vertical: AppScale.s(9)),
               decoration: BoxDecoration(
@@ -1184,6 +1187,84 @@ class _DetailCard extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  // 「立即购买」= 小豆代买（2026-11-27 hx 定）：点一下，小豆用默认地址
+  // 直接把待付款订单办好——券由服务端自动挑最划算的一张、满减与会员
+  // 95 折照算，用户只剩最后在订单详情里点「去支付」。
+  // 注意只有小豆里的卡片走代买；小豆之外（商品详情页等）的立即购买
+  // 仍走正常结算页，不要把那边的入口改到这里来。
+  // 没有任何地址时先弹提示：「去填写地址」跳新增地址页（那页会预填
+  // 昵称和注册手机号），填完回来自动接着下单；没填成则停在这一步。
+  Future<void> _agentBuy(BuildContext context) async {
+    final user = context.read<UserProvider>();
+    var address = user.defaultAddress;
+    if (address == null) {
+      final goFill = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('还没有收货地址'),
+          content: const Text('小豆帮你下单要用一个收货地址，先去填一个吧。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('稍后再说'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('去填写地址'),
+            ),
+          ],
+        ),
+      );
+      if (goFill != true || !context.mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(builder: (_) => const AddressEditPage()),
+      );
+      if (!context.mounted) return;
+      await user.loadFromRemote();
+      address = user.defaultAddress;
+      if (address == null) return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    Order? order;
+    Object? failure;
+    try {
+      order = await context.read<OrderProvider>().checkoutDirect(
+            [CartItem(product: product, quantity: 1, spec: product.spec)],
+            addressId: address.id,
+            payNow: false,
+            autoCoupon: true,
+          );
+      await user.loadFromRemote();
+    } catch (e) {
+      failure = e;
+    }
+    if (!context.mounted) return;
+    Navigator.of(context).pop();
+    if (order == null) {
+      showTopSnackBar(
+        context,
+        content: Text(
+          '小豆下单没办成${failure == null ? '' : '：$failure'}',
+          style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600),
+        ),
+      );
+      return;
+    }
+    showTopSnackBar(
+      context,
+      content: Text(
+        '小豆已帮你下单，就差付款了',
+        style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600),
+      ),
+    );
+    openOrderDetail(context, order);
   }
 
   // 价格文案与旧牌面同口径：整数不带小数，非整数保留两位。

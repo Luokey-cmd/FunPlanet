@@ -226,6 +226,11 @@ void _openOrderDetail(BuildContext context, Order order) {
   );
 }
 
+// 公开入口：小豆卡片代买下单成功后直达订单详情（里面有「去支付」），
+// 与订单列表点进来的是同一个详情页、同一份订单快照。
+void openOrderDetail(BuildContext context, Order order) =>
+    _openOrderDetail(context, order);
+
 class _OrderDetailPage extends StatelessWidget {
   const _OrderDetailPage({required this.order});
 

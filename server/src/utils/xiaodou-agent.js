@@ -244,8 +244,8 @@ function seriesDirectorySection(seriesText) {
 
 function agentSystemPrompt(starwish, seriesText = '') {
   const archive = starwish
-    ? `当前用户偏好档案：${JSON.stringify(starwish)}。推荐时参考其中的预算与用途，不要盘问已经知道的事。`
-    : '用户尚未填写偏好档案。需要时一次只问一个问题。';
+    ? `当前用户偏好档案（小豆记得你）：${JSON.stringify(starwish)}。推荐时参考其中的预算、用途、常送对象与喜欢的系列/类型，不要盘问已经知道的事。`
+    : '用户还没有被记住的偏好。需要时一次只问一个问题。';
   return {
     role: 'system',
     content:
@@ -282,8 +282,8 @@ function agentSystemPrompt(starwish, seriesText = '') {
 // 价格答店内问题、或拿店内数据编店外结论。
 function mergedSystemPrompt(starwish, seriesText = '') {
   const archive = starwish
-    ? `当前用户偏好档案：${JSON.stringify(starwish)}。推荐时参考其中的预算与用途，不要盘问已经知道的事。`
-    : '用户尚未填写偏好档案。需要时一次只问一个问题。';
+    ? `当前用户偏好档案（小豆记得你）：${JSON.stringify(starwish)}。推荐时参考其中的预算、用途、常送对象与喜欢的系列/类型，不要盘问已经知道的事。`
+    : '用户还没有被记住的偏好。需要时一次只问一个问题。';
   // 当前日期要喂给模型：它不知道今天是哪天，用户说「今天、明天、
   // 最近」时没有这个锚点就会按训练时的旧日期理解（DeepSeek 的思考
   // 里会先确认今天日期，咱们也照着给）。

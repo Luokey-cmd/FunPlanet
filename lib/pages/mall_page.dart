@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/product_data.dart';
 import '../providers/app_tab_provider.dart';
+import '../providers/product_catalog_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
@@ -27,6 +28,18 @@ class MallPage extends StatefulWidget {
 
 class _MallPageState extends State<MallPage> {
   String _activeCategory = 'all';
+
+  // 下拉刷新（2026-11-27 hx 追加）：先换一套穿插编织的随机种子，
+  // 再向服务端重拉一次商品目录；重拉失败不挡事，本地换序照样生效。
+  Future<void> _onRefresh() async {
+    bumpProductShuffleEpoch();
+    try {
+      await context.read<ProductCatalogProvider>().load();
+    } catch (_) {
+      // 目录重拉失败时保持现有数据，只换序、不报错。
+    }
+    if (mounted) setState(() {});
+  }
 
   // 商城综合排序（2026-11-26 hx 拍板：销量为主 + 新品加权）：
   // 分数 = 0.7 × 销量分 + 0.3 × 新品分。
@@ -56,7 +69,11 @@ class _MallPageState extends State<MallPage> {
       final byScore = score(b).compareTo(score(a));
       return byScore != 0 ? byScore : _idNum(b.id).compareTo(_idNum(a.id));
     });
-    return list;
+    // 与首页推荐同口径：综合分排完做偏向新品的随机穿插（新品占多数），
+    // 不然销量悬殊时前几屏全是老爆款（2026-11-27 hx 定稿）。
+    // 先名次窗口扰动再穿插：与首页推荐同口径，下拉刷新能真换一批
+    // （见 product_data 的 jitterRankedByWindow）。
+    return interleaveNewProducts(jitterRankedByWindow(list));
   }
 
   // 商品编号取数字部分（p123 → 123），取不到按 0 算。
@@ -87,8 +104,13 @@ class _MallPageState extends State<MallPage> {
       });
     }
     return SparkleBackground(
-      child: CustomScrollView(
-        slivers: [
+      child: RefreshIndicator(
+        onRefresh: _onRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
+          ),
+          slivers: [
           SliverToBoxAdapter(child: _MallHeader()),
           SliverToBoxAdapter(child: SizedBox(height: hmS(12))),
           SliverToBoxAdapter(
@@ -145,6 +167,7 @@ class _MallPageState extends State<MallPage> {
           ),
           SliverToBoxAdapter(child: SizedBox(height: hmS(20))),
         ],
+        ),
       ),
     );
   }

@@ -269,6 +269,7 @@ export default function BannersPage() {
                     className="px-3 py-2 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="product">跳商品</option>
+                    <option value="series">跳系列页</option>
                     <option value="category">跳分类</option>
                     <option value="url">跳外链</option>
                   </select>
@@ -287,7 +288,7 @@ export default function BannersPage() {
               </div>
               {(editing.linkType ?? "product") !== "product" && (
                 <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-muted-foreground">跳转目标（分类名或链接）</span>
+                  <span className="text-muted-foreground">{editing.linkType === "series" ? "跳转目标（系列名，如 深海观测站）" : "跳转目标（分类名或链接）"}</span>
                   <input
                     value={editing.linkTarget ?? ""}
                     onChange={(e) => setEditing({ ...editing, linkTarget: e.target.value || null })}

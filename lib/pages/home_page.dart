@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/product_data.dart';
 import '../providers/app_tab_provider.dart';
+import '../providers/product_catalog_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
@@ -31,6 +32,18 @@ class _HomePageState extends State<HomePage> {
   // 只能由页面统一持有。
   MarketTab _marketTab = MarketTab.recommend;
   RankingSubTab _rankingSub = RankingSubTab.sales;
+
+  // 下拉刷新（2026-11-27 hx 追加）：先换一套穿插编织的随机种子，
+  // 再向服务端重拉一次商品目录；重拉失败不挡事，本地换序照样生效。
+  Future<void> _onRefresh() async {
+    bumpProductShuffleEpoch();
+    try {
+      await context.read<ProductCatalogProvider>().load();
+    } catch (_) {
+      // 目录重拉失败时保持现有数据，只换序、不报错。
+    }
+    if (mounted) setState(() {});
+  }
 
   void _selectMarketTab(MarketTab next) {
     if (next == _marketTab) return;
@@ -90,8 +103,12 @@ class _HomePageState extends State<HomePage> {
     final marketItems = productsByMarketTab(_marketTab, rankingSub: _rankingSub);
     return RepaintBoundary(
       child: SparkleBackground(
-        child: CustomScrollView(
-          physics: const ClampingScrollPhysics(),
+        child: RefreshIndicator(
+          onRefresh: _onRefresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: ClampingScrollPhysics(),
+            ),
           slivers: [
             const SliverToBoxAdapter(child: HomeTopBar()),
             const SliverToBoxAdapter(child: BannerCarousel()),
@@ -178,6 +195,7 @@ class _HomePageState extends State<HomePage> {
               ),
             SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
           ],
+          ),
         ),
       ),
     );

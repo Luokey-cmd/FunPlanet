@@ -62,6 +62,16 @@ class UserAvatarImage extends StatelessWidget {
       );
     }
 
+    // 解码尺寸上限（2026-11-27 闪退教训）：本地大照片按原尺寸解码
+    // 一张就是一两百 MB 内存，会被系统杀掉。按显示宽度×像素密度
+    // 解码、上限 1024，肉眼看不出差别；没给宽度时按 256 解码
+    // （头像出现的地方都是小尺寸）。网络头像走 AppNetworkImage，
+    // 那边自有口径，不走这里。
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    final cacheWidth = width == null
+        ? 256
+        : (width! * dpr).round().clamp(64, 1024);
+
     final Widget image;
     if (isBundledAssetAvatarPath(path)) {
       image = Image.asset(
@@ -69,6 +79,7 @@ class UserAvatarImage extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
+        cacheWidth: cacheWidth,
         filterQuality: FilterQuality.high,
         gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) => _placeholder(),
@@ -79,6 +90,7 @@ class UserAvatarImage extends StatelessWidget {
         width: width,
         height: height,
         fit: fit,
+        cacheWidth: cacheWidth,
         filterQuality: FilterQuality.high,
         gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) => _placeholder(),

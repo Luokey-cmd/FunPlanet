@@ -1,101 +1,93 @@
+// 小豆记得你：小豆从对话里沉淀下来的用户偏好（hx 2026-11-27 定版，
+// 取代旧的星愿档案问卷）。主要来源是挑礼物问答里用户点选的选项，
+// 用户也能在「小豆记得你」弹层里查看、修改、删除。
+// 旧档案的「心情」与「送礼感受」已废除：心情是当次的、不进长期记忆；
+// 旧存档读入时只迁移预算与用途，其余字段丢弃。
 class StarwishProfile {
   const StarwishProfile({
-    this.mood = '',
     this.budget = 0,
     this.purpose = '',
-    this.giftFeeling = '',
+    this.recipient = '',
+    this.favoriteCategories = const [],
+    this.favoriteSeries = const [],
   });
 
-  /// dream / heal / cool / funny
-  final String mood;
-
-  /// 30 / 50 / 100 / 0=不限
+  /// 预算上限（元）：50 / 100 / 200；0 = 不限或还没记住
   final int budget;
 
-  /// self / gift / browse
+  /// self / gift / browse（沿用旧档案编码，服务端靠它判送礼场景，别改值）
   final String purpose;
 
-  /// understood / comforted / surprised
-  final String giftFeeling;
+  /// 常送的对象（选项原话）：送朋友 / 送对象 / 送家人 / 送同担
+  final String recipient;
 
-  bool get isComplete {
-    if (mood.isEmpty || purpose.isEmpty || budget < 0) return false;
-    if (purpose == 'gift' && giftFeeling.isEmpty) return false;
-    return true;
-  }
+  /// 喜欢的类型（大类名原话，如 玩具 / 公仔），最多记 3 个
+  final List<String> favoriteCategories;
 
-  String get moodLabel => switch (mood) {
-        'dream' => '梦幻',
-        'heal' => '治愈',
-        'cool' => '帅气',
-        'funny' => '搞怪',
-        _ => '未点亮',
-      };
+  /// 喜欢的系列（系列名原话），最多记 3 个
+  final List<String> favoriteSeries;
+
+  /// 一条都没记住时为 true，弹层据此显示空状态文案
+  bool get isEmpty =>
+      budget <= 0 &&
+      purpose.isEmpty &&
+      recipient.isEmpty &&
+      favoriteCategories.isEmpty &&
+      favoriteSeries.isEmpty;
 
   String get purposeLabel => switch (purpose) {
         'self' => '犒劳自己',
         'gift' => '送给别人',
         'browse' => '只是逛逛',
-        _ => '尚未启程',
+        _ => '',
       };
 
   String get budgetLabel => budget <= 0 ? '不限' : '$budget 内';
 
-  String get feelingLabel => switch (giftFeeling) {
-        'understood' => '被懂',
-        'comforted' => '被哄',
-        'surprised' => '被惊到',
-        _ => '',
-      };
-
-  String get signTitle => switch ((mood, purpose)) {
-        ('dream', 'gift') => '云笺旅人',
-        ('dream', _) => '星河拾光',
-        ('heal', 'gift') => '软风信使',
-        ('heal', _) => '灯下歇脚',
-        ('cool', _) => '夜轨行者',
-        ('funny', _) => '戏法旅人',
-        _ => '未署名旅人',
-      };
-
-  String get signLine => isComplete ? '$signTitle · $moodLabel · $budgetLabel' : '守瓶精灵 · 点亮你的星签';
-
   StarwishProfile copyWith({
-    String? mood,
     int? budget,
     String? purpose,
-    String? giftFeeling,
+    String? recipient,
+    List<String>? favoriteCategories,
+    List<String>? favoriteSeries,
   }) {
     return StarwishProfile(
-      mood: mood ?? this.mood,
       budget: budget ?? this.budget,
       purpose: purpose ?? this.purpose,
-      giftFeeling: giftFeeling ?? this.giftFeeling,
+      recipient: recipient ?? this.recipient,
+      favoriteCategories: favoriteCategories ?? this.favoriteCategories,
+      favoriteSeries: favoriteSeries ?? this.favoriteSeries,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'mood': mood,
         'budget': budget,
         'purpose': purpose,
-        'giftFeeling': giftFeeling,
+        'recipient': recipient,
+        'favoriteCategories': favoriteCategories,
+        'favoriteSeries': favoriteSeries,
       };
 
+  // 发给小豆服务端看的版本：只带记住的项，没记住的不占地方；
+  // 键名保持英文（服务端按 purpose 字段判送礼场景，别乱改键名）。
   Map<String, dynamic> toAgentJson() => {
-        'mood': moodLabel,
-        'budget': budget <= 0 ? '不限' : budget,
-        'purpose': purposeLabel,
-        if (feelingLabel.isNotEmpty) 'giftFeeling': feelingLabel,
-        'signTitle': signTitle,
+        if (budget > 0) 'budget': budget,
+        if (purpose.isNotEmpty) 'purpose': purposeLabel,
+        if (recipient.isNotEmpty) 'recipient': recipient,
+        if (favoriteCategories.isNotEmpty) 'favoriteCategories': favoriteCategories,
+        if (favoriteSeries.isNotEmpty) 'favoriteSeries': favoriteSeries,
       };
 
   factory StarwishProfile.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const StarwishProfile();
+    List<String> readList(String key) =>
+        (json[key] as List?)?.map((e) => e.toString()).where((e) => e.isNotEmpty).toList() ?? const [];
     return StarwishProfile(
-      mood: json['mood'] as String? ?? '',
       budget: (json['budget'] as num?)?.toInt() ?? 0,
       purpose: json['purpose'] as String? ?? '',
-      giftFeeling: json['giftFeeling'] as String? ?? '',
+      recipient: json['recipient'] as String? ?? '',
+      favoriteCategories: readList('favoriteCategories'),
+      favoriteSeries: readList('favoriteSeries'),
     );
   }
 }

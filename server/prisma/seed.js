@@ -219,6 +219,11 @@ async function main() {
         imagePath: b.imagePath,
         productId: b.productId,
         sortOrder: b.sortOrder,
+        // 系列横幅靠这三个字段认：title 存系列名、linkType=series、
+        // linkTarget 存要跳的系列名；老三条没有这些字段、按商品跳。
+        title: b.title ?? null,
+        linkType: b.linkType ?? 'product',
+        linkTarget: b.linkTarget ?? null,
       },
     });
   }

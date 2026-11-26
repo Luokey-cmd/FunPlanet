@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -81,61 +82,93 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
   Future<void> _pickAvatar() async {
     try {
+      // 不带 withData：大照片不要走平台通道把整份字节搬进内存，
+      // 只拿文件路径，后面统一压成小图再用（见 _prepareAvatarImage）。
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image,
         allowMultiple: false,
-        withData: true,
       );
       if (result == null || result.files.isEmpty) return;
 
       final file = result.files.first;
-      String? path = file.path;
-      final ext = (file.extension?.isNotEmpty ?? false) ? file.extension!.toLowerCase() : 'jpg';
-      final mimeType = ext == 'png'
-          ? 'image/png'
-          : ext == 'webp'
-              ? 'image/webp'
-              : ext == 'gif'
-                  ? 'image/gif'
-                  : 'image/jpeg';
-
+      final path = file.path;
       if (path == null || path.isEmpty) {
-        final bytes = file.bytes;
-        if (bytes == null) {
-          if (!mounted) return;
-          showTopSnackBar(
-            context,
-            content: Text('无法读取图片，请重试', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-          );
-          return;
-        }
-        final saved = File('${Directory.systemTemp.path}/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext');
-        await saved.writeAsBytes(bytes);
-        path = saved.path;
-        if (mounted) {
-          setState(() {
-            _selectedAvatar = path!;
-            _pendingAvatarBytes = bytes;
-            _pendingAvatarMime = mimeType;
-          });
-        }
+        if (!mounted) return;
+        showTopSnackBar(
+          context,
+          content: Text('无法读取图片，请重试', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+        );
         return;
       }
 
-      final bytes = file.bytes ?? await File(path).readAsBytes();
-      if (mounted) {
-        setState(() {
-          _selectedAvatar = path!;
-          _pendingAvatarBytes = bytes;
-          _pendingAvatarMime = mimeType;
-        });
+      final prepared = await _prepareAvatarImage(path);
+      if (!mounted) return;
+      if (prepared == null) {
+        showTopSnackBar(
+          context,
+          content: Text('这张图片处理失败，换一张试试', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+        );
+        return;
       }
+      setState(() {
+        _selectedAvatar = prepared.path;
+        _pendingAvatarBytes = prepared.bytes;
+        _pendingAvatarMime = prepared.mimeType;
+      });
     } catch (e) {
       if (!mounted) return;
       showTopSnackBar(
         context,
         content: Text('选择图片失败，请重试', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
       );
+    }
+  }
+
+  // 把选中的原图压成最长边 512 的小图（PNG）写进临时目录，
+  // 返回小图的路径与字节，保存时上传的也是这份小图。
+  // 为什么必须压（2026-11-27 hx 实测闪退）：手机现拍/相册大照片
+  // 几千万像素，旧写法把原图整份读进内存、又按原尺寸解码显示，
+  // 内存瞬间涨一两百 MB，系统直接把 App 杀掉——选完图就闪退、
+  // 还没点保存。压到 512 后显示解码和待上传字节都小一个量级；
+  // 头像在 App 里最大也就显示到屏幕宽，512 够清晰。原图不动。
+  // 小文件（≤2MB，如截图、小图）不值得压：直接用原图，但仍受
+  // UserAvatarImage 的解码尺寸上限保护，不会重演闪退。
+  Future<({String path, Uint8List bytes, String mimeType})?> _prepareAvatarImage(
+    String sourcePath,
+  ) async {
+    try {
+      final source = File(sourcePath);
+      final sourceBytes = await source.readAsBytes();
+      final lower = sourcePath.toLowerCase();
+      final sourceMime = lower.endsWith('.png')
+          ? 'image/png'
+          : lower.endsWith('.webp')
+              ? 'image/webp'
+              : lower.endsWith('.gif')
+                  ? 'image/gif'
+                  : 'image/jpeg';
+      if (sourceBytes.length <= 2 * 1024 * 1024) {
+        return (path: sourcePath, bytes: sourceBytes, mimeType: sourceMime);
+      }
+      final codec = await ui.instantiateImageCodec(
+        sourceBytes,
+        targetWidth: 512,
+        targetHeight: 512,
+      );
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      codec.dispose();
+      if (byteData == null) return null;
+      final bytes = byteData.buffer.asUint8List();
+      final saved = File(
+        '${Directory.systemTemp.path}/avatar_small_${DateTime.now().millisecondsSinceEpoch}.png',
+      );
+      await saved.writeAsBytes(bytes);
+      return (path: saved.path, bytes: bytes, mimeType: 'image/png');
+    } catch (_) {
+      return null;
     }
   }
 
