@@ -205,6 +205,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
               Text('优惠券已优惠 ¥${order.discount.toStringAsFixed(2)}', style: FeaturePageStyle.secondary()),
             if (order.promotionDiscount > 0)
               Text('满减已优惠 ¥${order.promotionDiscount.toStringAsFixed(2)}', style: FeaturePageStyle.secondary()),
+            if (order.memberDiscount > 0)
+              Text('会员95折已优惠 ¥${order.memberDiscount.toStringAsFixed(2)}', style: FeaturePageStyle.secondary()),
           ],
         ),
       );

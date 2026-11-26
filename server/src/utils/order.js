@@ -32,6 +32,8 @@ export function serializeOrder(order) {
     discount: Number(order.discount),
     promotionDiscount: order.promotionDiscount == null ? 0 : Number(order.promotionDiscount),
     promotionName: order.promotionName ?? null,
+    // 会员 95 折金额：老订单没有这列时按 0 处理（与 promotionDiscount 同款）
+    memberDiscount: order.memberDiscount == null ? 0 : Number(order.memberDiscount),
     // 运费单独给出：total 是含运费的最终实付，freight 让前端能把运费拆出来显示
     freight: order.freight == null ? 0 : Number(order.freight),
     total: Number(order.total),

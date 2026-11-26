@@ -59,6 +59,28 @@ model UserProfile {
   dailyShareDone             Boolean   @default(false) @map("daily_share_done")
   dailyBrowseRewardClaimed   Boolean   @default(false) @map("daily_browse_reward_claimed")
   dailyBrowseCount           Int       @default(0) @map("daily_browse_count")
+  // 每日任务扩展（2026-11-26 丰富版）：Done=今天做过（行为接口自动记）、Claimed=奖励已领，
+  // 两段分开和浏览任务一个口径（先做、再领）。跨天由 ensureProfileFresh 一起清零。
+  dailyFavoriteDone          Boolean   @default(false) @map("daily_favorite_done")
+  dailyFavoriteClaimed       Boolean   @default(false) @map("daily_favorite_claimed")
+  dailyCartDone              Boolean   @default(false) @map("daily_cart_done")
+  dailyCartClaimed           Boolean   @default(false) @map("daily_cart_claimed")
+  dailyChatDone              Boolean   @default(false) @map("daily_chat_done")
+  dailyChatClaimed           Boolean   @default(false) @map("daily_chat_claimed")
+  dailyCommunityDone         Boolean   @default(false) @map("daily_community_done")
+  dailyCommunityClaimed      Boolean   @default(false) @map("daily_community_claimed")
+  // 连续签到：streak 是连签天数，lastCheckInDate 是上次签到的中国日期（yyyy-MM-dd）；
+  // 签到时上次是昨天就 +1、否则归 1。7 天一轮，第 3 天 / 第 7 天有额外奖励。
+  checkInStreak              Int       @default(0) @map("check_in_streak")
+  lastCheckInDate            String    @default("") @map("last_check_in_date")
+  // 每周任务：weekKey 是本周一的中国日期（yyyy-MM-dd），跨周由 ensureProfileFresh 清零整组。
+  weekKey                    String    @default("") @map("week_key")
+  weeklyCheckInDays          Int       @default(0) @map("weekly_check_in_days")
+  weeklyCheckInClaimed       Boolean   @default(false) @map("weekly_check_in_claimed")
+  weeklyOrderDone            Boolean   @default(false) @map("weekly_order_done")
+  weeklyOrderClaimed         Boolean   @default(false) @map("weekly_order_claimed")
+  weeklyReviewDone           Boolean   @default(false) @map("weekly_review_done")
+  weeklyReviewClaimed        Boolean   @default(false) @map("weekly_review_claimed")
   pushEnabled                Boolean   @default(true) @map("push_enabled")
   // 个人资料补充：之前资料只有头像和昵称，想做生日礼、编辑资料页都没有字段可存
   gender                     String?
@@ -73,6 +95,16 @@ model UserProfile {
   dailyDate                  String    @default("") @map("daily_date")
   // 会员每月赠券领取月份（yyyy-MM）：memberMonthlyCouponClaimed 只对这个月有效，跨月自动可再领，规则同 dailyDate
   memberCouponMonth          String    @default("") @map("member_coupon_month")
+  // 会员每日礼包上次领取日期（yyyy-MM-dd，按 Asia/Shanghai 算）：等于今天就是今日已领，
+  // 跨天自动可再领，规则同 dailyDate；存日期字符串不用布尔，就是为了不用每天清零。
+  memberDailyGiftDate        String    @default("") @map("member_daily_gift_date")
+  // 生日礼包年份（2026-11-26 做真）：生日当天首次查资料时发 +50 趣玩币，
+  // 记下年份防同年生日重复发；0 = 从没发过
+  birthdayGiftYear           Int       @default(0) @map("birthday_gift_year")
+  // AI 社区已读标记：上次进社区页（标已读）的时间；「我的帖子」收到晚于这个
+  // 时间的他人评论数就是社区未读角标数。可空 = 从没标过，接口首次查询时先把
+  // 标记立在当前时间再返回 0，防止功能上线时历史回复一股脑倒灌成未读。
+  communityLastReadAt        DateTime? @map("community_last_read_at")
   createdAt                  DateTime  @default(now()) @map("created_at")
   updatedAt                  DateTime  @updatedAt @map("updated_at")
   user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -316,6 +348,9 @@ model Order {
   // 「券减了多少、活动减了多少」；promotionName 是下单时的活动名快照
   promotionDiscount Decimal              @default(0) @map("promotion_discount") @db.Decimal(10, 2)
   promotionName     String?              @map("promotion_name")
+  // 会员 95 折金额（2026-11-26 做真）：VIP2 起对券后商品款打 95 折，单独
+  // 记账，订单详情要能拆出这笔；非会员订单为 0
+  memberDiscount    Decimal              @default(0) @map("member_discount") @db.Decimal(10, 2)
   total             Decimal              @db.Decimal(10, 2)
   addressName       String?              @map("address_name")
   addressPhone      String?              @map("address_phone")

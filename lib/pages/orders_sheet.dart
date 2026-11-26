@@ -12,6 +12,7 @@ import '../theme/feature_page_style.dart';
 import '../utils/snackbar_utils.dart';
 import '../utils/user_session_sync.dart';
 import '../widgets/feature_page_scaffold.dart';
+import '../widgets/product_image.dart';
 import 'after_sales_page.dart';
 import 'order_review_page.dart';
 import 'order_review_detail_page.dart';
@@ -87,13 +88,18 @@ class _OrdersPageState extends State<_OrdersPage> {
             onRefresh: _onRefresh,
             color: AppColors.primary,
             child: ListView.separated(
+              // padding 显式归零：不写时 ListView 会自带一份顶部安全区留白，
+              // 和页面外框的顶部间距叠加，第一张卡离标题会多出一截空（2026-11-26 hx 指出）。
+              padding: EdgeInsets.zero,
               physics: const AlwaysScrollableScrollPhysics(),
               itemCount: list.length,
               separatorBuilder: (_, _) => SizedBox(height: AppScale.s(12)),
               itemBuilder: (context, index) {
                 final order = list[index];
                 final cfg = orderStatusConfig(order.status);
-                return Container(
+                return AppGestureDetector(
+                onTap: () => _openOrderDetail(context, order),
+                child: Container(
                 padding: FeaturePageStyle.cardPadding,
                 decoration: BoxDecoration(
                   color: AppColors.card,
@@ -199,11 +205,219 @@ class _OrdersPageState extends State<_OrdersPage> {
                     ],
                   ],
                 ),
+              ),
               );
             },
           ),
           );
         },
+      ),
+    );
+  }
+}
+
+// 订单详情入口：列表整卡点击进来。详情数据全用订单本身的快照
+// （商品图/单价/收货信息都是下单时存的），不查物流——本项目没有物流系统，
+// 详情页不设物流区（2026-11-26 hx 定）。
+void _openOrderDetail(BuildContext context, Order order) {
+  Navigator.push<void>(
+    context,
+    MaterialPageRoute(builder: (_) => _OrderDetailPage(order: order)),
+  );
+}
+
+class _OrderDetailPage extends StatelessWidget {
+  const _OrderDetailPage({required this.order});
+
+  final Order order;
+
+  @override
+  Widget build(BuildContext context) {
+    // 详情页跟着订单最新状态走：在详情里点了去支付，状态要当场变，
+    // 不能还停在进来时那份快照上（列表页就是这么跟 OrderProvider 同步的）。
+    var order = this.order;
+    for (final o in context.watch<OrderProvider>().orders) {
+      if (o.id == order.id) {
+        order = o;
+        break;
+      }
+    }
+    final cfg = orderStatusConfig(order.status);
+    return FeaturePageScaffold(
+      title: '订单详情',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 状态头：状态徽章 + 订单号 + 下单时间
+          Container(
+            width: double.infinity,
+            padding: FeaturePageStyle.cardPadding,
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(FeaturePageStyle.cardRadius),
+              border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(cfg.label, style: FeaturePageStyle.title(color: cfg.color)),
+                    Text(order.time, style: FeaturePageStyle.secondary()),
+                  ],
+                ),
+                SizedBox(height: AppScale.s(6)),
+                Text('订单号 ${order.orderNo}', style: FeaturePageStyle.secondary()),
+                if (order.cancelReason != null && order.cancelReason!.isNotEmpty) ...[
+                  SizedBox(height: AppScale.s(6)),
+                  Text('取消原因：${order.cancelReason}', style: FeaturePageStyle.secondary()),
+                ],
+              ],
+            ),
+          ),
+          SizedBox(height: AppScale.s(12)),
+          // 商品清单：图是下单时快照，单价/小计按下单成交价算，不跟现价走
+          Container(
+            width: double.infinity,
+            padding: FeaturePageStyle.cardPadding,
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(FeaturePageStyle.cardRadius),
+              border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('商品清单', style: FeaturePageStyle.bodyBold()),
+                SizedBox(height: AppScale.s(10)),
+                ...order.items.map((item) => Padding(
+                      padding: EdgeInsets.only(bottom: AppScale.s(10)),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (item.imagePath != null && item.imagePath!.isNotEmpty)
+                            ProductImage(
+                              image: item.imagePath!,
+                              width: AppScale.s(56),
+                              height: AppScale.s(56),
+                              borderRadius: BorderRadius.circular(AppScale.s(8)),
+                            )
+                          else
+                            Container(
+                              width: AppScale.s(56),
+                              height: AppScale.s(56),
+                              decoration: BoxDecoration(
+                                color: AppColors.muted,
+                                borderRadius: BorderRadius.circular(AppScale.s(8)),
+                              ),
+                              child: Icon(Icons.image_outlined, color: AppColors.mutedForeground, size: AppScale.s(22)),
+                            ),
+                          SizedBox(width: AppScale.s(10)),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item.name, style: FeaturePageStyle.body()),
+                                if (item.spec != null && item.spec!.isNotEmpty)
+                                  Text(item.spec!, style: FeaturePageStyle.secondary()),
+                                if (item.unitPrice != null)
+                                  Text('¥${item.unitPrice!.toStringAsFixed(2)} × ${item.quantity}', style: FeaturePageStyle.secondary()),
+                              ],
+                            ),
+                          ),
+                          if (item.unitPrice != null)
+                            Text(
+                              '¥${(item.unitPrice! * item.quantity).toStringAsFixed(2)}',
+                              style: FeaturePageStyle.bodyBold(),
+                            )
+                          else
+                            Text('x${item.quantity}', style: FeaturePageStyle.body()),
+                        ],
+                      ),
+                    )),
+              ],
+            ),
+          ),
+          SizedBox(height: AppScale.s(12)),
+          // 金额拆分：小计/优惠/运费/实付，与服务端订单字段一一对应
+          Container(
+            width: double.infinity,
+            padding: FeaturePageStyle.cardPadding,
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(FeaturePageStyle.cardRadius),
+              border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+            ),
+            child: Column(
+              children: [
+                _amountRow('商品金额', '¥${(order.subtotal ?? order.total).toStringAsFixed(2)}'),
+                if (order.discount > 0) _amountRow('优惠', '-¥${order.discount.toStringAsFixed(2)}'),
+                if (order.memberDiscount > 0) _amountRow('会员95折', '-¥${order.memberDiscount.toStringAsFixed(2)}'),
+                _amountRow('运费', order.freight > 0 ? '¥${order.freight.toStringAsFixed(2)}' : '包邮'),
+                SizedBox(height: AppScale.s(8)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('实付', style: FeaturePageStyle.bodyBold()),
+                    Text('¥${order.total.toStringAsFixed(2)}', style: FeaturePageStyle.priceLarge()),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // 收货信息：老订单没存地址快照时整段不显示
+          if (order.addressName != null && order.addressName!.isNotEmpty) ...[
+            SizedBox(height: AppScale.s(12)),
+            Container(
+              width: double.infinity,
+              padding: FeaturePageStyle.cardPadding,
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(FeaturePageStyle.cardRadius),
+                border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('收货信息', style: FeaturePageStyle.bodyBold()),
+                  SizedBox(height: AppScale.s(6)),
+                  Text('${order.addressName} ${order.addressPhone ?? ''}', style: FeaturePageStyle.body()),
+                  if (order.addressDetail != null && order.addressDetail!.isNotEmpty)
+                    Text(order.addressDetail!, style: FeaturePageStyle.secondary()),
+                  if (order.remark != null && order.remark!.isNotEmpty) ...[
+                    SizedBox(height: AppScale.s(6)),
+                    Text('备注：${order.remark}', style: FeaturePageStyle.secondary()),
+                  ],
+                ],
+              ),
+            ),
+          ],
+          // 详情页底部保留与列表一致的动作：待付款去支付、可售后状态申请售后
+          if (order.status == OrderStatus.pending) ...[
+            SizedBox(height: AppScale.s(14)),
+            Align(alignment: Alignment.centerRight, child: _PayButton(order: order)),
+          ],
+          if (order.status == OrderStatus.paid ||
+              order.status == OrderStatus.shipping ||
+              order.status == OrderStatus.completed) ...[
+            SizedBox(height: AppScale.s(14)),
+            Align(alignment: Alignment.centerRight, child: _AfterSaleButton(order: order)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _amountRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppScale.s(6)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: FeaturePageStyle.secondary()),
+          Text(value, style: FeaturePageStyle.body()),
+        ],
       ),
     );
   }

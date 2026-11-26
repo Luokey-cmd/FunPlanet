@@ -5,8 +5,22 @@ import { fail, ok } from '../utils/response.js';
 import { log } from '../utils/log.js';
 import { generateOrderNo, parseCouponMinAmount, serializeOrder } from '../utils/order.js';
 import { getFlashPriceMap, resolvePromotionDiscount } from '../utils/promotions.js';
+import { markWeeklyTaskDone } from '../utils/daily-tasks.js';
 import { recordWalletLedger } from '../utils/wallet-ledger.js';
 import { AFTER_SALE_TYPES } from '../utils/status-values.js';
+
+// 购物返积分/返币的唯一口径（2026-11-26 hx 拍板）：只在付款时发——
+// 创建待付款订单不发，免得建单发一次、付款再发一次（旧版双发实锤，
+// 且建单那次只改余额不写流水，账还对不上）。
+// 输入：total 实付金额、vipLevel 会员等级
+// 输出：{ points, coins }——基础积分 = 实付向下取整（1 分起、100 封顶）；
+// 会员（VIP2 起）积分 ×1.5（卡面权益做真，倍率后最高 150）；返币 = 基础
+// 积分 ×2，不吃倍率（权益文案只承诺积分 ×1.5）。
+function orderReward(total, vipLevel) {
+  const base = Math.min(100, Math.max(1, Math.floor(Number(total) || 0)));
+  const points = vipLevel >= 2 ? Math.round(base * 1.5) : base;
+  return { points, coins: base * 2 };
+}
 
 // 库存与销量联动（付款时扣、取消已付订单时回）
 // 输入：tx 事务、items（带 productId / quantity）、direction（pay 付款扣库存 / restore 取消回补）
@@ -296,6 +310,12 @@ router.post('/', authRequired, async (req, res) => {
   }
 
   const subtotal = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
+  // 会员等级这一单要用两次：95 折计价与付款时的积分倍率，开头查一次
+  const buyerProfile = await prisma.userProfile.findUnique({
+    where: { userId: req.user.sub },
+    select: { vipLevel: true },
+  });
+  const vipLevel = buyerProfile?.vipLevel ?? 1;
   const discountResult = await resolveDiscount(req.user.sub, couponTemplateId, subtotal, lineItems);
   if (discountResult.error) {
     return fail(res, discountResult.error.status, discountResult.error.message);
@@ -303,10 +323,15 @@ router.post('/', authRequired, async (req, res) => {
   const discount = discountResult?.discount ?? 0;
   // 满减：门槛按小计（已含特价）判，与券可叠加，单独记账到 promotionDiscount
   const promotion = await resolvePromotionDiscount(subtotal);
+  // 会员 95 折（2026-11-26 做真）：VIP2 起，券与满减先减，剩下的商品款
+  // 再打 95 折；单独记 memberDiscount 一列（订单详情能拆出这笔账），
+  // 运费不打折。非会员为 0，计价与旧版完全一致。
+  const memberBase = Math.max(0, subtotal - discount - promotion.amount);
+  const memberDiscount = vipLevel >= 2 ? Math.round(memberBase * 0.05 * 100) / 100 : 0;
   // 运费：前端不传就是 0（包邮）；total 保持「最终实付」口径 = 小计 - 优惠 + 运费
   const freight = Math.max(0, Number(req.body?.freight) || 0);
   const remark = String(req.body?.remark ?? '').trim().slice(0, 200) || null;
-  const total = Math.max(0, subtotal - discount - promotion.amount + freight);
+  const total = Math.max(0, memberBase - memberDiscount + freight);
 
   const address = await resolveAddress(req.user.sub, addressId);
   if (!address) return fail(res, 400, '请先添加收货地址');
@@ -324,6 +349,7 @@ router.post('/', authRequired, async (req, res) => {
         discount,
         promotionDiscount: promotion.amount,
         promotionName: promotion.name,
+        memberDiscount,
         total,
         addressName: address.name,
         addressPhone: address.phone,
@@ -418,26 +444,26 @@ router.post('/', authRequired, async (req, res) => {
       },
     });
 
-    const earned = Math.min(100, Math.max(1, Math.floor(total)));
-    const coinEarned = earned * 2;
-    await tx.userProfile.upsert({
-      where: { userId: req.user.sub },
-      create: {
-        userId: req.user.sub,
-        points: earned,
-        funCoins: coinEarned,
-      },
-      update: {
-        points: { increment: earned },
-        funCoins: { increment: coinEarned },
-      },
-    });
-
+    // 积分/返币只在付款时发（2026-11-26 hx 拍板修双发）：payNow 的单创建
+    // 即已付，在这里发；待付款单这里不发，等 /pay 支付成功再发。
     if (payNow) {
+      const reward = orderReward(total, vipLevel);
+      await tx.userProfile.upsert({
+        where: { userId: req.user.sub },
+        create: {
+          userId: req.user.sub,
+          points: reward.points,
+          funCoins: reward.coins,
+        },
+        update: {
+          points: { increment: reward.points },
+          funCoins: { increment: reward.coins },
+        },
+      });
       await recordWalletLedger(tx, {
         userId: req.user.sub,
         walletType: 'points',
-        amount: earned,
+        amount: reward.points,
         title: '购物返积分',
         refType: 'order',
         refId: created.id,
@@ -445,7 +471,7 @@ router.post('/', authRequired, async (req, res) => {
       await recordWalletLedger(tx, {
         userId: req.user.sub,
         walletType: 'coins',
-        amount: coinEarned,
+        amount: reward.coins,
         title: '购物返币',
         refType: 'order',
         refId: created.id,
@@ -455,6 +481,7 @@ router.post('/', authRequired, async (req, res) => {
     return created;
   });
 
+  if (payNow) await markWeeklyTaskDone(req.user.sub, 'weeklyOrderDone');
   log.info('订单', `创建订单成功，订单号 ${order.orderNo}，应付 ¥${order.total}${payNow ? '，已直接支付' : '，待付款'}`);
   ok(res, { order: serializeOrder(order) });
 });
@@ -498,17 +525,21 @@ router.post('/:id/pay', authRequired, async (req, res) => {
       },
     });
 
-    const earned = Math.min(100, Math.max(1, Math.floor(Number(order.total))));
-    const coinEarned = earned * 2;
+    // 付款才发积分/返币（与创建路由共用 orderReward 口径，会员积分 ×1.5）
+    const payerProfile = await tx.userProfile.findUnique({
+      where: { userId: req.user.sub },
+      select: { vipLevel: true },
+    });
+    const reward = orderReward(order.total, payerProfile?.vipLevel ?? 1);
     await tx.userProfile.upsert({
       where: { userId: req.user.sub },
-      create: { userId: req.user.sub, points: earned, funCoins: coinEarned },
-      update: { points: { increment: earned }, funCoins: { increment: coinEarned } },
+      create: { userId: req.user.sub, points: reward.points, funCoins: reward.coins },
+      update: { points: { increment: reward.points }, funCoins: { increment: reward.coins } },
     });
     await recordWalletLedger(tx, {
       userId: req.user.sub,
       walletType: 'points',
-      amount: earned,
+      amount: reward.points,
       title: '购物返积分',
       refType: 'order',
       refId: order.id,
@@ -516,7 +547,7 @@ router.post('/:id/pay', authRequired, async (req, res) => {
     await recordWalletLedger(tx, {
       userId: req.user.sub,
       walletType: 'coins',
-      amount: coinEarned,
+      amount: reward.coins,
       title: '购物返币',
       refType: 'order',
       refId: order.id,
@@ -527,6 +558,7 @@ router.post('/:id/pay', authRequired, async (req, res) => {
     return next;
   });
 
+  await markWeeklyTaskDone(req.user.sub, 'weeklyOrderDone');
   log.info('订单', `订单支付成功，订单号 ${updated.orderNo ?? updated.id}`);
   ok(res, { order: serializeOrder(updated) });
 });

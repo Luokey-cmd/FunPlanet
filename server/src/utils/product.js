@@ -1,7 +1,7 @@
 // flash：这件商品当前命中的限时特价（utils/promotions.js 的
 // getFlashPriceMap 给出），没有就是 null，三个促销字段一律给空，
 // App 侧只认 promoPrice 有没有值，不用猜活动状态。
-export function serializeProduct(p, flash = null) {
+export function serializeProduct(p, flash = null, recentSales = 0) {
   return {
     id: p.id,
     name: p.name,
@@ -36,8 +36,11 @@ export function serializeProduct(p, flash = null) {
     reviewCount: p.reviewCount ?? 0,
     positiveRate: p.positiveRate ?? null,
     favoriteCount: p.favoriteCount ?? 0,
-    promoPrice: flash ? flash.price : null,
-    promotionName: flash ? flash.promotionName : null,
-    promoEndsAt: flash ? flash.endsAt.toISOString() : null,
+    // 近 30 天销量：只有商品列表/详情接口会按订单明细汇总后传入（routes/products.js），
+    // 其他调用方不传就是 0，App 侧只拿它给「近期热销」排序，不展示。
+    recentSales: recentSales ?? 0,
+    promoPrice: flash?.price ?? null,
+    promotionName: flash?.promotionName ?? null,
+    promoEndsAt: flash?.endsAt ? new Date(flash.endsAt).toISOString() : null,
   };
 }

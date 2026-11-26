@@ -10,7 +10,7 @@ import '../models/agent_records.dart';
 import '../models/chat_message.dart';
 import 'token_storage.dart';
 
-enum XiaodouStreamKind { text, products, fate, cart, appraisal, giftNote, thinking, status, actions, homework, options }
+enum XiaodouStreamKind { text, products, fate, cart, appraisal, giftNote, thinking, status, actions, homework, options, couponChoices }
 
 /// 一批亮牌的元数据（服务端 fate_cards 事件的 batch 字段）：
 /// 一共有多少件匹配、还有没有下一批、本批的抽牌条件、每张牌的特点句。
@@ -63,6 +63,8 @@ class XiaodouStreamEvent {
     this.action,
     this.homeworkEntry,
     this.options = const [],
+    this.optionSet,
+    this.couponChoices = const [],
   });
 
   factory XiaodouStreamEvent.text(String content) =>
@@ -83,8 +85,13 @@ class XiaodouStreamEvent {
       XiaodouStreamEvent._(kind: XiaodouStreamKind.homework, homeworkEntry: entry);
 
   // 提问选项（服务端在问句收尾时下发的短回答，用户点一下即可回复）。
-  factory XiaodouStreamEvent.options(List<String> options) =>
-      XiaodouStreamEvent._(kind: XiaodouStreamKind.options, options: options);
+  // optionSet 是分组问法（挑礼物两步），与单组 options 二选一。
+  factory XiaodouStreamEvent.options(List<String> options, {XiaodouOptionSet? optionSet}) =>
+      XiaodouStreamEvent._(kind: XiaodouStreamKind.options, options: options, optionSet: optionSet);
+
+  // 可领券清单（只列不代领：卡片上每行带领取按钮，用户自己点）。
+  factory XiaodouStreamEvent.couponChoices(List<CouponChoice> choices) =>
+      XiaodouStreamEvent._(kind: XiaodouStreamKind.couponChoices, couponChoices: choices);
 
   factory XiaodouStreamEvent.cartConfirm(List<Product> pendingCart) =>
       XiaodouStreamEvent._(kind: XiaodouStreamKind.cart, pendingCart: pendingCart);
@@ -113,6 +120,8 @@ class XiaodouStreamEvent {
   final AgentAction? action;
   final HomeworkEntry? homeworkEntry;
   final List<String> options;
+  final XiaodouOptionSet? optionSet;
+  final List<CouponChoice> couponChoices;
 }
 
 // 云端会话摘要（服务端 AiChatConversation）：和手机本地记录是两套，
@@ -358,7 +367,23 @@ class XiaodouChatService {
 
           if (type == 'options') {
             final list = (json['options'] as List<dynamic>? ?? []).map((e) => '$e').toList();
-            if (list.isNotEmpty) yield XiaodouStreamEvent.options(list);
+            final rawSet = json['optionSet'];
+            final set = rawSet is Map<String, dynamic> ? XiaodouOptionSet.fromJson(rawSet) : null;
+            if (set != null && set.groups.length >= 2) {
+              yield XiaodouStreamEvent.options(list, optionSet: set);
+            } else if (list.isNotEmpty) {
+              yield XiaodouStreamEvent.options(list);
+            }
+            continue;
+          }
+
+          if (type == 'coupon_choices') {
+            final list = (json['groups'] as List<dynamic>? ?? [])
+                .map((item) => CouponChoice.fromJson(item as Map<String, dynamic>))
+                .toList();
+            if (list.isNotEmpty) {
+              yield XiaodouStreamEvent.couponChoices(list);
+            }
             continue;
           }
 

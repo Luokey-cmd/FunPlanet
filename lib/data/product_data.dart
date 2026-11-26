@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
@@ -36,6 +38,7 @@ class Product {
     this.reviewCount = 0,
     this.positiveRate,
     this.favoriteCount = 0,
+    this.recentSales = 0,
     this.promoPrice,
     this.promotionName,
     this.promoEndsAt,
@@ -79,6 +82,9 @@ class Product {
   final int? positiveRate;
   // 收藏数：热度展示用。
   final int favoriteCount;
+  // 近 30 天销量：服务端按订单明细实时汇总（见 server/src/routes/products.js），
+  // 老接口/本地兜底清单没有这个字段时为 0，「近期热销」会自动退回按总销量兜底排序。
+  final int recentSales;
   // 限时特价（营销中心）：接口命中活动时才有值，老接口没有就全空。
   final double? promoPrice;
   final String? promotionName;
@@ -140,6 +146,7 @@ class Product {
       reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       positiveRate: (json['positiveRate'] as num?)?.toInt(),
       favoriteCount: (json['favoriteCount'] as num?)?.toInt() ?? 0,
+      recentSales: (json['recentSales'] as num?)?.toInt() ?? 0,
       promoPrice: json['promoPrice'] == null ? null : (json['promoPrice'] as num).toDouble(),
       promotionName: json['promotionName'] as String?,
       promoEndsAt: json['promoEndsAt'] as String?,
@@ -179,6 +186,7 @@ class Product {
       'reviewCount': reviewCount,
       'positiveRate': positiveRate,
       'favoriteCount': favoriteCount,
+      'recentSales': recentSales,
       'promoPrice': promoPrice,
       'promotionName': promotionName,
       'promoEndsAt': promoEndsAt,
@@ -205,6 +213,7 @@ class OrderItem {
     this.spec,
     this.productId,
     this.imagePath,
+    this.unitPrice,
   });
 
   final String name;
@@ -213,6 +222,9 @@ class OrderItem {
   final String? productId;
   // 下单时的商品图快照：商品后来改图/下架，订单里仍显示下单时的图。
   final String? imagePath;
+  // 下单时的成交单价：服务端 serializeOrder 一直在发，2026-11-26 前 App 没接，
+  // 订单详情页要靠它算每件小计；老数据没有时为 null，详情页就不显示单价行。
+  final double? unitPrice;
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
     return OrderItem(
@@ -221,6 +233,7 @@ class OrderItem {
       spec: json['spec'] as String?,
       productId: json['productId'] as String?,
       imagePath: json['imagePath'] as String?,
+      unitPrice: (json['unitPrice'] as num?)?.toDouble(),
     );
   }
 }
@@ -238,6 +251,7 @@ class Order {
     this.subtotal,
     this.discount = 0,
     this.promotionDiscount = 0,
+    this.memberDiscount = 0,
     this.promotionName,
     this.reviewedProductIds = const [],
     // 下面是后端字段整改后订单新增的信息，老订单没有时为空。
@@ -248,6 +262,9 @@ class Order {
     this.shippedAt,
     this.receivedAt,
     this.cancelReason,
+    this.addressName,
+    this.addressPhone,
+    this.addressDetail,
   });
 
   final String id;
@@ -260,6 +277,8 @@ class Order {
   final double discount;
   // 满减优惠（营销中心）：与券 discount 分开记，订单详情拆开显示
   final double promotionDiscount;
+  // 会员 95 折金额（服务端下单时真打折后回传；老订单/非会员为 0）
+  final double memberDiscount;
   final String? promotionName;
   final List<String> reviewedProductIds;
   final double freight;
@@ -270,6 +289,11 @@ class Order {
   final String? shippedAt;
   final String? receivedAt;
   final String? cancelReason;
+  // 收货信息快照：服务端 serializeOrder 以 address 对象下发（name/phone/detail），
+  // 2026-11-26 前 App 没接；订单详情页展示用，老订单没有时为空、整段不显示。
+  final String? addressName;
+  final String? addressPhone;
+  final String? addressDetail;
 
   bool get hasTracking => trackingNo != null && trackingNo!.isNotEmpty;
 
@@ -292,6 +316,7 @@ class Order {
       subtotal: subtotal,
       discount: discount,
       promotionDiscount: promotionDiscount,
+      memberDiscount: memberDiscount,
       promotionName: promotionName,
       reviewedProductIds: reviewedProductIds ?? this.reviewedProductIds,
       // copyWith 只换状态/评价记录，物流等字段必须原样带过去，漏一个就丢一个。
@@ -302,6 +327,9 @@ class Order {
       shippedAt: shippedAt,
       receivedAt: receivedAt,
       cancelReason: cancelReason,
+      addressName: addressName,
+      addressPhone: addressPhone,
+      addressDetail: addressDetail,
     );
   }
 
@@ -316,6 +344,7 @@ class Order {
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? (json['total'] as num).toDouble(),
       discount: (json['discount'] as num?)?.toDouble() ?? 0,
       promotionDiscount: (json['promotionDiscount'] as num?)?.toDouble() ?? 0,
+      memberDiscount: (json['memberDiscount'] as num?)?.toDouble() ?? 0,
       promotionName: json['promotionName'] as String?,
       status: _orderStatusFromString(json['status'] as String),
       time: json['time'] as String,
@@ -329,6 +358,9 @@ class Order {
       shippedAt: json['shippedAt'] as String?,
       receivedAt: json['receivedAt'] as String?,
       cancelReason: json['cancelReason'] as String?,
+      addressName: (json['address'] as Map<String, dynamic>?)?['name'] as String?,
+      addressPhone: (json['address'] as Map<String, dynamic>?)?['phone'] as String?,
+      addressDetail: (json['address'] as Map<String, dynamic>?)?['detail'] as String?,
     );
   }
 }
@@ -576,6 +608,28 @@ const memberMascotPath = 'assets/images/会员领好礼IP形象.png';
 const memberBadgePath = 'assets/images/会员图标.png';
 const memberTargetVipLevel = 2;
 const memberSubscribeCoinPrice = 299;
+
+// 趣玩币充值档位（2026-11-26 定 B 方案：1 元 = 15 币）。
+// 这份只供 App 展示与选择；真正到账的币数以服务端 profile.js 的
+// RECHARGE_PACKAGES 为准（按 id 查表），改档位时两边必须一起改。
+class CoinRechargePackage {
+  const CoinRechargePackage({required this.id, required this.yuan, required this.coins});
+
+  final String id;
+  final int yuan;
+  final int coins;
+
+  // 高于基础比例（15 币/元）的部分就是赠送币数，0 表示这档不送。
+  int get bonus => coins - yuan * 15;
+}
+
+const coinRechargePackages = <CoinRechargePackage>[
+  CoinRechargePackage(id: 'r6', yuan: 6, coins: 90),
+  CoinRechargePackage(id: 'r12', yuan: 12, coins: 180),
+  CoinRechargePackage(id: 'r20', yuan: 20, coins: 320),
+  CoinRechargePackage(id: 'r48', yuan: 48, coins: 780),
+  CoinRechargePackage(id: 'r98', yuan: 98, coins: 1590),
+];
 const oneEyedGiftBoxPath = 'assets/images/独眼礼盒.png';
 const inviteCharactersPath = 'assets/images/两小人物.png';
 const aiPaintEntryPath = 'assets/images/AI绘画.png';
@@ -703,21 +757,82 @@ List<Product> productsByCategory(String categoryId) {
   return products.where((p) => p.category == categoryId).toList();
 }
 
+// 商品编号取数字部分（p123 → 123），取不到按 0 算。
+// 市集排序里当「上架先后」用：编号越大上架越晚（App 商品模型没接服务端的 createdAt）。
+int _productIdNum(String id) =>
+    int.tryParse(id.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
+// 市集四个页签的取数与排序（2026-11-26 hx 拍板修正版）。
+// 输入：全局 products（服务端按编号正序返回全店商品）；输出：排好序的新列表，不动原列表。
+// 坑：全店评分只有 4.6～4.9 四档，只按评分排会有上百件同分、同分顺序等于编号序，
+// 所以「趣玩推荐」必须用综合分打破同分；各榜同分时统一用编号大的在前兜底，保证顺序稳定。
 List<Product> productsByMarketTab(MarketTab tab, {RankingSubTab? rankingSub}) {
   switch (tab) {
     case MarketTab.recommend:
-      return List<Product>.from(products)..sort((a, b) => b.rating.compareTo(a.rating));
+      // 趣玩推荐 = 综合分：0.40×对数销量分 + 0.25×评分分 + 0.20×对数收藏分 + 0.15×新品分。
+      // 销量/收藏差距悬殊（销量最高 8569、中位约 200），直接比原值会焊死老爆款，
+      // 取对数压平（与商城页综合排序同口径）；评分分把 4.5 当 0、5.0 当 1 拉开窄区间；
+      // 新品分 = 编号÷全店最大编号，让新系列穿插进前排（实测前 30 件约 8 件新系列）。
+      final list = List<Product>.from(products);
+      if (list.length < 2) return list;
+      var maxSales = 0;
+      var maxFav = 0;
+      var maxId = 0;
+      for (final p in list) {
+        if (p.sales > maxSales) maxSales = p.sales;
+        if (p.favoriteCount > maxFav) maxFav = p.favoriteCount;
+        final n = _productIdNum(p.id);
+        if (n > maxId) maxId = n;
+      }
+      final maxLogSales = math.log(maxSales + 1);
+      final maxLogFav = math.log(maxFav + 1);
+      double score(Product p) {
+        final salesPart = maxLogSales > 0 ? math.log(p.sales + 1) / maxLogSales : 0.0;
+        final ratingPart = ((p.rating - 4.5) / 0.5).clamp(0.0, 1.0);
+        final favPart = maxLogFav > 0 ? math.log(p.favoriteCount + 1) / maxLogFav : 0.0;
+        final newPart = maxId > 0 ? _productIdNum(p.id) / maxId : 0.0;
+        return 0.40 * salesPart + 0.25 * ratingPart + 0.20 * favPart + 0.15 * newPart;
+      }
+
+      list.sort((a, b) {
+        final byScore = score(b).compareTo(score(a));
+        return byScore != 0 ? byScore : _productIdNum(b.id).compareTo(_productIdNum(a.id));
+      });
+      return list;
     case MarketTab.hot:
-      final sorted = List<Product>.from(products)..sort((a, b) => b.sales.compareTo(a.sales));
+      // 近期热销：按近 30 天真实销量 recentSales 排（服务端按订单明细汇总，
+      // 虚拟订单也在订单表里、同样计入）——这才和人气榜单·售卖榜（累计总销量）拉开区别，
+      // 旧版两边都按总销量排、是完全相同的两张榜。同分依次按总销量、收藏数、编号兜底；
+      // recentSales 全为 0（老服务端/本地兜底清单）时自动退化成总销量排序，不会乱序。
+      final sorted = List<Product>.from(products)..sort((a, b) {
+          final byRecent = b.recentSales.compareTo(a.recentSales);
+          if (byRecent != 0) return byRecent;
+          final bySales = b.sales.compareTo(a.sales);
+          if (bySales != 0) return bySales;
+          final byFav = b.favoriteCount.compareTo(a.favoriteCount);
+          return byFav != 0 ? byFav : _productIdNum(b.id).compareTo(_productIdNum(a.id));
+        });
       return sorted;
     case MarketTab.newRelease:
-      return products.where((p) => p.tag == '新品').toList();
+      // 新品首发：只留「新品」标签，再按编号从大到小——最新上架的排最前，
+      // 不再像旧版那样正序把最新商品埋在最后。
+      final news = products.where((p) => p.tag == '新品').toList();
+      news.sort((a, b) => _productIdNum(b.id).compareTo(_productIdNum(a.id)));
+      return news;
     case MarketTab.ranking:
       final sorted = List<Product>.from(products)..sort((a, b) {
         if (rankingSub == RankingSubTab.collect) {
-          return b.rating.compareTo(a.rating);
+          // 收藏排行榜单：按收藏数 favoriteCount 排（旧版误按评分排，与「趣玩推荐」撞榜）。
+          final byFav = b.favoriteCount.compareTo(a.favoriteCount);
+          if (byFav != 0) return byFav;
+          final bySales = b.sales.compareTo(a.sales);
+          return bySales != 0 ? bySales : _productIdNum(b.id).compareTo(_productIdNum(a.id));
         }
-        return b.sales.compareTo(a.sales);
+        // 售卖排行榜单：按累计总销量排（全历史口径，与「近期热销」的近 30 天口径不同）。
+        final bySales = b.sales.compareTo(a.sales);
+        if (bySales != 0) return bySales;
+        final byFav = b.favoriteCount.compareTo(a.favoriteCount);
+        return byFav != 0 ? byFav : _productIdNum(b.id).compareTo(_productIdNum(a.id));
       });
       return sorted;
   }

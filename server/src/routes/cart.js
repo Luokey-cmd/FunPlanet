@@ -5,6 +5,7 @@ import { fail, ok } from '../utils/response.js';
 import { log } from '../utils/log.js';
 import { serializeProduct } from '../utils/product.js';
 import { getFlashPriceMap } from '../utils/promotions.js';
+import { markDailyTaskDone } from '../utils/daily-tasks.js';
 
 const router = Router();
 
@@ -72,6 +73,7 @@ router.post('/', authRequired, async (req, res) => {
     });
   }
 
+  if (delta > 0) await markDailyTaskDone(req.user.sub, 'dailyCartDone');
   log.info('购物车', `购物车已更新：商品 ${productId}，当前数量 ${item.quantity}`);
   const flashMap = await getFlashPriceMap([item.productId]);
   ok(res, { item: serializeCartItem(item, flashMap.get(item.productId) ?? null) });

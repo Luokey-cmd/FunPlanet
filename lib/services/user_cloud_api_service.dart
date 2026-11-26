@@ -28,7 +28,7 @@ class UserCloudApiService {
     await _client.post('/api/browse-history', {'productId': productId}, auth: true);
   }
 
-  Future<({List<Coupon> coupons, bool newcomerClaimed, bool memberMonthlyCouponClaimed})> fetchCoupons() async {
+  Future<({List<Coupon> coupons, bool newcomerClaimed, bool memberMonthlyCouponClaimed, bool memberDailyGiftClaimedToday})> fetchCoupons() async {
     final data = await _client.get('/api/coupons', auth: true);
     final list = (data['coupons'] as List<dynamic>)
         .map((e) => Coupon.fromJson(e as Map<String, dynamic>))
@@ -37,6 +37,8 @@ class UserCloudApiService {
       coupons: list,
       newcomerClaimed: data['newcomerClaimed'] as bool? ?? false,
       memberMonthlyCouponClaimed: data['memberMonthlyCouponClaimed'] as bool? ?? false,
+      // 会员每日礼包今日领没领：老服务端没这个键时按未领处理，不影响其他券
+      memberDailyGiftClaimedToday: data['memberDailyGiftClaimedToday'] as bool? ?? false,
     );
   }
 
@@ -50,8 +52,27 @@ class UserCloudApiService {
     return _parseCoupons(data['coupons'] as List<dynamic>);
   }
 
+  // 会员每日礼包：服务端一次发齐礼包券 + 积分 + 趣玩币，这里只取回券列表，
+  // 积分与币的到账由调用方整表刷新资料后体现（不要在本地先加，防两边对不上）。
+  Future<List<Coupon>> claimMemberDailyGift() async {
+    final data = await _client.post('/api/coupons/claim/member-daily', {}, auth: true);
+    return _parseCoupons(data['coupons'] as List<dynamic>);
+  }
+
   Future<List<Coupon>> claimCenter() async {
     final data = await _client.post('/api/coupons/claim/center', {}, auth: true);
+    return _parseCoupons(data['coupons'] as List<dynamic>);
+  }
+
+  // 领券中心满200减40（c8）：与服务端 /claim/center-200 一一对应，单独领取。
+  Future<List<Coupon>> claimCenter200() async {
+    final data = await _client.post('/api/coupons/claim/center-200', {}, auth: true);
+    return _parseCoupons(data['coupons'] as List<dynamic>);
+  }
+
+  // 领券中心满300减80（c3）：与服务端 /claim/center-300 一一对应，单独领取。
+  Future<List<Coupon>> claimCenter300() async {
+    final data = await _client.post('/api/coupons/claim/center-300', {}, auth: true);
     return _parseCoupons(data['coupons'] as List<dynamic>);
   }
 
@@ -149,8 +170,10 @@ class UserCloudApiService {
     return data['avatarPath'] as String;
   }
 
-  Future<Map<String, dynamic>> profileAction(String action) async {
-    final data = await _client.post('/api/profile/actions/$action', {}, auth: true);
+  // body 可选：多数动作不需要参数；充值要带 packageId（只报档位 id，
+  // 到账币数由服务端查表决定）。老调用不传 body 时行为与之前完全一致。
+  Future<Map<String, dynamic>> profileAction(String action, {Map<String, dynamic>? body}) async {
+    final data = await _client.post('/api/profile/actions/$action', body ?? {}, auth: true);
     return data['profile'] as Map<String, dynamic>;
   }
 

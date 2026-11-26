@@ -36,6 +36,10 @@ class MainActivity : FlutterFragmentActivity() {
 
     // 流式识别的 PCM 推流（EventChannel funplanet/voice_stream）
     private val streamChannelName = "funplanet/voice_stream"
+
+    // 系统分享（funplanet/share）：拉起 Android 原生分享面板，
+    // 不引第三方分享插件，Intent.ACTION_SEND 是系统标准做法
+    private val shareChannelName = "funplanet/share"
     private var pcmRecord: AudioRecord? = null
     private var pcmThread: Thread? = null
 
@@ -88,6 +92,25 @@ class MainActivity : FlutterFragmentActivity() {
                     "cancelRecord" -> {
                         cancelRecord()
                         result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, shareChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "shareText" -> {
+                        val text = call.argument<String>("text") ?: ""
+                        try {
+                            val intent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, text)
+                            }
+                            startActivity(Intent.createChooser(intent, "分享"))
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
                     }
                     else -> result.notImplemented()
                 }

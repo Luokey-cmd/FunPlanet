@@ -35,6 +35,8 @@ class _AiPaintPageState extends State<AiPaintPage> {
   AiArtwork? _currentArtwork;
   AiPaintQuota? _quota;
   String _styleKey = 'default';
+  String _ratioKey = 'square';
+  int _drawCount = 2;
   bool _loadingPage = true;
   bool _generating = false;
 
@@ -126,14 +128,24 @@ class _AiPaintPageState extends State<AiPaintPage> {
     });
 
     final prompt = buildAiPaintPrompt(rawPrompt, _styleKey);
+    final ratio = aiRatioPresets.firstWhere(
+      (item) => item.key == _ratioKey,
+      orElse: () => aiRatioPresets.first,
+    );
     try {
-      final result = await _service.generate(prompt: prompt, style: _styleKey);
+      final result = await _service.generate(
+        prompt: prompt,
+        style: _styleKey,
+        size: ratio.size,
+        count: _drawCount,
+      );
       if (!mounted) return;
+      final fresh = result.artworks;
       setState(() {
-        _currentArtwork = result.artwork;
+        _currentArtwork = fresh.first;
         _artworks = [
-          result.artwork,
-          ..._artworks.where((item) => item.id != result.artwork.id),
+          ...fresh,
+          ..._artworks.where((item) => !fresh.any((f) => f.id == item.id)),
         ];
         _quota = AiPaintQuota(
           dailyLimit: _quota?.dailyLimit ?? 20,
@@ -219,7 +231,7 @@ class _AiPaintPageState extends State<AiPaintPage> {
                         children: [
                           Text('AI绘画', style: FeaturePageStyle.pageTitle()),
                           Text(
-                            _quota == null ? '通义万相 · 文生图' : '今日剩余 ${_quota!.remainingToday}/${_quota!.dailyLimit} 次',
+                            _quota == null ? '通义万相 · 文生图' : '今日剩余 ${_quota!.remainingToday}/${_quota!.dailyLimit} 张',
                             style: FeaturePageStyle.caption(),
                           ),
                         ],
@@ -254,6 +266,16 @@ class _AiPaintPageState extends State<AiPaintPage> {
                           _StyleSection(
                             selectedKey: _styleKey,
                             onSelected: (key) => setState(() => _styleKey = key),
+                          ),
+                          SizedBox(height: FeaturePageStyle.s(14)),
+                          _RatioSection(
+                            selectedKey: _ratioKey,
+                            onSelected: (key) => setState(() => _ratioKey = key),
+                          ),
+                          SizedBox(height: FeaturePageStyle.s(14)),
+                          _CountSection(
+                            selected: _drawCount,
+                            onSelected: (value) => setState(() => _drawCount = value),
                           ),
                           SizedBox(height: FeaturePageStyle.s(16)),
                           _GenerateButton(
@@ -342,7 +364,7 @@ class _HintCard extends StatelessWidget {
           SizedBox(width: FeaturePageStyle.s(10)),
           Expanded(
             child: Text(
-              '描述你想画的画面，选择风格后一键生成 2K 高清插画。',
+              '描述你想画的画面，选好风格与画幅，一次生成 1～2 张候选图。',
               style: FeaturePageStyle.secondary(color: AppColors.foreground.withValues(alpha: 0.82)),
             ),
           ),
@@ -435,6 +457,78 @@ class _StyleSection extends StatelessWidget {
               label: Text(preset.label),
               selected: active,
               onSelected: (_) => onSelected(preset.key),
+              selectedColor: AppColors.secondary,
+              labelStyle: FeaturePageStyle.caption(
+                color: active ? AppColors.primary : AppColors.mutedForeground,
+                weight: active ? FontWeight.w600 : FontWeight.normal,
+              ),
+              side: BorderSide(color: active ? AppColors.primaryLight : AppColors.border),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _RatioSection extends StatelessWidget {
+  const _RatioSection({required this.selectedKey, required this.onSelected});
+
+  final String selectedKey;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('画幅', style: FeaturePageStyle.sectionTitle()),
+        SizedBox(height: FeaturePageStyle.s(10)),
+        Wrap(
+          spacing: FeaturePageStyle.s(8),
+          runSpacing: FeaturePageStyle.s(8),
+          children: aiRatioPresets.map((preset) {
+            final active = preset.key == selectedKey;
+            return ChoiceChip(
+              label: Text(preset.label),
+              selected: active,
+              onSelected: (_) => onSelected(preset.key),
+              selectedColor: AppColors.secondary,
+              labelStyle: FeaturePageStyle.caption(
+                color: active ? AppColors.primary : AppColors.mutedForeground,
+                weight: active ? FontWeight.w600 : FontWeight.normal,
+              ),
+              side: BorderSide(color: active ? AppColors.primaryLight : AppColors.border),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _CountSection extends StatelessWidget {
+  const _CountSection({required this.selected, required this.onSelected});
+
+  final int selected;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('生成张数', style: FeaturePageStyle.sectionTitle()),
+        SizedBox(height: FeaturePageStyle.s(10)),
+        Wrap(
+          spacing: FeaturePageStyle.s(8),
+          runSpacing: FeaturePageStyle.s(8),
+          children: [1, 2].map((value) {
+            final active = value == selected;
+            return ChoiceChip(
+              label: Text(value == 1 ? '1 张' : '2 张候选'),
+              selected: active,
+              onSelected: (_) => onSelected(value),
               selectedColor: AppColors.secondary,
               labelStyle: FeaturePageStyle.caption(
                 color: active ? AppColors.primary : AppColors.mutedForeground,

@@ -506,7 +506,7 @@ class _MemberSection extends StatelessWidget {
   // 第三个元素是权益的数值小字：只写名字用户感知不到值不值，
   // 数值与会员权益说明页（showMemberBenefits）里的文案保持一致，改一处要同步改另一处。
   static const _benefits = [
-    ('assets/images/icon_pf_monthly_coupon.png', '每月赠券', '满99减20'),
+    ('assets/images/icon_pf_monthly_coupon.png', '每月赠券', '满88减20'),
     ('assets/images/icon_pf_points_boost.png', '积分加成', '购物×1.5'),
     ('assets/images/icon_pf_discount.png', '专属折扣', '指定95折'),
     ('assets/images/icon_pf_birthday_gift.png', '生日礼包', '+50趣玩币'),

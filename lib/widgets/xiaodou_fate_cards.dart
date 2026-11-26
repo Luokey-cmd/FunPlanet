@@ -12,14 +12,18 @@ import '../theme/app_scale.dart';
 import '../utils/snackbar_utils.dart';
 import '../widgets/product_image.dart';
 
-/// 亮牌牌板（2026-11-23 改版 v3，hx 看完开场动画三帧后亲自定的形态）：
-/// 把开场动画结尾的变身原样搬进导购，分三段——
-/// 1. **三张竖版小卡并排**：极简，牌面只有商品图 + 名字，纯粹先把商品亮出来；
-/// 2. **点中一张**：它整圈旋转 + 放大，变成带金色翅膀的**幻想大卡**
-///    （牌面是 AI 生成的美术图 fate_fantasy_card.webp，商品图落在正中发光圆台上），
-///    停约 1.15 秒让人看清；
-/// 3. **再旋转半圈落定**：转成奶油底**详细卡**（价格/评分/特点/双按钮，
-///    即 v2 宽卡的牌面），点牌身进详情页，下方有「回到三张牌」可以重选。
+/// 亮牌牌板（2026-11-26 改版 v4，hx 看真机录屏后定的形态）：
+/// 三张竖版小卡并排（极简，只有商品图 + 名字）这一步不变；点中一张后的变身
+/// **搬到全屏顶层**演（v3 在聊天框里转，被气泡宽高框住、还裁边，hx 点名不行）：
+/// 1. 卡从小卡脸起转：整圈旋转 + 放大，转到背面时是专门的**牌背美术图**
+///    （fate_card_back.webp：照开场动画翻牌那一帧做的——深紫星空、金雕花框、
+///    月牙四角、中央发光星座椭圆、金翅膀放射光；v3 没有牌背、转过去是正面的
+///    镜像，hx 点名不满意），一圈落回正面时已换成幻想大卡（金翅膀美术图 +
+///    商品圆徽章），停约 0.95 秒；
+/// 2. 再半转落成奶油底**详细卡**（价格/评分/特点/双按钮的静态版）；
+/// 3. 停住等用户点任意处（点卡上、点卡外都算）才关掉全屏层，详细卡落回
+///    聊天消息里变可点正式版，下方有「回到三张牌」可以重选。
+/// 系统返回键在落定前 = 取消回三张牌，落定后 = 同点按落回聊天。
 /// 批次切换由外层（XiaodouFateSection）换 key 重建本组件，状态自然清零。
 class XiaodouFateBoard extends StatefulWidget {
   const XiaodouFateBoard({
@@ -39,65 +43,43 @@ class XiaodouFateBoard extends StatefulWidget {
 
 /// 变身阶段：idle 三张小卡 / spin1 转成幻想卡 / hold 幻想卡停留 /
 /// spin2 转成详细卡 / detail 详细卡落定。
-enum _Phase { idle, spin1, hold, spin2, detail }
+enum _Phase { idle, detail }
 
-class _XiaodouFateBoardState extends State<XiaodouFateBoard>
-    with TickerProviderStateMixin {
-  /// 幻想卡美术图的宽高比（768×1376），定舞台尺寸用，图本身 cover 填满不怕小差。
-  static const double _fantasyAspect = 768 / 1376;
-
-  /// 第一转：整圈 2π + 从小卡尺寸放大到幻想卡尺寸，950ms。
-  late final AnimationController _spin1 = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 950),
-  );
-
-  /// 第二转：幻想卡转到侧面（π/2）换脸，详细卡从侧面转回正面，880ms。
-  late final AnimationController _spin2 = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 880),
-  );
-
+class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
   _Phase _phase = _Phase.idle;
   int _selected = -1;
 
-  @override
-  void dispose() {
-    _spin1.dispose();
-    _spin2.dispose();
-    super.dispose();
-  }
-
   Product get _selectedProduct => widget.products[_selected];
 
-  /// 点选小卡后整条变身链：转幻想卡 → 停 1.15 秒 → 转详细卡。
-  /// 坑：组件中途被销毁（切批次换 key）时控制器 future 会抛 TickerCanceled，
-  /// 这里吞掉并靠 mounted 守卫收尾，不让异常冒泡。
+  /// 点选小卡：把变身交给全屏层（_FateFlipOverlay）演，演完落定才回 true。
+  /// 输入是点中的下标；输出无（结果体现在 _phase 上）。
+  /// 坑：全屏层是 rootNavigator 上的独立路由，本组件在它底下一直活着，
+  /// 回来后 setState 前仍要查 mounted（用户可能在层开着时退出聊天页）。
   Future<void> _select(int index) async {
     if (_phase != _Phase.idle) return;
-    setState(() {
-      _selected = index;
-      _phase = _Phase.spin1;
-    });
-    try {
-      await _spin1.forward();
-      if (!mounted) return;
-      setState(() => _phase = _Phase.hold);
-      await Future.delayed(const Duration(milliseconds: 1150));
-      if (!mounted || _phase != _Phase.hold) return;
-      setState(() => _phase = _Phase.spin2);
-      await _spin2.forward();
-      if (!mounted) return;
+    _selected = index;
+    final product = widget.products[index];
+    final settled = await Navigator.of(context, rootNavigator: true).push<bool>(
+      PageRouteBuilder<bool>(
+        opaque: false,
+        transitionDuration: const Duration(milliseconds: 180),
+        reverseTransitionDuration: const Duration(milliseconds: 160),
+        pageBuilder: (_, _, _) => _FateFlipOverlay(
+          product: product,
+          trait: widget.traits[product.id],
+        ),
+        transitionsBuilder: (_, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+    );
+    if (!mounted) return;
+    if (settled == true) {
       setState(() => _phase = _Phase.detail);
-    } on TickerCanceled {
-      // 组件已销毁/动画被打断，静默收尾。
     }
   }
 
-  /// 回到三张牌重选：阶段与两个控制器一起归零。
+  /// 回到三张牌重选。
   void _reset() {
-    _spin1.reset();
-    _spin2.reset();
     setState(() {
       _phase = _Phase.idle;
       _selected = -1;
@@ -108,77 +90,14 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard>
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(top: AppScale.s(12)),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final w = constraints.maxWidth;
-          final gap = AppScale.s(10);
-          final miniW = (w - gap * 2) / 3;
-          final miniH = miniW * 1.46;
-          final fantasyW = math.min(w * 0.64, AppScale.s(224));
-          final fantasyH = fantasyW / _fantasyAspect;
-          final inStage = _phase != _Phase.idle;
-          // 舞台高度：小卡阶段只占小卡高，点选后撑到幻想卡高（AnimatedSize 平滑过渡）。
-          final stageH = inStage ? fantasyH : miniH;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AnimatedSize(
-                duration: const Duration(milliseconds: 320),
-                curve: Curves.easeOut,
-                alignment: Alignment.topCenter,
-                child: _phase == _Phase.detail
-                    // 落定后换成自然高度的可点详细卡，舞台高度随之收回，
-                    // 不在聊天里留一大块空白。
-                    ? _DetailCard(
-                        product: _selectedProduct,
-                        trait: widget.traits[_selectedProduct.id],
-                      )
-                    : SizedBox(
-                        height: stageH,
-                        child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // 三张小卡：点选后整排淡出让位给变身舞台。
-                      Positioned.fill(
-                        child: AnimatedOpacity(
-                          opacity: inStage ? 0 : 1,
-                          duration: const Duration(milliseconds: 280),
-                          child: IgnorePointer(
-                            ignoring: inStage,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                for (var i = 0; i < widget.products.length; i++) ...[
-                                  if (i > 0) SizedBox(width: gap),
-                                  _FadeIn(
-                                    delay: Duration(milliseconds: i * 70),
-                                    child: _MiniCard(
-                                      product: widget.products[i],
-                                      width: miniW,
-                                      height: miniH,
-                                      onTap: () => _select(i),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // 变身主卡：spin1/spin2/hold 三段共用一个定位，靠动画值换脸换角度。
-                      if (inStage && _phase != _Phase.detail)
-                        Center(
-                          child: AnimatedBuilder(
-                            animation: Listenable.merge([_spin1, _spin2]),
-                            builder: (context, _) => _stageCard(fantasyW, fantasyH),
-                          ),
-                        ),
-                    ],
-                        ),
-                      ),
-              ),
-              if (_phase == _Phase.detail) ...[
+      child: _phase == _Phase.detail
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _DetailCard(
+                  product: _selectedProduct,
+                  trait: widget.traits[_selectedProduct.id],
+                ),
                 SizedBox(height: AppScale.s(10)),
                 Center(
                   child: GestureDetector(
@@ -200,55 +119,255 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard>
                   ),
                 ),
               ],
-            ],
-          );
-        },
+            )
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final gap = AppScale.s(10);
+                final miniW = (w - gap * 2) / 3;
+                final miniH = miniW * 1.46;
+                // 顶部多留 s(9)：小卡的判断标签缎带半挂在卡沿外，
+                // 不留这段会被上一层内容压住。
+                return SizedBox(
+                  height: miniH + AppScale.s(9),
+                  child: Padding(
+                    padding: EdgeInsets.only(top: AppScale.s(9)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (var i = 0; i < widget.products.length; i++) ...[
+                          if (i > 0) SizedBox(width: gap),
+                          _FadeIn(
+                            delay: Duration(milliseconds: i * 70),
+                            child: _MiniCard(
+                              product: widget.products[i],
+                              trait: widget.traits[widget.products[i].id],
+                              width: miniW,
+                              height: miniH,
+                              onTap: () => _select(i),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
+
+/// 全屏翻牌层（v4 新增）：在 rootNavigator 顶层演完整套变身，不受聊天框约束。
+/// 时序：spin1 整圈（小卡脸 → 牌背 → 幻想脸）1000ms → 幻想卡停 0.95s →
+/// spin2 半转落成详细卡 880ms → 落定等点按（点任意处 pop 回 true）。
+/// 输入：商品与特点句；输出：路由返回值 bool（true = 落回聊天变详细卡，
+/// false = 取消回三张牌）。返回键：落定前取消、落定后等同点按落定。
+class _FateFlipOverlay extends StatefulWidget {
+  const _FateFlipOverlay({required this.product, this.trait});
+
+  final Product product;
+  final String? trait;
+
+  @override
+  State<_FateFlipOverlay> createState() => _FateFlipOverlayState();
+}
+
+enum _FlipPhase { spin1, hold, spin2, landed }
+
+class _FateFlipOverlayState extends State<_FateFlipOverlay>
+    with TickerProviderStateMixin {
+  /// 幻想卡 / 牌背美术图的宽高比（768×1376），全屏舞台尺寸按它算。
+  static const double _cardAspect = 768 / 1376;
+
+  late final AnimationController _spin1 = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1000),
+  );
+  late final AnimationController _spin2 = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 880),
+  );
+
+  _FlipPhase _phase = _FlipPhase.spin1;
+
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  @override
+  void dispose() {
+    _spin1.dispose();
+    _spin2.dispose();
+    super.dispose();
+  }
+
+  /// 变身主链：转幻想卡 → 停留 → 转详细卡落定。
+  /// 坑：层被返回键关掉时控制器 future 抛 TickerCanceled，吞掉静默收尾。
+  Future<void> _run() async {
+    try {
+      await _spin1.forward();
+      if (!mounted) return;
+      setState(() => _phase = _FlipPhase.hold);
+      await Future.delayed(const Duration(milliseconds: 950));
+      if (!mounted || _phase != _FlipPhase.hold) return;
+      await _startSpin2();
+    } on TickerCanceled {
+      // 层已关闭，静默收尾。
+    }
+  }
+
+  Future<void> _startSpin2() async {
+    setState(() => _phase = _FlipPhase.spin2);
+    await _spin2.forward();
+    if (!mounted) return;
+    setState(() => _phase = _FlipPhase.landed);
+  }
+
+  /// 点按：落定后 = 关层落回聊天；幻想卡停留时点按 = 跳过等待直接翻详细卡；
+  /// 旋转途中不响应（防连点把时序点乱）。
+  void _onTap() {
+    if (_phase == _FlipPhase.landed) {
+      Navigator.of(context).pop(true);
+    } else if (_phase == _FlipPhase.hold) {
+      _startSpin2();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final cardW = math.min(size.width * 0.62, AppScale.s(250));
+    final cardH = cardW / _cardAspect;
+    final detailW = math.min(size.width * 0.92, AppScale.s(520));
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        // 返回键：落定后同点按（落回聊天），没落定 = 取消回三张牌。
+        Navigator.of(context).pop(_phase == _FlipPhase.landed);
+      },
+      child: Material(
+        color: Colors.transparent,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _onTap,
+          child: Container(
+            // 深紫星空底：盖住整个屏幕（含状态栏与输入框），翻牌只在这块舞台上演。
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0, -0.1),
+                radius: 1.1,
+                colors: [Color(0xF22E1158), Color(0xF7150529), Color(0xFA0D0218)],
+                stops: [0, 0.55, 1],
+              ),
+            ),
+            child: SafeArea(
+              child: Stack(
+                children: [
+                  // 卡背后的光晕：跟着卡一起居中，衬托放射光感。
+                  Center(
+                    child: Container(
+                      width: cardW * 1.9,
+                      height: cardH * 1.15,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            const Color(0xFFB78CFF).withValues(alpha: 0.30),
+                            const Color(0xFFB78CFF).withValues(alpha: 0),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Center(
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([_spin1, _spin2]),
+                      builder: (context, _) => _stageCard(cardW, cardH, detailW),
+                    ),
+                  ),
+                  if (_phase == _FlipPhase.landed)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: AppScale.s(46),
+                      child: Center(
+                        child: Text(
+                          '点任意处回到聊天',
+                          style: TextStyle(
+                            fontSize: AppScale.t(12.5),
+                            color: Colors.white.withValues(alpha: 0.75),
+                            letterSpacing: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  /// 变身主卡的当前帧：按阶段与动画进度算（角度， 缩放， 牌面）。
-  /// 输入是两个控制器的当前值，输出一个已套好 3D 变换的牌面组件。
-  /// 换脸点都卡在牌面转到侧面（90°，只剩一条线）的一刻，观众看不见切换。
-  Widget _stageCard(double fantasyW, double fantasyH) {
-    final product = _selectedProduct;
+  /// 当前帧的牌面：按阶段与动画进度算（角度、缩放、哪张脸）。
+  /// 换脸点都卡在牌面侧对观众（90°，只剩一条线）或背对观众的时刻，观众看不见切换：
+  /// spin1 前半正面是小卡脸、背对时是牌背、后半正面换成幻想脸；
+  /// 牌背要多转半圈（π）抵消镜像，不然星座图是反的。
+  Widget _stageCard(double cardW, double cardH, double detailW) {
+    final product = widget.product;
     switch (_phase) {
-      case _Phase.spin1:
+      case _FlipPhase.spin1:
         final v = Curves.easeInOut.transform(_spin1.value);
         final angle = v * math.pi * 2;
-        final scale = 0.42 + 0.58 * Curves.easeOut.transform(_spin1.value);
-        // 半圈（v=0.5）时牌面正好侧对观众，在这一帧把小卡脸换成幻想脸。
-        final face = v < 0.5
-            ? _MiniFace(product: product, width: fantasyW, height: fantasyH)
-            : _FantasyFace(product: product, width: fantasyW, height: fantasyH);
-        return _rotated(angle, scale, face);
-      case _Phase.hold:
-        return _FantasyFace(product: product, width: fantasyW, height: fantasyH);
-      case _Phase.spin2:
+        final scale = 0.5 + 0.5 * Curves.easeOut.transform(_spin1.value);
+        final cos = math.cos(angle);
+        if (cos >= 0) {
+          // 正对观众：前段是小卡脸，后段（背对过一轮后）是幻想脸。
+          final face = angle < math.pi * 1.5
+              ? _MiniFace(product: product, trait: widget.trait, width: cardW, height: cardH)
+              : _FantasyFace(product: product, width: cardW, height: cardH);
+          return _rotated(angle, scale, face);
+        }
+        // 背对观众：牌背美术图，先自转 π 抵消镜像再跟主旋转。
+        return _rotated(
+          angle,
+          scale,
+          Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()..rotateY(math.pi),
+            child: _BackFace(width: cardW, height: cardH),
+          ),
+        );
+      case _FlipPhase.hold:
+        return _FantasyFace(product: product, width: cardW, height: cardH);
+      case _FlipPhase.spin2:
         final v = _spin2.value;
         if (v < 0.5) {
           // 前半：幻想卡加速转到侧面。
           final angle = Curves.easeIn.transform(v * 2) * math.pi / 2;
-          return _rotated(
-            angle,
-            1,
-            _FantasyFace(product: product, width: fantasyW, height: fantasyH),
-          );
+          return _rotated(angle, 1, _FantasyFace(product: product, width: cardW, height: cardH));
         }
-        // 后半：详细卡从侧面转回正面（静态版先行，落定后换成可点版）。
+        // 后半：详细卡从侧面转回正面（静态版，落定后聊天里换可点版）。
         final t = Curves.easeOut.transform((v - 0.5) * 2);
         return _rotated(
           -math.pi / 2 * (1 - t),
           0.94 + 0.06 * t,
-          _DetailCard(
-            product: product,
-            trait: widget.traits[product.id],
-            interactive: false,
+          SizedBox(
+            width: detailW,
+            child: _DetailCard(product: product, trait: widget.trait, interactive: false),
           ),
         );
-      case _Phase.idle:
-      case _Phase.detail:
-        return const SizedBox.shrink();
+      case _FlipPhase.landed:
+        return SizedBox(
+          width: detailW,
+          child: _DetailCard(product: product, trait: widget.trait, interactive: false),
+        );
     }
   }
 
@@ -261,6 +380,28 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard>
         ..rotateY(angle)
         ..scaleByDouble(scale, scale, scale, 1),
       child: child,
+    );
+  }
+}
+
+/// 牌背（v4 新增）：照开场动画翻牌帧做的美术图——深紫星空牌背、金雕花框、
+/// 月牙四角、中央发光星座椭圆，背后一对金翅膀。
+/// 坑：美术图本身**没有背景**（透明底，hx 23:33 定稿：不要紫云、不要放射光、
+/// 连纯色底都不要，只要翅膀 + 卡片 + 小星星），所以这里绝不能套圆角裁剪或
+/// 矩形阴影——那会把透明区框出一块假底色；整图按原画幅 contain 摆正即可，
+/// 透明处直接透出全屏层的深紫舞台底。
+class _BackFace extends StatelessWidget {
+  const _BackFace({required this.width, required this.height});
+
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Image.asset('assets/images/fate_card_back.webp', fit: BoxFit.contain),
     );
   }
 }
@@ -345,24 +486,77 @@ Widget _productArt(Product product, {required BoxFit fit}) {
 
 /// 第一阶段的小卡：竖版，淡紫牌框 + 内圈细线 + 角上小星，
 /// 牌面只有商品图和名字（hx 口径：纯粹展示商品，不堆细节）。
+/// 判断标签的短词：服务端特点句格式是「短词，整句」（如「口碑最好，评分 4.8」），
+/// 逗号前不超过 5 个字才算短词；没有短词（空特点）就不挂缎带。
+/// 与 _DetailCard 的拆分口径保持一致。
+String? _traitPill(String? trait) {
+  final t = trait;
+  if (t == null || t.isEmpty) return null;
+  final idx = t.indexOf('，');
+  if (idx > 0 && idx <= 5) return t.substring(0, idx);
+  return null;
+}
+
+/// 卡面顶部中央的判断标签缎带：深紫胶囊 + 金边，半挂在卡沿上。
+/// 输入短词与字号（小卡和全屏小卡脸共用，字号不同）；输出胶囊组件。
+Widget _traitRibbon(String text, {required double fontSize}) {
+  return Container(
+    padding: EdgeInsets.symmetric(
+      horizontal: AppScale.s(8),
+      vertical: AppScale.s(2.5),
+    ),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFF6E46C8), Color(0xFF8F66E0)],
+      ),
+      borderRadius: BorderRadius.circular(AppScale.s(999)),
+      border: Border.all(color: const Color(0xFFE9CE8C), width: 1),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFF6E46C8).withValues(alpha: 0.35),
+          blurRadius: 6,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: AppScale.t(fontSize),
+        fontWeight: FontWeight.w800,
+        color: Colors.white,
+        letterSpacing: 0.5,
+      ),
+    ),
+  );
+}
+
 class _MiniCard extends StatelessWidget {
   const _MiniCard({
     required this.product,
+    this.trait,
     required this.width,
     required this.height,
     required this.onTap,
   });
 
   final Product product;
+
+  /// 服务端算好的特点句；短词部分挂成卡面顶部的判断标签缎带。
+  final String? trait;
   final double width;
   final double height;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final pill = _traitPill(trait);
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
         width: width,
         height: height,
         padding: EdgeInsets.all(AppScale.s(6)),
@@ -412,6 +606,15 @@ class _MiniCard extends StatelessWidget {
             ],
           ),
         ),
+          ),
+          if (pill != null)
+            Positioned(
+              top: -AppScale.s(9),
+              left: 0,
+              right: 0,
+              child: Center(child: _traitRibbon(pill, fontSize: 9.5)),
+            ),
+        ],
       ),
     );
   }
@@ -420,15 +623,22 @@ class _MiniCard extends StatelessWidget {
 /// 变身第一转的前半张脸：小卡脸的放大版（与小卡同款式），
 /// 转过半圈后换成幻想脸，观众只会觉得同一张牌在变身。
 class _MiniFace extends StatelessWidget {
-  const _MiniFace({required this.product, required this.width, required this.height});
+  const _MiniFace({required this.product, this.trait, required this.width, required this.height});
 
   final Product product;
+
+  /// 与小卡同一条特点句：变身第一张脸继续挂缎带，免得标签凭空消失。
+  final String? trait;
   final double width;
   final double height;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final pill = _traitPill(trait);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
       width: width,
       height: height,
       padding: EdgeInsets.all(AppScale.s(12)),
@@ -462,6 +672,15 @@ class _MiniFace extends StatelessWidget {
           ),
         ],
       ),
+        ),
+        if (pill != null)
+          Positioned(
+            top: -AppScale.s(11),
+            left: 0,
+            right: 0,
+            child: Center(child: _traitRibbon(pill, fontSize: 12)),
+          ),
+      ],
     );
   }
 }

@@ -13,6 +13,7 @@ import '../widgets/click_effect/app_pressable.dart';
 import '../widgets/notification_sheet.dart';
 import '../widgets/sparkle_background.dart';
 import '../widgets/xiaodou_agent_card.dart';
+import 'ai_community_page.dart';
 import 'orders_sheet.dart';
 import 'support_chat_page.dart';
 import 'xiaodou_chat_page.dart';
@@ -129,6 +130,22 @@ class _MessagesPageState extends State<MessagesPage> {
                   subtitle: support.latestSupportPreview ?? '有问题随时找客服',
                   badgeCount: support.supportUnreadTotal,
                   onTap: () => SupportChatPage.openGeneral(context),
+                ),
+                SizedBox(height: AppScale.s(10)),
+                // AI 社区是固定入口行（hx 2026-11-26 要求加在客服中心下面）：
+                // 角标 = 我的帖子未读回复数（UserProvider.communityUnreadReplies，
+                // 服务端口径：只算他人评论、不算点赞与本人评论；进社区页即清零）。
+                // 副标题是固定文案，不冒充最新帖子预览。点击直达社区页，与
+                // 「我的」页里 AI 社区入口同一个目的地。
+                _EntryRow(
+                  icon: Icons.groups_outlined,
+                  imageAsset: 'assets/images/icon_pf_community.png',
+                  title: 'AI 社区',
+                  subtitle: '看看同担们都在聊什么',
+                  badgeCount: user.communityUnreadReplies,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const AiCommunityPage()),
+                  ),
                 ),
                 // 小豆提醒是条件行：没有待办事项时整行不显示、不占位，
                 // 角标就是事项数（与底部导航消息角标的口径一致）。

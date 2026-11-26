@@ -54,7 +54,7 @@ const _metas = <MemberBenefitKind, _BenefitMeta>{
     label: '每月赠券',
     iconPath: 'assets/images/icon_pf_monthly_coupon.png',
     tagline: '每月 1 张会员专属券，领了当月用',
-    valueText: '满99减20',
+    valueText: '满88减20',
     rules: [
       'VIP2 及以上会员每月可领 1 张，跨月自动恢复可领。',
       '领到的券在「我的优惠券」里，结算时选用即可抵扣。',
@@ -313,7 +313,7 @@ class _MemberBenefitPageState extends State<MemberBenefitPage> {
                   ],
                 ),
               ),
-              Text('满99可用', style: FeaturePageStyle.caption()),
+              Text('满88可用', style: FeaturePageStyle.caption()),
             ],
           ),
           SizedBox(width: AppScale.s(16)),

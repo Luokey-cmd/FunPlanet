@@ -54,6 +54,10 @@ class _NotificationPageState extends State<_NotificationPage> {
             return Center(child: Text('暂无消息', style: FeaturePageStyle.empty()));
           }
           return ListView.separated(
+            // padding 显式归零：不写时 ListView 会自带一份顶部安全区
+            // 留白，和页面外框的间距叠加，列表顶部会空出一大截
+            // （与订单列表修过的同款毛病）。
+            padding: EdgeInsets.zero,
             itemCount: user.notifications.length,
             separatorBuilder: (_, _) => Divider(color: AppColors.border, height: AppScale.s(16)),
             itemBuilder: (context, index) {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 
@@ -9,6 +10,7 @@ import '../models/agent_records.dart';
 import '../models/chat_message.dart';
 import '../models/xiaodou_chat_session.dart';
 import '../services/xiaodou_chat_history_storage.dart';
+import '../services/user_cloud_api_service.dart';
 import '../services/xiaodou_chat_service.dart';
 
 class XiaodouChatProvider extends ChangeNotifier {
@@ -106,6 +108,15 @@ class XiaodouChatProvider extends ChangeNotifier {
     notifyListeners();
 
     final assistantIndex = _messages.length - 1;
+    // 照片落盘用的压缩副本异步备好：原图最大 4MB，整份会话记录
+    // 存在一份 JSON 里，原图 base64 塞进去会撑爆，所以存档只收
+    // 压缩副本（最长边 512，见 _compressImageForStorage）。下面发
+    // 服务端的请求用的仍是原图字节（本方法开头捕获的 imageBytes，
+    // 副本替换只动消息列表、不动这个局部变量），看图质量不受影响。
+    final userIndex = assistantIndex - 1;
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      unawaited(_shrinkMessageImage(userIndex, imageBytes));
+    }
 
     try {
       final history = _messages.where((m) => !m.isLoading).toList();
@@ -187,7 +198,10 @@ class XiaodouChatProvider extends ChangeNotifier {
             }
           case XiaodouStreamKind.options:
             // 提问选项挂到这条回复上，页面在气泡下方渲染成按钮。
-            if (event.options.isNotEmpty) {
+            // 分组选项（optionSet）优先：有它就走分组渲染，单组 options 照旧。
+            if (event.optionSet != null) {
+              _messages[assistantIndex] = current.copyWith(optionSet: event.optionSet);
+            } else if (event.options.isNotEmpty) {
               _messages[assistantIndex] = current.copyWith(options: event.options);
             }
           case XiaodouStreamKind.cart:
@@ -209,6 +223,11 @@ class XiaodouChatProvider extends ChangeNotifier {
               isLoading: false,
               giftNote: event.content,
             );
+          case XiaodouStreamKind.couponChoices:
+            // 可领券清单：整卡挂到这条回复上，领取状态后续原地更新。
+            if (event.couponChoices.isNotEmpty) {
+              _messages[assistantIndex] = current.copyWith(couponChoices: event.couponChoices);
+            }
         }
         notifyListeners();
       }
@@ -258,13 +277,79 @@ class XiaodouChatProvider extends ChangeNotifier {
     }
   }
 
+  // 照片存档副本的最长边：聊天气泡里照片显示宽度约 200 逻辑像素，
+  // 512 覆盖高清屏 2 倍采样还留余量，肉眼看不出糊；再大只是白白
+  // 撑大存档 JSON。编码用 PNG 无损——512 尺寸下体积只有几十 KB，
+  // 且 dart:ui 直接支持、不引第三方压缩包。
+  static const int _storedImageMaxEdge = 512;
+
+  /// 给指定下标的用户消息备一份压缩副本并换上，然后触发一次存档，
+  /// 让会话记录里存的是小图而不是原图。
+  ///
+  /// 输入：消息下标 + 原图字节。输出：无（副作用是替换消息并存档）。
+  /// 坑与取舍：压缩失败、或期间列表已被清空/重开对话导致对不上号，
+  /// 一律静默放弃——这张图就不落盘，但发送与回复流程分毫不受影响；
+  /// 已经比原图小的字节原样保留，不重复编码。换图只认内容签名
+  /// （长度+首尾字节），不靠下标硬认，防止流式回复期间下标漂移认
+  /// 错消息（用户消息在发送期间不会被改动，签名足够可靠）。
+  Future<void> _shrinkMessageImage(int index, Uint8List original) async {
+    final small = await _compressImageForStorage(original);
+    if (small == null || small.length >= original.length) return;
+    if (index < 0 || index >= _messages.length) return;
+    final current = _messages[index];
+    if (current.role != ChatRole.user || !_sameBytes(current.imageBytes, original)) return;
+    _messages[index] = current.copyWith(imageBytes: small);
+    await _persistCurrentSession();
+  }
+
+  /// 把图片字节缩到最长边 [_storedImageMaxEdge] 并以 PNG 重新编码；
+  /// 本来就不超边时直接返回原字节。解码/编码任何一步失败返回 null，
+  /// 调用方按「不落盘」处理。
+  Future<Uint8List?> _compressImageForStorage(Uint8List bytes) async {
+    ui.Image? image;
+    try {
+      final codec = await ui.instantiateImageCodec(
+        bytes,
+        targetWidth: _storedImageMaxEdge,
+        targetHeight: _storedImageMaxEdge,
+      );
+      final frame = await codec.getNextFrame();
+      image = frame.image;
+      // 两条边都没超：不用重编码（PNG 重编码可能反而比原图大）。
+      if (image.width <= _storedImageMaxEdge && image.height <= _storedImageMaxEdge) {
+        return bytes;
+      }
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      return data?.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    } finally {
+      image?.dispose();
+    }
+  }
+
+  /// 轻量字节签名比对：整段逐字节比对太贵，长度 + 首尾各 16 字节
+  /// 足以区分「还是不是当初那张图」（选图字节来自同一份内存数据）。
+  bool _sameBytes(Uint8List? a, Uint8List b) {
+    if (a == null || a.length != b.length) return false;
+    final head = a.length < 16 ? a.length : 16;
+    for (var i = 0; i < head; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    for (var i = 1; i <= head; i++) {
+      if (a[a.length - i] != b[b.length - i]) return false;
+    }
+    return true;
+  }
+
   // 点提问选项 = 用选项文字替用户发一句。先把这组选项标记用过
   // （整组撤掉、防重复点），再走正常发送流程；发送中直接忽略。
   Future<void> chooseOption(int messageIndex, String text) async {
     if (_sending) return;
     if (messageIndex < 0 || messageIndex >= _messages.length) return;
     final target = _messages[messageIndex];
-    if (target.options.isEmpty || target.optionsUsed) return;
+    // 分组选项的消息 options 是空的、答案在 optionSet 里，同样放行。
+    if ((target.options.isEmpty && target.optionSet == null) || target.optionsUsed) return;
     _messages[messageIndex] = target.copyWith(optionsUsed: true);
     notifyListeners();
     await send(text);
@@ -425,6 +510,69 @@ class XiaodouChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 点券卡上的「领取」：走领券中心同款接口领这一组，领完把卡片
+  /// 那行翻成已领取；失败把原因写回那一行（要开会员的翻成会员态、
+  /// 其实已领过的翻成已领取）。返回是否领成，页面据此刷新券包。
+  Future<bool> claimCouponChoice(int msgIndex, String group) async {
+    if (msgIndex < 0 || msgIndex >= _messages.length) return false;
+    final message = _messages[msgIndex];
+    final at = message.couponChoices.indexWhere((c) => c.group == group);
+    if (at < 0) return false;
+    final choice = message.couponChoices[at];
+    if (choice.status != 'claimable') return false;
+    _patchCouponChoice(msgIndex, choice.copyWith(status: 'claiming', clearFailReason: true));
+    try {
+      final api = UserCloudApiService();
+      switch (group) {
+        case 'newcomer':
+          await api.claimNewcomer();
+        case 'member_monthly':
+          await api.claimMemberMonthly();
+        case 'center':
+          await api.claimCenter();
+        case 'center_200':
+          await api.claimCenter200();
+        case 'center_300':
+          await api.claimCenter300();
+        default:
+          throw Exception('这张券不能在这里领');
+      }
+      _patchCouponChoice(
+        msgIndex,
+        choice.copyWith(status: 'claimed', statusText: '已领取', clearFailReason: true),
+      );
+      return true;
+    } catch (e) {
+      final reason = e.toString().replaceFirst('Exception: ', '');
+      if (reason.contains('开通会员')) {
+        _patchCouponChoice(
+          msgIndex,
+          choice.copyWith(status: 'member', statusText: '开通 VIP2 后可领', clearFailReason: true),
+        );
+      } else if (reason.contains('已领取')) {
+        _patchCouponChoice(
+          msgIndex,
+          choice.copyWith(status: 'claimed', statusText: '已领取', clearFailReason: true),
+        );
+      } else {
+        _patchCouponChoice(msgIndex, choice.copyWith(status: 'claimable', failReason: reason));
+      }
+      return false;
+    }
+  }
+
+  void _patchCouponChoice(int msgIndex, CouponChoice next) {
+    if (msgIndex < 0 || msgIndex >= _messages.length) return;
+    final message = _messages[msgIndex];
+    final list = List<CouponChoice>.from(message.couponChoices);
+    final at = list.indexWhere((c) => c.group == next.group);
+    if (at < 0) return;
+    list[at] = next;
+    _messages[msgIndex] = message.copyWith(couponChoices: list);
+    _persistCurrentSession();
+    notifyListeners();
+  }
+
   Future<void> startNewChat() async {
     if (_sending) return;
     await _persistCurrentSession();
@@ -445,6 +593,9 @@ class XiaodouChatProvider extends ChangeNotifier {
       ..addAll(target.messages.map((m) => ChatMessage(
             role: m.role,
             content: m.content,
+            // 照片已随存档落盘，重建时必须一并带回，漏了它从历史
+            // 列表点开旧对话照片照样不显示（本批修复的主场景之一）。
+            imageBytes: m.imageBytes,
             products: List<Product>.from(m.products),
             starRoles: List<String>.from(m.starRoles),
             giftNote: m.giftNote,

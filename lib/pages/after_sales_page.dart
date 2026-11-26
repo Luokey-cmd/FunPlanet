@@ -79,6 +79,9 @@ class _AfterSalesPageState extends State<AfterSalesPage> {
             onRefresh: _reload,
             color: AppColors.primary,
             child: ListView.separated(
+              // padding 显式归零：不写时 ListView 会自带一份顶部安全区
+              // 留白，和页面外框的间距叠加，列表顶部会空出一大截。
+              padding: EdgeInsets.zero,
               physics: const AlwaysScrollableScrollPhysics(),
               itemCount: list.length,
               separatorBuilder: (_, _) => SizedBox(height: AppScale.s(12)),

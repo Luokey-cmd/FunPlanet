@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { APP_KNOWLEDGE } from './app-knowledge.js';
 import { chatCompletion } from './deepseek.js';
 import { streamXiaodouAgent } from './utils/xiaodou-agent.js';
+import { markDailyTaskDone } from './utils/daily-tasks.js';
 import { drawStarCardsBatch } from './utils/xiaodou-tools.js';
 import { chatCompletionRaw } from './utils/openai-compatible.js';
 import { prisma } from './db.js';
@@ -288,6 +289,7 @@ app.post('/api/chat', authRequired, async (req, res) => {
       userText: lastUser?.content ?? '',
       assistantText: reply,
     });
+    await markDailyTaskDone(req.user?.sub, 'dailyChatDone');
   } catch (error) {
     log.error('小豆', '普通对话回复失败', error);
     res.status(500).json({ code: 500, message: error.message || '对话失败', data: null });
@@ -353,10 +355,14 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
         res.write(`data: ${JSON.stringify({ type: 'actions', action: event.action })}\n\n`);
       } else if (event.type === 'homework') {
         res.write(`data: ${JSON.stringify({ type: 'homework', entry: event.entry })}\n\n`);
+      } else if (event.type === 'coupon_choices') {
+        // 可领券清单卡：每行带「领取」按钮、用户自己点（只列不代领）；
+        // 与提问选项同口径，只活在本次会话里、不落云端聊天记录。
+        res.write(`data: ${JSON.stringify({ type: 'coupon_choices', groups: event.groups ?? [] })}\n\n`);
       } else if (event.type === 'options') {
         // 提问选项：这一轮以问句收尾时随正文下发的短回答按钮，
         // App 渲染在气泡下方，点了就当用户回复；不落库。
-        res.write(`data: ${JSON.stringify({ type: 'options', options: event.options ?? [] })}\n\n`);
+        res.write(`data: ${JSON.stringify({ type: 'options', options: event.options ?? [], ...(event.optionSet ? { optionSet: event.optionSet } : {}) })}\n\n`);
       } else if (event.type === 'cart_confirm') {
         res.write(`data: ${JSON.stringify({ type: 'cart_confirm', products: event.products })}\n\n`);
       } else if (event.type === 'appraisal') {
@@ -379,6 +385,7 @@ app.post('/api/chat/stream', authRequired, async (req, res) => {
         userText: lastUserText,
         assistantText: assistantFullText,
       });
+      await markDailyTaskDone(req.user?.sub, 'dailyChatDone');
       if (recommendedProducts.length > 0) {
         await recordGuideRecommendations({
           userId: req.user?.sub,

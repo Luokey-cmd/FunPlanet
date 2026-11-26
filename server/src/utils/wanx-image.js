@@ -21,11 +21,12 @@ export function formatWanxErrorMessage(message) {
   return text;
 }
 
+// 提示词预处理（2026-11-26 修正）：只做去空白，不再强制加「儿童绘本插画，温馨治愈」前缀。
+// 旧版给每张图套同一句画风，结果用户选什么风格出来的都一个味；
+// 内容安全靠 buildWanxParameters 的负面词 + 平台自身的审核拦截，不再靠改画风实现。
+// 函数保留是为了不动 routes/ai.js 之外的调用面，进出都是同一段文本。
 export function wrapSafePaintPrompt(prompt) {
-  const text = String(prompt ?? '').trim();
-  if (!text) return text;
-  if (text.startsWith('儿童绘本插画')) return text;
-  return `儿童绘本插画，画面温馨治愈、健康积极，${text}`;
+  return String(prompt ?? '').trim();
 }
 
 function isContentBlockedError(message) {
@@ -55,8 +56,10 @@ function buildWanxParameters(model, size) {
   };
 
   if (!modelName.includes('2.7') && !isWanx27Model(modelName)) {
-    parameters.prompt_extend = true;
-    parameters.negative_prompt = '暴力，血腥，低俗，裸露，恐怖，畸形，写实人体';
+    // 自动扩写关掉：平台扩写会把每个人的描述润色成同一种审美，图容易撞脸；
+    // 关掉后模型直接按用户原话 + 所选风格前缀生成，差异和可控性都更好。
+    parameters.prompt_extend = false;
+    parameters.negative_prompt = '暴力，血腥，低俗，裸露，恐怖，畸形，低质量，模糊，水印';
   }
 
   return parameters;

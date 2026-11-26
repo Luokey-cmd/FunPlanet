@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/product_data.dart';
 import '../providers/app_tab_provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
-import '../providers/product_catalog_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../utils/snackbar_utils.dart';
@@ -54,24 +54,39 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _claimNewcomer(UserProvider user) {
-    if (user.newcomerClaimed) {
+  // 首页会员每日礼包卡的按钮四态（顺序不能乱）：
+  // 1. 未登录 → 先引导登录。App 本身没有游客模式（AuthGate 会拦），
+  //    这里是会话失效时的兜底提示，不自创登录页跳转。
+  // 2. 今日已领 → 跳我的优惠券看礼包券（与原新人券已领的跳法一致）。
+  // 3. 非会员 → 弹会员专享提示（去开通会员），绝不能领到。
+  // 4. 会员未领 → 真领，三件到账后弹成功提示说清领到了什么。
+  void _claimMemberDailyGift(UserProvider user) {
+    final auth = context.read<AuthProvider>();
+    if (!auth.isLoggedIn) {
+      showTopSnackBar(
+        context,
+        content: Text('请先登录，再来领取会员每日礼包', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+      );
+      return;
+    }
+    if (user.memberDailyGiftClaimedToday) {
       UserFeatureSheets.showCoupons(context);
       return;
     }
-    if (user.claimNewcomerCoupon()) {
+    if (user.vipLevel < memberTargetVipLevel) {
+      UserFeatureSheets.showMemberDailyGiftLockedDialog(context);
+      return;
+    }
+    if (user.claimMemberDailyGift()) {
       showTopSnackBar(
         context,
-        content: Text('领取成功！新人优惠券已放入账户', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+        content: Text('领取成功！积分 +10、趣玩币 +5、满30减5礼包券已放入账户', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // watch 目录状态：断网顶上本地缓存时要在首页顶部出提示条，
-    // 顺带让目录数据刷新时首页跟着重建（原来只靠轮播图组件 watch）。
-    final catalog = context.watch<ProductCatalogProvider>();
     final marketItems = productsByMarketTab(_marketTab, rankingSub: _rankingSub);
     return RepaintBoundary(
       child: SparkleBackground(
@@ -79,35 +94,11 @@ class _HomePageState extends State<HomePage> {
           physics: const ClampingScrollPhysics(),
           slivers: [
             const SliverToBoxAdapter(child: HomeTopBar()),
-            if (catalog.showStaleHint)
-              SliverToBoxAdapter(
-                child: Container(
-                  margin: EdgeInsets.fromLTRB(AppScale.s(16), AppScale.s(10), AppScale.s(16), 0),
-                  padding: EdgeInsets.symmetric(horizontal: AppScale.s(12), vertical: AppScale.s(8)),
-                  decoration: BoxDecoration(
-                    color: AppColors.muted,
-                    borderRadius: BorderRadius.circular(AppScale.s(10)),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.cloud_off_outlined, size: AppScale.s(15), color: AppColors.mutedForeground),
-                      SizedBox(width: AppScale.s(6)),
-                      Expanded(
-                        child: Text(
-                          '未连上服务端，正在显示上次打开时的数据',
-                          style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
             const SliverToBoxAdapter(child: BannerCarousel()),
             SliverToBoxAdapter(child: SizedBox(height: AppScale.s(12))),
             const SliverToBoxAdapter(child: _QuickActions()),
             SliverToBoxAdapter(child: SizedBox(height: AppScale.s(20))),
-            SliverToBoxAdapter(child: _NewcomerSection(onClaim: _claimNewcomer)),
+            SliverToBoxAdapter(child: _MemberGiftSection(onClaim: _claimMemberDailyGift)),
             SliverToBoxAdapter(child: SizedBox(height: AppScale.s(24))),
             SliverToBoxAdapter(
               child: _MarketHeader(tab: _marketTab, onSelect: _selectMarketTab),
@@ -232,8 +223,10 @@ class _QuickActions extends StatelessWidget {
   }
 }
 
-class _NewcomerSection extends StatelessWidget {
-  const _NewcomerSection({required this.onClaim});
+// 首页会员每日礼包卡（旧名 _NewcomerSection：以前挂着会员专享的标题、
+// 领的却是新人券包，2026-11-26 改成真礼包后随名一起正过来）。
+class _MemberGiftSection extends StatelessWidget {
+  const _MemberGiftSection({required this.onClaim});
 
   final void Function(UserProvider) onClaim;
 
@@ -288,7 +281,7 @@ class _NewcomerSection extends StatelessWidget {
                     ),
                     Flexible(
                       child: Text(
-                        ' · 登录领取每日惊喜礼包',
+                        ' · VIP2 每日可领一份',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -311,18 +304,20 @@ class _NewcomerSection extends StatelessWidget {
                             height: AppScale.s(72),
                             child: Row(
                               children: [
-                                _BenefitMiniCard(iconPath: memberBenefitIconPaths['coupon']!, value: '¥ 5', label: '新人券包'),
+                                // 三格就是礼包真发的三件，一件不多写：
+                                // 礼包券（满30减5）/ 趣玩币 +5 / 积分 +10。
+                                _BenefitMiniCard(iconPath: memberBenefitIconPaths['coupon']!, value: '¥ 5', label: '礼包券'),
                                 SizedBox(width: AppScale.s(8)),
-                                _BenefitMiniCard(iconPath: memberBenefitIconPaths['coins']!, value: '10', label: '积分奖励'),
+                                _BenefitMiniCard(iconPath: memberBenefitIconPaths['coins']!, value: '5', label: '趣玩币'),
                                 SizedBox(width: AppScale.s(8)),
-                                _BenefitMiniCard(iconPath: memberBenefitIconPaths['gift']!, label: '专属抽奖', iconSize: 31.2),
+                                _BenefitMiniCard(iconPath: memberBenefitIconPaths['gift']!, value: '10', label: '积分奖励', iconSize: 31.2),
                               ],
                             ),
                           ),
                         ),
                         SizedBox(width: AppScale.s(6)),
                         _MemberBenefitAction(
-                          claimed: user.newcomerClaimed,
+                          claimed: user.memberDailyGiftClaimedToday,
                           onTap: () => onClaim(user),
                         ),
                       ],
@@ -489,12 +484,15 @@ class _MemberBenefitAction extends StatelessWidget {
               child: Container(
                 height: buttonHeight,
                 decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
+                  // 已领取态置灰：不用渐变、换成淡灰紫实色，和可领状态一眼分开；
+                  // 点击行为不变（已领点按跳我的优惠券，在页面回调里处理）。
+                  gradient: claimed ? null : AppColors.primaryGradient,
+                  color: claimed ? AppColors.mutedForeground.withValues(alpha: 0.45) : null,
                   borderRadius: BorderRadius.circular(AppScale.s(999)),
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  claimed ? '前往查看' : '立即领取',
+                  claimed ? '已领取' : '立即领取',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: AppScale.t(13),

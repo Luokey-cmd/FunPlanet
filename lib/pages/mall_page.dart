@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/product_data.dart';
@@ -26,7 +28,40 @@ class MallPage extends StatefulWidget {
 class _MallPageState extends State<MallPage> {
   String _activeCategory = 'all';
 
-  List<Product> get _filtered => productsByCategory(_activeCategory);
+  // 商城综合排序（2026-11-26 hx 拍板：销量为主 + 新品加权）：
+  // 分数 = 0.7 × 销量分 + 0.3 × 新品分。
+  // 销量分 = ln(销量+1) ÷ ln(本列表最高销量+1)：全店销量差距悬殊
+  // （最高 8569、中位只有 197），直接比销量会让几个老爆款焊死榜首；
+  // 取对数压平后爆款仍在前排，又不至于整屏都是老货。
+  // 新品分 = 商品编号 ÷ 本列表最大编号：编号越新分越高，
+  // 让新系列的商品穿插进前几屏。同分时编号大的在前，保证顺序稳定。
+  List<Product> get _filtered {
+    final list = List<Product>.of(productsByCategory(_activeCategory));
+    if (list.length < 2) return list;
+    var maxSales = 0;
+    var maxId = 0;
+    for (final p in list) {
+      if (p.sales > maxSales) maxSales = p.sales;
+      final n = _idNum(p.id);
+      if (n > maxId) maxId = n;
+    }
+    final maxLog = math.log(maxSales + 1);
+    double score(Product p) {
+      final salesPart = maxLog > 0 ? math.log(p.sales + 1) / maxLog : 0.0;
+      final newPart = maxId > 0 ? _idNum(p.id) / maxId : 0.0;
+      return 0.7 * salesPart + 0.3 * newPart;
+    }
+
+    list.sort((a, b) {
+      final byScore = score(b).compareTo(score(a));
+      return byScore != 0 ? byScore : _idNum(b.id).compareTo(_idNum(a.id));
+    });
+    return list;
+  }
+
+  // 商品编号取数字部分（p123 → 123），取不到按 0 算。
+  static int _idNum(String id) =>
+      int.tryParse(id.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 
   void _claimCoupon(UserProvider user) {
     if (user.newcomerClaimed) return;
@@ -40,6 +75,17 @@ class _MallPageState extends State<MallPage> {
 
   @override
   Widget build(BuildContext context) {
+    // 首页分类小按钮带过来的待选分类：读到就选中它（效果与在本页点
+    // 那个分类按钮一致），并在本帧结束后清掉记号，免得之后每次重建
+    // 都被强行拨回这个分类（hx 2026-11-26：首页小按钮与商城同效）。
+    final tabProvider = context.watch<AppTabProvider>();
+    final pendingCategory = tabProvider.pendingMallCategory;
+    if (pendingCategory != null) {
+      _activeCategory = pendingCategory;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        tabProvider.clearPendingMallCategory();
+      });
+    }
     return SparkleBackground(
       child: CustomScrollView(
         slivers: [

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/product_data.dart';
 import '../pages/search_page.dart';
+import '../providers/app_tab_provider.dart';
 import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
@@ -115,7 +116,10 @@ class HomeTopBar extends StatelessWidget {
                 chipHorizontalPadding: 18.5,
                 chipVerticalPadding: 3.9,
                 barHeight: 33.8,
-                onSelected: (cat) => SearchPage.open(context, initialQuery: cat.name),
+                // 与商城页的分类按钮同效（hx 2026-11-26 定）：跳商城并
+                // 选中同名分类，不再拿分类名去跳搜索页。
+                onSelected: (cat) =>
+                    context.read<AppTabProvider>().goToMallCategory(cat.id),
               ),
             ],
           ),

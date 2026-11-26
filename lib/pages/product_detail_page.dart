@@ -16,6 +16,8 @@ import '../widgets/product_thumbnail.dart';
 import '../widgets/staggered_product_grid.dart';
 import '../widgets/sparkle_background.dart';
 import '../services/review_api_service.dart';
+import '../services/share_service.dart';
+import 'package:flutter/services.dart';
 import '../widgets/product_review_card.dart';
 import 'checkout_page.dart';
 import 'image_preview_page.dart';
@@ -452,19 +454,28 @@ class _TopChrome extends StatelessWidget {
   final int activeAnchor;
   final void Function(int index) onAnchorTap;
 
-  void _share(BuildContext context) {
-              final user = context.read<UserProvider>();
-              if (user.completeDailyShare()) {
-                showTopSnackBar(
-                  context,
-                  content: Text('分享成功，获得 20 趣玩币', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-                );
-              } else {
-                showTopSnackBar(
-                  context,
-                  content: Text('已分享「${product.name}」', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-                );
-              }
+  // 分享：先拉起系统分享面板（MainActivity 的 funplanet/share 通道），
+  // 面板真的弹出来才算完成每日分享任务；没有通道的平台兜底复制文案。
+  Future<void> _share(BuildContext context) async {
+    final text = '我在趣玩星球发现了「${product.name}」，¥${_priceText(product.effectivePrice)}，快来看看！';
+    final shown = await ShareService.shareText(text);
+    if (!context.mounted) return;
+    if (!shown) {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (!context.mounted) return;
+    }
+    final user = context.read<UserProvider>();
+    if (user.completeDailyShare()) {
+      showTopSnackBar(
+        context,
+        content: Text(shown ? '分享成功，获得 20 趣玩币' : '文案已复制，分享任务完成，获得 20 趣玩币', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+      );
+    } else {
+      showTopSnackBar(
+        context,
+        content: Text(shown ? '已分享「${product.name}」' : '文案已复制，去粘贴给朋友吧', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+      );
+    }
   }
 
   @override

@@ -65,4 +65,21 @@ class AiCommunityService {
   Future<void> deletePost(String postId) async {
     await _client.delete('/api/ai-community/posts/$postId', auth: true);
   }
+
+  /// 我的帖子未读回复数（消息页 AI 社区行与底部导航角标用）。
+  /// 口径在服务端：只算评论不算点赞、排除本人评论；首次查询服务端会先立
+  /// 已读标记再返 0，不会把历史回复倒灌成未读。解析不出数字时按 0 处理，
+  /// 角标宁可不亮也不能乱亮。
+  Future<int> fetchUnreadReplyCount() async {
+    final data = await _client.get('/api/ai-community/unread-replies', auth: true);
+    final count = data['unreadCount'];
+    return count is int ? count : 0;
+  }
+
+  /// 标已读：进社区页时调，服务端把已读标记推到当前时间并返回 0。
+  Future<int> markRepliesRead() async {
+    final data = await _client.post('/api/ai-community/unread-replies/read', {}, auth: true);
+    final count = data['unreadCount'];
+    return count is int ? count : 0;
+  }
 }

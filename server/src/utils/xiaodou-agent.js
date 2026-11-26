@@ -7,6 +7,7 @@ import { chatCompletionRaw, streamChatEvents, streamChatText } from './openai-co
 import { analyzeShoppingImage, formatVisionHint, formatImageQuestionHint } from './xiaodou-vision.js';
 import {
   executeXiaodouTool,
+  getSeriesDirectory,
   MAJOR_CATEGORIES,
   toolResultForModel,
   XIAODOU_TOOLS,
@@ -152,7 +153,7 @@ export async function searchProductsForAgent(keyword, limit = KEYWORD_LIMIT) {
     ]);
     if (categoryProducts.length > 0) {
       return {
-        products: categoryProducts.map(serializeProduct),
+        products: categoryProducts.map((p) => serializeProduct(p)),
         totalCount,
         categoryLabel: majorCategory,
       };
@@ -175,7 +176,7 @@ export async function searchProductsForAgent(keyword, limit = KEYWORD_LIMIT) {
 
   if (products.length > 0) {
     return {
-      products: products.map(serializeProduct),
+      products: products.map((p) => serializeProduct(p)),
       totalCount: products.length,
       categoryLabel: detectMajorCategory(value) ?? '',
     };
@@ -196,7 +197,7 @@ export async function searchProductsForAgent(keyword, limit = KEYWORD_LIMIT) {
       ]);
       if (categoryProducts.length > 0) {
         return {
-          products: categoryProducts.map(serializeProduct),
+          products: categoryProducts.map((p) => serializeProduct(p)),
           totalCount,
           categoryLabel: tokenCategory,
         };
@@ -217,7 +218,7 @@ export async function searchProductsForAgent(keyword, limit = KEYWORD_LIMIT) {
     });
     if (partial.length > 0) {
       return {
-        products: partial.map(serializeProduct),
+        products: partial.map((p) => serializeProduct(p)),
         totalCount: partial.length,
         categoryLabel: tokenCategory ?? '',
       };
@@ -229,7 +230,19 @@ export async function searchProductsForAgent(keyword, limit = KEYWORD_LIMIT) {
 
 // 小豆话术的总开关：奇幻味只在身份/闲聊场景放一点，正经问题一律干货。
 // 以前写死「一句画面+一句理由+一句邀请」，逼得每答都写散文，2026-11-20 hx 定规矩后改成分场景。
-function agentSystemPrompt(starwish) {
+// 店内系列清单段落（服务端按商品数据实时汇总，见 xiaodou-tools 的
+// getSeriesDirectory）：小豆问系列/角色时只能从这份清单里选，
+// 清单外不许编。清单为空（查库失败）时整段不注入，行为退回从前。
+function seriesDirectorySection(seriesText) {
+  if (!seriesText) return '';
+  return (
+    '## 店内系列清单（实时汇总，问系列时照这份给）\n' +
+    `${seriesText}\n` +
+    '规矩：用户想买某个品类、你问他想要哪个系列或角色时，只能从上面这份清单里该品类那一行选，有几个给几个（这类问题选项可以超过 4 个）；清单里没有的系列、角色不许编，也不许只给自己顺手翻到的两三个。\n\n'
+  );
+}
+
+function agentSystemPrompt(starwish, seriesText = '') {
   const archive = starwish
     ? `当前用户偏好档案：${JSON.stringify(starwish)}。推荐时参考其中的预算与用途，不要盘问已经知道的事。`
     : '用户尚未填写偏好档案。需要时一次只问一个问题。';
@@ -244,6 +257,7 @@ function agentSystemPrompt(starwish) {
       '会员等级、积分、优惠券只认工具返回的数据，没查到不要假设用户是任何等级。\n' +
       '不许对用户提「工具、接口、系统提示、预设规则」这些内部词；被问到能不能联网、有没有深度思考时，不要讲原理，用一句人话带过，并落到你能帮他做的事上。\n' +
       `${archive}\n\n` +
+      seriesDirectorySection(seriesText) +
       '## 导购规则\n' +
       '1. 闲聊正常答，不搜货，不把话题强行拐去卖货。\n' +
       '2. App 用法、VIP、券：get_promotions / get_user_context。\n' +
@@ -266,7 +280,7 @@ function agentSystemPrompt(starwish) {
 // 这份多出「三样本事自己判断用哪样」与「查证规矩」——店内事实只信工具、
 // 店外事实只信搜索，是这次合并最关键的一条，防的是模型拿搜到的过期
 // 价格答店内问题、或拿店内数据编店外结论。
-function mergedSystemPrompt(starwish) {
+function mergedSystemPrompt(starwish, seriesText = '') {
   const archive = starwish
     ? `当前用户偏好档案：${JSON.stringify(starwish)}。推荐时参考其中的预算与用途，不要盘问已经知道的事。`
     : '用户尚未填写偏好档案。需要时一次只问一个问题。';
@@ -292,6 +306,7 @@ function mergedSystemPrompt(starwish) {
       '输出格式：App 是纯文本，禁止任何 markdown 符号（包括 ** 加粗、# 标题、链接、表格），分点用「1.」或「·」。\n' +
       '不许对用户提「工具、接口、系统提示、预设规则」这些内部词；被问到能不能联网、有没有深度思考时，不要讲原理，用一句人话带过，并落到你能帮他做的事上。\n' +
       `${archive}\n\n` +
+      seriesDirectorySection(seriesText) +
       '## 查证规矩（最重要）\n' +
       '1. 店内事实（商品、价格、库存、订单、优惠券、会员、活动）只信工具返回的数据：价格只能复述工具返回的 ¥，会员等级、积分、券只认工具，没查到不要假设用户是任何等级；严禁用搜索结果回答店内价格与活动，搜到的店内信息一律不算数。\n' +
       '2. 店外事实（新闻、行情、政策、流行趋势、通用知识、网友评价）只信 web_search 搜回来的结果：需要最新信息时先调 web_search 再答，并自然带一句信息的时间或来源（例如「我刚查了下，截至今天……」）；搜到的资料不够新（比如是昨天的）也要用，把日期标清楚再给；只有确实什么相关内容都没搜到时，才说没查到，不许编。\n' +
@@ -302,7 +317,7 @@ function mergedSystemPrompt(starwish) {
       '1. 闲聊正常答，不搜货，不把话题强行拐去卖货。\n' +
       '2. App 用法、VIP、券：get_promotions / get_user_context。\n' +
       '3. 需求清楚时优先 draw_star_cards（三张星牌），不要一次甩很多热销。\n' +
-      '4. 信息不够只问 1 个问题。送礼或挑选时，先看关键信息齐不齐：送谁（或什么场景）、想要哪一类、预算多少——星愿档案里有的先用档案填，不重复问；真缺了关键的，先提问再抽牌，不许信息不够就直接 draw_star_cards 亮牌。\n' +
+      '4. 信息不够只问 1 个问题。送礼或挑选时，先看关键信息齐不齐：送谁（或什么场景）、想要哪一类、预算多少——星愿档案里有的先用档案填，不重复问；真缺了关键的，先提问再抽牌，不许信息不够就直接 draw_star_cards 亮牌。唯一的例外是挑礼物开场：「送给谁+预算」按办事规矩第 10 条合并成一轮问，不算多问。\n' +
       '5. 谷子≠小卡，手办≠公仔。\n' +
       '6. 亮牌那一轮，正文只写 2 句：一句引出（比如「给你挑了三张」）、一句建议（拿不准选哪张时选哪张）。商品名、价格、特点句全在牌面上，正文一律不复述、不点名、不报价格；要指代某张牌只许用位置（第一张/中间那张/最后一张）。特点句是系统按真实数据算好、放在牌面上的（工具结果的 trait），你心里有数即可，不要说出来。\n' +
       '7. 换一批由用户在牌面点「下一批」自己翻，不用你处理；用户在对话里明确说换一批时，带 excludeIds 重新 draw_star_cards。\n' +
@@ -312,15 +327,16 @@ function mergedSystemPrompt(starwish) {
       '11. 对比商品时必须下结论：先摆数据（价格/券后价、规格、销量评分、优惠适配，缺的数据明说没有），最后一句说清选谁、为什么，不许把判断推回用户。\n' +
       '12. 不许把判断过程写出来：像「用户说……，信息不够：……，规则：……」这种复述规则、盘算信息的句子，思考和正文里都绝对不许出现；想清楚了就直接对用户提问或回答。\n\n' +
       '## 办事规矩（能真办事，就不要只动嘴）\n' +
-      '1. 用户明确要你办的事，用工具真办：领券 claim_coupon、加购物车 add_to_cart、改数量 update_cart、收藏 add_favorite、写备注 set_order_note、生成待付款订单 create_order。办完的结果会自动记进办事清单给用户看，你在正文里一句话确认即可，不要逐条复述清单。\n' +
+      '1. 用户明确要你办的事，用工具真办：加购物车 add_to_cart、改数量 update_cart、收藏 add_favorite、写备注 set_order_note、生成待付款订单 create_order。办完的结果会自动记进办事清单给用户看，你在正文里一句话确认即可，不要逐条复述清单。\n' +
       '2. 只有用户明确表达了意图才动手：说「就它了/买这个/帮我下单」才 create_order；说「先加购物车」就只 add_to_cart，不要自作主张替他下单；只是咨询、对比时不许动手。\n' +
       '3. 付款是唯一的闸：你最多把订单生成到待付款，绝不能说「已经下单成功/已经付款」；生成订单后把应付金额说清，并提醒他在清单卡里点「确认下单」付款。\n' +
       '4. 工具返回失败（action.status 是 failed）时如实转告原因，不要假装办成、不要换个说法糊弄过去；可以顺带给一个能点的下一步（如先加地址、先领别的券）。\n' +
       '5. 用户交代备注或贺卡内容时先 set_order_note 记下，同一轮里再 create_order 会自动带上，不用重复问。\n' +
-      '6. 下单前若有一张他能领、且明显能省钱的券（get_promotions 里查得到），可以先 claim_coupon 再 create_order，create_order 会自动挑最划算的已领券抵扣。\n' +
+      '6. 领券只列清单、不代领：用户问优惠、说领券时调 list_claimable_coupons，清单会做成带「领取」按钮的卡片给他自己点；正文简短点名最值得领的一两张就行，不要逐张复述、更不许说「已帮你领」。下单时 create_order 只用他已经领到手的券自动抵扣；碰上一张他还没领、又明显能省钱的券，提醒他先点卡片领，别替他操作。\n' +
       '7. 订单的事走订单工具：问订单到哪了、发货没，先 get_my_orders 查，只信它返回的状态和物流；取消订单用 cancel_order、申请售后用 apply_after_sale，都要先查到订单 id 再动手，用户没指明哪一笔时先问清楚，不许自己挑一笔。售后只是提交申请等后台处理，别说已经退款。\n' +
-      '8. 提问时带选项：你这一轮要向用户提问题时，同时调用 suggest_options，把 3~4 个他最可能点的短回答一起给出来（界面会挂成按钮给他点）；一次只问一个问题，选项只对这一个问题；陈述、亮牌、办事的轮次不要调用它，正文里也不要把选项再念一遍。\n' +
-      '9. 工具结果里的金额和数量都是服务端复查过的真实数据，汇报时照它说，不要自己再算一遍改口。',
+      '8. 提问时带选项：你这一轮要向用户提问题时，同时调用 suggest_options，把 3~4 个他最可能点的短回答一起给出来（界面会挂成按钮给他点）；一次只问一个问题，选项只对这一个问题；陈述、亮牌、办事的轮次不要调用它，正文里也不要把选项再念一遍。例外：问系列/角色时按「店内系列清单」给全，不受 3~4 个限制。\n' +
+      '9. 工具结果里的金额和数量都是服务端复查过的真实数据，汇报时照它说，不要自己再算一遍改口。\n' +
+      '10. 挑礼物的问法（固定两步，别自由发挥）：第一步——送给谁和预算都还不知道时，合并成一轮问：正文一句里把两件事问清，suggest_options 用 groups 分组给，mode 用 each：第一组标签「送给谁」，选项[送朋友、送对象、送家人、送同担、自己用]；第二组标签「预算」，选项[50元以内、50到100元、100到200元、200元以上、预算不限]。他每组选一个、点「选好了」会把两个答案一起发给你，收到后不要再回头确认这两项。第二步——最后一问问他朋友喜欢哪类：正文问清，suggest_options 仍用 groups，mode 用 multi：第一组标签「类型」，选项[玩具、公仔、手办、谷子、小卡、文具、实用周边]；第二组标签「系列」，选项[星屿邮局、山海小食堂、月光马戏团、霓虹夜行、深海观测站、时光钟表店、樱庭花艺社、极光观测队]；anyOption 给「你帮我定」。他可以只选一个（只要类型或只要系列），也可以选两个（一类加一个系列），提交后信息就齐了，直接 draw_star_cards 亮牌，不要再多问。哪一步的信息他已经在话里说过（或档案里有），那一步就跳过，不许重复问。',
   };
 }
 
@@ -462,7 +478,9 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
   const turnState = {};
   let lastDrawMeta = null;
   const homeworkSeen = new Set();
-  const history = [mergedSystemPrompt(starwish), ...messages];
+  // 系列清单带缓存（10 分钟），查目录不许拖慢或拖垮对话：失败返回空。
+  const { text: seriesText } = await getSeriesDirectory();
+  const history = [mergedSystemPrompt(starwish, seriesText), ...messages];
 
   // 先报一句状态：思考与查工具都要时间，第一秒就让用户知道在动。
   // 文案用中性的「思考中…」：这一轮未必会联网搜索（那是模型自己
@@ -608,6 +626,9 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
       if (call.name === 'suggest_options' && Array.isArray(result?.suggestedOptions)) {
         turnState.suggestedOptions = result.suggestedOptions;
       }
+      if (call.name === 'suggest_options' && result?.suggestedOptionSet) {
+        turnState.suggestedOptionSet = result.suggestedOptionSet;
+      }
       // 办事结果：办成或没办成都发一条 actions 事件，App 实时记进
       // 清单。改购物车数量同轮多次只占一行——把明细攒在 turnState
       // 里重写同一条记录（id 不变，App 按 id 覆盖）。
@@ -629,6 +650,15 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
           action = merged.action;
         }
         yield { type: 'actions', action };
+        produced = true;
+      }
+      // 可领券清单：做成带「领取」按钮的卡片下发（只列不代领）
+      if (
+        call.name === 'list_claimable_coupons' &&
+        Array.isArray(result?.couponChoices) &&
+        result.couponChoices.length > 0
+      ) {
+        yield { type: 'coupon_choices', groups: result.couponChoices };
         produced = true;
       }
       // 功课段：数字只从工具结果里摘，同轮同句不重复发，最多 5 条。
@@ -699,8 +729,11 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
   }
 
   // 模型自带选项：整轮说完再交出去，由外层 withQuestionOptions
-  // 决定发不发（内部事件，不直接给 App）。
-  if (turnState.suggestedOptions?.length) {
+  // 决定发不发（内部事件，不直接给 App）。分组选项（optionSet）
+  // 与单组选项二选一，分组优先。
+  if (turnState.suggestedOptionSet) {
+    yield { type: 'suggested_options', optionSet: turnState.suggestedOptionSet };
+  } else if (turnState.suggestedOptions?.length) {
     yield { type: 'suggested_options', options: turnState.suggestedOptions };
   }
 
@@ -749,6 +782,13 @@ function homeworkFrom(toolName, result) {
     }
     entries.push({ text: `看了你的会员档案：VIP${result.vipLevel ?? 1}`, candidates: [] });
   }
+  if (toolName === 'list_claimable_coupons') {
+    const claimable = result.claimableCount ?? 0;
+    entries.push({
+      text: claimable > 0 ? `看了领券中心：${claimable} 张券可以领` : '看了领券中心：暂时没有能领的新券',
+      candidates: [],
+    });
+  }
   return entries;
 }
 
@@ -769,7 +809,8 @@ async function* runGuideFallback(messages, dashscope, { userId, starwish } = {})
   let offerCards = false;
   let fateRoles = [];
   let emittedText = false;
-  const history = [agentSystemPrompt(starwish), ...messages];
+  const { text: seriesText } = await getSeriesDirectory();
+  const history = [agentSystemPrompt(starwish, seriesText), ...messages];
 
   for (let round = 0; round < 3; round += 1) {
     const message = await chatCompletionRaw({
@@ -1007,6 +1048,7 @@ async function* withQuestionOptions(source, { dashscope, userText }) {
   let sawCards = false;
   let sawActions = false;
   let modelOptions = null;
+  let modelOptionSet = null;
   for await (const event of source) {
     if (event.type === 'text') fullText += String(event.content ?? '');
     if (event.type === 'fate_cards' || event.type === 'products' || event.type === 'cart_confirm') {
@@ -1015,9 +1057,14 @@ async function* withQuestionOptions(source, { dashscope, userText }) {
     if (event.type === 'actions') sawActions = true;
     if (event.type === 'suggested_options') {
       modelOptions = Array.isArray(event.options) ? event.options : null;
+      modelOptionSet = event.optionSet ?? null;
       continue;
     }
     yield event;
+  }
+  if (modelOptionSet && !sawCards && !sawActions) {
+    yield { type: 'options', optionSet: modelOptionSet };
+    return;
   }
   if (modelOptions && modelOptions.length >= 2 && !sawCards && !sawActions) {
     yield { type: 'options', options: modelOptions };

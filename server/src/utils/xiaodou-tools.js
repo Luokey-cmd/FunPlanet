@@ -3,7 +3,8 @@ import { log } from './log.js';
 import { serializeProduct } from './product.js';
 import { buildWeatherContext } from './weather.js';
 import { streamChatEvents } from './openai-compatible.js';
-import { CLAIM_GROUPS, claimCouponGroupForUser } from '../routes/coupons.js';
+import { CLAIM_GROUPS } from '../routes/coupons.js';
+import { ensureProfileFresh, isMemberCouponClaimedThisMonth } from './daily-tasks.js';
 import {
   buildLineItemsFromRequest,
   cancelOrderForUser,
@@ -138,15 +139,12 @@ export const XIAODOU_TOOLS = [
   {
     type: 'function',
     function: {
-      name: 'claim_coupon',
+      name: 'list_claimable_coupons',
       description:
-        '帮用户领取一张优惠券：用户说要领券时，或下单前发现有他能领、且对这次购买明显有用的券时调用。templateId 用 get_promotions 返回的券 id。领过的、领完的会如实返回失败，不要假装领到。',
+        '列出用户现在能领的优惠券：用户说领券、找优惠、有什么券能领时调用。只列清单——结果会做成带「领取」按钮的卡片给用户自己点，你不要替他领，也不要说已经帮他领了。',
       parameters: {
         type: 'object',
-        properties: {
-          templateId: { type: 'string', description: '券模板 id，如 c6' },
-        },
-        required: ['templateId'],
+        properties: {},
       },
     },
   },
@@ -296,17 +294,37 @@ export const XIAODOU_TOOLS = [
     function: {
       name: 'suggest_options',
       description:
-        '你这一轮要向用户提一个问题时，同时调用这个工具，把 3~4 个用户最可能点的短回答交出来，界面会把它们挂成按钮在他点选（省得打字）。规矩：只有提问的那一轮才调用，陈述、亮牌、办事的轮次绝不调用；一次只问一个问题，选项必须全是这一个问题的回答；每个选项不超过 8 个字、写成用户会说出口的话（如「送朋友」「自己留着」「100 元以内」）；结合他刚说的话和档案给，别给万金油选项。',
+        '你这一轮要向用户提问时，同时调用这个工具，把用户最可能点的短回答交出来，界面会把它们挂成按钮给他点选（省得打字）。两种给法：①普通一问：用 options 给 3~4 个短选项，点一个就发送。②分组问法（挑礼物专用，见导购规则）：用 groups 给 2 组带标签的选项，mode=each 表示每组必选一个、都选完点「选好了」才发送（送给谁+预算合并问）；mode=multi 表示两组一共选 1~2 个、每组最多选 1 个（类型+系列那一问），anyOption 给一个可单独提交的兜底项（如「你帮我定」）。规矩：只有提问的那一轮才调用，陈述、亮牌、办事的轮次绝不调用；选项写成用户会说出口的话；结合他刚说的话和档案给，别给万金油选项。例外：问「想要哪个系列/角色」时，用 options 把系统提示里「店内系列清单」中该品类下的系列一次给全（可以超过 4 个，服务端只放行清单里真实存在的系列名，编的会被截掉）。',
       parameters: {
         type: 'object',
         properties: {
           options: {
             type: 'array',
-            description: '3~4 个短选项',
+            description: '普通一问的 3~4 个短选项（与 groups 二选一）',
             items: { type: 'string' },
           },
+          groups: {
+            type: 'array',
+            description: '分组问法：2 组选项，每组带一个标签（如「送给谁」「预算」）',
+            items: {
+              type: 'object',
+              properties: {
+                label: { type: 'string', description: '组标签，如「送给谁」' },
+                options: { type: 'array', items: { type: 'string' } },
+              },
+              required: ['label', 'options'],
+            },
+          },
+          mode: {
+            type: 'string',
+            description: '分组问法才用：each=每组必选一个；multi=两组共选 1~2 个、每组最多 1 个',
+            enum: ['each', 'multi'],
+          },
+          anyOption: {
+            type: 'string',
+            description: '分组问法可选：一个能单独点选直接提交的兜底项，如「你帮我定」',
+          },
         },
-        required: ['options'],
       },
     },
   },
@@ -432,7 +450,7 @@ async function searchProducts(args, { take = SEARCH_LIMIT } = {}) {
           totalCount: looseCount,
           skip,
           products: loose.map(compactProduct),
-          fullProducts: loose.map(serializeProduct),
+          fullProducts: loose.map((p) => serializeProduct(p)),
           note: `按「${token}」放宽匹配`,
         };
       }
@@ -444,43 +462,118 @@ async function searchProducts(args, { take = SEARCH_LIMIT } = {}) {
     totalCount,
     skip,
     products: rows.map(compactProduct),
-    fullProducts: rows.map(serializeProduct),
+    fullProducts: rows.map((p) => serializeProduct(p)),
     note: rows.length === 0 ? '没有更多匹配商品，请换关键词或放宽预算，不要编造商品。' : undefined,
   };
 }
 
-// 给三张牌各算一句「特点」：只用真实数据里的最高级——口碑最好（评分）、
-// 价格最低、卖得最火（销量），一张牌占一条、互不重复；哪条都没占上
-// 就退回「价格 · 销量 · 评分」的事实行。不许模型自己编特点，
-// 数字全在这里算死（导购全流程稿拍 4 的硬规矩）。
-// 输入：本批三件商品；输出：Map<商品 id, 特点句>。
+// 给三张牌各算一个「判断标签」：格式「短标签，证据句」，App 按第一个
+// 逗号拆——小卡顶部缎带只挂短标签，翻开的详细卡显示整句。
+// 标签只能来自真实数据的同批比对，一共 8 个候选维度：
+//   口碑最好（评分，评分同分时评价条数多者胜）／好评率最高／卖得最火（销量）／
+//   收藏最多／性价比最高（评分×好评率÷价格）／价格最低／折扣最大（直降比例）／
+//   最新上架（编号最大）。
+// 分配按「赢的幅度」贪心：每个维度算第一名赢第二名的相对差，幅度大的
+// 断言先落位；一张牌只占一个标签、一个标签只给一张牌，保证三张牌的
+// 标签互不重复、且都是各自最有说服力的那条。并列第一的维度不发标签
+// （不能两张都叫最高）。哪条都没赢的牌退回「小豆精选，事实行」，
+// 不硬凑最高级。数字全在这里算死，不许模型自己编（导购硬规矩）。
+// 输入：本批商品（通常 3 件）；输出：Map<商品 id, 标签句>。
 function computeTraits(picked) {
   const traits = new Map();
-  const used = new Set();
-  const bestRating = Math.max(...picked.map((x) => Number(x.rating ?? 0)));
-  const minPrice = Math.min(...picked.map((x) => Number(x.price ?? 0)));
-  const maxPrice = Math.max(...picked.map((x) => Number(x.price ?? 0)));
-  const bestSales = Math.max(...picked.map((x) => Number(x.sales ?? 0)));
-  const bestPositive = Math.max(...picked.map((x) => Number(x.positiveRate ?? 0)));
+  if (picked.length === 0) return traits;
+  const num = (v) => Number(v ?? 0) || 0;
+  const idNum = (id) => parseInt(String(id).replace(/[^0-9]/g, ''), 10) || 0;
+  const prices = picked.map((x) => num(x.price));
+  const priceSpread = Math.max(...prices) - Math.min(...prices);
+  // 性价比：口碑综合（评分 × 好评率）除以价格，花得少、口碑还硬的胜出；
+  // 好评率缺失时按 0.9 中性兜底，不让缺字段的商品直接出局。
+  const valueOf = (x) => {
+    const price = num(x.price);
+    if (price <= 0) return 0;
+    const positive = num(x.positiveRate);
+    return (num(x.rating) * (positive > 0 ? positive / 100 : 0.9)) / price;
+  };
+  const discountOf = (x) => {
+    const op = num(x.originalPrice);
+    const price = num(x.price);
+    return op > price && price > 0 ? (op - price) / op : 0;
+  };
+  const dims = [
+    {
+      key: 'rating',
+      // 评分只有 4.6~4.9 几档、同分常见：同分时评价条数多者胜（样本大更可信）。
+      value: (x) => num(x.rating) * 100000 + Math.min(num(x.reviewCount), 99999),
+      ok: (best) => best > 0,
+      text: (x) => `口碑最好，评分 ${num(x.rating)} · ${num(x.reviewCount)} 条评价`,
+    },
+    {
+      key: 'positive',
+      value: (x) => num(x.positiveRate) * 1000 + num(x.rating),
+      ok: (best) => best >= 90 * 1000,
+      text: (x) => `好评率最高，${num(x.positiveRate)}% 的买家给了好评`,
+    },
+    {
+      key: 'sales',
+      value: (x) => num(x.sales),
+      ok: (best) => best > 0,
+      text: (x) => `卖得最火，已售 ${num(x.sales)} 件`,
+    },
+    {
+      key: 'favorite',
+      value: (x) => num(x.favoriteCount),
+      ok: (best) => best > 0,
+      text: (x) => `收藏最多，${num(x.favoriteCount)} 人收藏`,
+    },
+    {
+      key: 'value',
+      value: valueOf,
+      ok: () => true,
+      text: (x) => `性价比最高，评分 ${num(x.rating)} · 好评率 ${num(x.positiveRate)}%，只要 ¥${num(x.price)}`,
+    },
+    {
+      key: 'price',
+      value: (x) => -num(x.price),
+      ok: () => priceSpread > 0,
+      text: () => `价格最低，比最贵的省 ¥${Math.round(priceSpread)}`,
+    },
+    {
+      key: 'discount',
+      value: discountOf,
+      ok: (best) => best >= 0.15,
+      text: (x) => `折扣最大，直降 ¥${Math.round(num(x.originalPrice) - num(x.price))}`,
+    },
+    {
+      key: 'newest',
+      value: (x) => idNum(x.id),
+      ok: () => true,
+      text: () => '最新上架，本批三件里最新上架',
+    },
+  ];
+  const claims = [];
+  dims.forEach((dim, dimIdx) => {
+    const vals = picked.map((x) => dim.value(x));
+    const best = Math.max(...vals);
+    if (!dim.ok(best)) return;
+    const winnerIdx = vals.indexOf(best);
+    if (vals.filter((v) => v === best).length !== 1) return; // 并列第一不发
+    const runnerUp = Math.max(...vals.filter((_, i) => i !== winnerIdx), 0);
+    const margin = Math.abs(best) > 0 ? (best - runnerUp) / Math.abs(best) : 0;
+    claims.push({ item: picked[winnerIdx], dim, dimIdx, margin });
+  });
+  // 幅度大的先落位；同幅度按维度顺序（口碑、好评、销量在前）裁决。
+  claims.sort((a, b) => b.margin - a.margin || a.dimIdx - b.dimIdx);
+  const usedItems = new Set();
+  const usedDims = new Set();
+  for (const claim of claims) {
+    if (usedItems.has(claim.item.id) || usedDims.has(claim.dim.key)) continue;
+    usedItems.add(claim.item.id);
+    usedDims.add(claim.dim.key);
+    traits.set(claim.item.id, claim.dim.text(claim.item));
+  }
   for (const item of picked) {
-    const rating = Number(item.rating ?? 0);
-    const price = Number(item.price ?? 0);
-    const sales = Number(item.sales ?? 0);
-    const positive = Number(item.positiveRate ?? 0);
-    if (rating > 0 && rating === bestRating && !used.has('rating')) {
-      used.add('rating');
-      traits.set(item.id, `口碑最好，评分 ${rating}`);
-    } else if (positive === bestPositive && positive >= 95 && !used.has('positive')) {
-      used.add('positive');
-      traits.set(item.id, `好评率最高，${positive}% 的买家给了好评`);
-    } else if (price === minPrice && maxPrice > minPrice && !used.has('price')) {
-      used.add('price');
-      traits.set(item.id, `价格最低，比最贵的省 ¥${Math.round(maxPrice - minPrice)}`);
-    } else if (sales === bestSales && sales > 0 && !used.has('sales')) {
-      used.add('sales');
-      traits.set(item.id, `卖得最火，已售 ${sales} 件`);
-    } else {
-      traits.set(item.id, `¥${price} · 已售 ${sales} 件 · 评分 ${rating}`);
+    if (!traits.has(item.id)) {
+      traits.set(item.id, `小豆精选，¥${num(item.price)} · 已售 ${num(item.sales)} 件 · 评分 ${num(item.rating)}`);
     }
   }
   return traits;
@@ -776,73 +869,85 @@ function money(value) {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
 
-// 领券：按 templateId 反查它属于哪个领券组，走 coupons 路由同款核心
-// 逻辑（claimCouponGroupForUser），已领/领完/未到时间都如实失败。
-async function claimCoupon(args, context) {
+// 列可领券（2026-11-26 hx 定）：小豆只列清单、不代领——把每个领券组
+// 的状态（可领/已领/需会员/领完）算好做成卡片下发，App 在每行后面挂
+// 「领取」按钮，用户点哪张领哪张。状态口径与领券核心
+// claimCouponGroupForUser 保持一致（会员门槛、月券跨月、新人终身
+// 一次、中心券看持有），那边改规则时这边要跟着对。
+// 输入：context.userId。输出：{ ok, couponChoices, claimableCount, note }。
+async function listClaimableCoupons(context) {
   const userId = context.userId;
-  const templateId = String(args.templateId ?? '').trim();
   if (!userId) {
-    return { ok: false, action: failedAction(context, 'coupon', '领取优惠券', '用户未登录，领不了券') };
+    return { ok: false, error: '用户未登录，领不了券' };
   }
-  const template = templateId
-    ? await prisma.couponTemplate.findUnique({ where: { id: templateId } })
-    : null;
-  if (!template) {
-    return { ok: false, action: failedAction(context, 'coupon', '领取优惠券', '这张券不存在') };
-  }
-  const groupKey = Object.keys(CLAIM_GROUPS).find((key) => CLAIM_GROUPS[key].includes(templateId));
-  if (!groupKey) {
-    return {
-      ok: false,
-      action: failedAction(context, 'coupon', `领取${template.title}`, '这张券不能直接领取'),
-    };
-  }
-  const result = await claimCouponGroupForUser(userId, groupKey);
-  if (!result.ok) {
-    const reason =
-      result.status === 409 && result.error === '已领取过'
-        ? '这张券你已经领过了'
-        : result.error;
-    // 换方案：想要的那张领不成（已领过/已领完）时，别把失败直接甩给
-    // 用户——把其他领券组挨个试一遍，第一张能领的自动换领，并在
-    // 清单和给模型的说明里如实交代换了（hx 2026-11-23 定的办事规矩）。
-    const swappable =
-      result.status === 409 || /领完|领取完|抢完/.test(String(result.error ?? ''));
-    if (swappable) {
-      for (const otherKey of Object.keys(CLAIM_GROUPS)) {
-        if (otherKey === groupKey) continue;
-        const alt = await claimCouponGroupForUser(userId, otherKey);
-        if (!alt.ok) continue;
-        const altTitles = alt.coupons.map((c) => c.title).join('、');
-        const altFirst = alt.coupons[0];
-        return {
-          ok: true,
-          action: makeAction(context, {
-            type: 'coupon',
-            title: '已领取优惠券',
-            detail: `${altTitles} · ${altFirst?.condition ?? ''} · ${altFirst?.expire ?? ''} 到期`,
-            target: { page: 'coupons' },
-          }),
-          note: `原想领的「${template.title}」没领成（${reason}），已自动换领上面这张可用券，正文里要如实告诉用户换了、别装作领的是原来那张。`,
-        };
+  const profile = await ensureProfileFresh(userId);
+  const groupOrder = ['newcomer', 'center', 'center_200', 'center_300', 'member_monthly'];
+  const allIds = groupOrder.flatMap((key) => CLAIM_GROUPS[key] ?? []);
+  const [templates, owned] = await Promise.all([
+    prisma.couponTemplate.findMany({ where: { id: { in: allIds } } }),
+    prisma.userCoupon.findMany({ where: { userId }, select: { templateId: true } }),
+  ]);
+  const byId = new Map(templates.map((t) => [t.id, t]));
+  const ownedSet = new Set(owned.map((r) => r.templateId));
+  const now = new Date();
+  const expireText = (t) => (t?.expireAt ? t.expireAt.toISOString().slice(0, 10) : '');
+  const choices = [];
+  for (const group of groupOrder) {
+    const ids = CLAIM_GROUPS[group] ?? [];
+    const rows = ids.map((id) => byId.get(id)).filter(Boolean);
+    if (rows.length !== ids.length || rows.length === 0) continue;
+    const first = rows[0];
+    let status = 'claimable';
+    let statusText = '';
+    if (group === 'member_monthly' && (profile?.vipLevel ?? 1) < 2) {
+      status = 'member';
+      statusText = '开通 VIP2 后可领';
+    } else if (
+      group === 'member_monthly'
+        ? isMemberCouponClaimedThisMonth(profile)
+        : group === 'newcomer'
+          ? Boolean(profile?.newcomerClaimed)
+          : ownedSet.has(ids[0])
+    ) {
+      status = 'claimed';
+      statusText = '已领取';
+    } else {
+      const blocked = rows.find(
+        (t) =>
+          (t.claimStartAt && now < t.claimStartAt) ||
+          (t.expireAt && now > t.expireAt) ||
+          (t.totalQuantity != null && t.issuedCount >= t.totalQuantity),
+      );
+      if (blocked) {
+        status = 'unavailable';
+        statusText =
+          blocked.claimStartAt && now < blocked.claimStartAt
+            ? '尚未开始领取'
+            : blocked.expireAt && now > blocked.expireAt
+              ? '已过期'
+              : '已领完';
       }
     }
-    return {
-      ok: false,
-      action: failedAction(context, 'coupon', `领取${template.title}`, reason, { page: 'coupons' }),
-    };
+    choices.push({
+      group,
+      title: group === 'newcomer' ? '新人券包' : first.title,
+      detail:
+        group === 'newcomer'
+          ? `${rows.map((t) => t.title).join('、')} · ${expireText(first)} 到期`
+          : `${first.condition} · ${expireText(first)} 到期`,
+      status,
+      statusText,
+    });
   }
-  const first = result.coupons[0];
-  const titles = result.coupons.map((c) => c.title).join('、');
+  // 可领的排最前，其次要开会员的，最后已领/不可领（同档保持领券中心顺序）
+  const rank = { claimable: 0, member: 1, claimed: 2, unavailable: 3 };
+  choices.sort((a, b) => rank[a.status] - rank[b.status]);
+  const claimableCount = choices.filter((c) => c.status === 'claimable').length;
   return {
     ok: true,
-    action: makeAction(context, {
-      type: 'coupon',
-      title: `已领取优惠券`,
-      detail: `${titles} · ${first?.condition ?? ''} · ${first?.expire ?? ''} 到期`,
-      target: { page: 'coupons' },
-    }),
-    note: '券已真实领取到账，可以在正文里告诉用户。',
+    couponChoices: choices,
+    claimableCount,
+    note: '清单已做成带「领取」按钮的卡片发给用户了。规矩：你只列清单、正文简短点名最值得领的一两张，不要替他领、不要说「已帮你领」，点不点由他自己。',
   };
 }
 
@@ -1055,7 +1160,15 @@ async function createOrder(args, context) {
   const freight = 0;
   // 满减与下单路由同一口径（utils/promotions.js），小豆代下单也享活动
   const promotion = await resolvePromotionDiscount(subtotal);
-  const total = Math.max(0, subtotal - discount - promotion.amount + freight);
+  // 会员 95 折与下单路由同口径：VIP2 起，券与满减后的商品款再打 95 折
+  const buyerProfile = await prisma.userProfile.findUnique({
+    where: { userId },
+    select: { vipLevel: true },
+  });
+  const memberBase = Math.max(0, subtotal - discount - promotion.amount);
+  const memberDiscount =
+    (buyerProfile?.vipLevel ?? 1) >= 2 ? Math.round(memberBase * 0.05 * 100) / 100 : 0;
+  const total = Math.max(0, memberBase - memberDiscount + freight);
   const remark =
     String(args.note ?? '').trim().slice(0, 200) || turnStateOf(context).note || null;
   const orderNo = generateOrderNo();
@@ -1071,6 +1184,7 @@ async function createOrder(args, context) {
         discount,
         promotionDiscount: promotion.amount,
         promotionName: promotion.name,
+        memberDiscount,
         total,
         addressName: address.name,
         addressPhone: address.phone,
@@ -1241,7 +1355,7 @@ const TOOL_LABELS = {
   get_promotions: '查优惠',
   get_user_context: '读用户档案',
   propose_add_to_cart: '提议加购',
-  claim_coupon: '领优惠券',
+  list_claimable_coupons: '列出可领券',
   add_to_cart: '加入购物车',
   update_cart: '调整购物车',
   add_favorite: '收藏商品',
@@ -1362,18 +1476,142 @@ async function applyAfterSale(args, context) {
   };
 }
 
+// ── 店内系列目录（2026-11-26 hx 选 A 方案）──────────────────
+// 病根：小豆被问「想要哪个系列」时没人给它全店清单，只能凭翻到的
+// 几件商品临场编，还被单组选项上限 4 个截断——店里光谷子就有 20+
+// 个系列/角色，它只给了 4 个、还漏了原创 8 系列（hx 截图抓到）。
+// 解法：服务端按商品数据实时汇总一份目录（系列列 → 描述《》→
+// 名称前缀 → 英文角色名 → 饼干等关键词，逐级兜底），一式两用：
+// ①注入小豆的系统提示，它问系列时照单给全；②suggest_options 清洗
+// 时做白名单——超过 4 个的选项，只有名字在目录里才放行（上限 10）。
+// 目录带 10 分钟缓存，查库失败就当没有（选项退回上限 4，不许崩）。
+const SERIES_DIRECTORY_TTL_MS = 10 * 60 * 1000;
+let _seriesDirectoryCache = null;
+let _seriesDirectoryBuiltAt = 0;
+
+function seriesGroupOf(product, knownSeries) {
+  const fromColumn = String(product.series ?? '').trim();
+  if (fromColumn) return fromColumn;
+  const fromDesc = String(product.description ?? '').match(/《([^》]{2,14})》/);
+  if (fromDesc) return fromDesc[1];
+  const name = String(product.name ?? '');
+  for (const series of knownSeries) {
+    if (series && name.startsWith(series)) return series;
+  }
+  const english = name.match(/^([A-Za-z]{3,})/);
+  if (english) return english[1].toUpperCase();
+  if (name.includes('饼干')) return '饼干人系列';
+  const stripped = name.replace(/【[^】]*】/g, '');
+  const seriesSuffix = stripped.match(/^(.{2,6}?)系列/);
+  if (seriesSuffix) return `${seriesSuffix[1]}系列`;
+  const formPrefix = stripped.match(/^(.{3,6}?)(徽章|立牌|挂件|色纸|周边|套装|礼盒)/);
+  if (formPrefix) return formPrefix[1];
+  return null;
+}
+
+export async function getSeriesDirectory() {
+  if (_seriesDirectoryCache && Date.now() - _seriesDirectoryBuiltAt < SERIES_DIRECTORY_TTL_MS) {
+    return _seriesDirectoryCache;
+  }
+  try {
+    const products = await prisma.product.findMany({
+      select: { name: true, description: true, series: true, majorCategory: true },
+    });
+    const knownSeries = new Set();
+    for (const product of products) {
+      const fromColumn = String(product.series ?? '').trim();
+      if (fromColumn) knownSeries.add(fromColumn);
+      const fromDesc = String(product.description ?? '').match(/《([^》]{2,14})》/);
+      if (fromDesc) knownSeries.add(fromDesc[1]);
+    }
+    // names：全店系列/角色名集合（白名单用，英文名统一大写比对另存一份）
+    const names = new Set();
+    const byCategory = new Map();
+    for (const product of products) {
+      const group = seriesGroupOf(product, knownSeries);
+      if (!group) continue;
+      names.add(group);
+      const category = String(product.majorCategory ?? '').trim() || '其他';
+      if (!byCategory.has(category)) byCategory.set(category, new Map());
+      const bucket = byCategory.get(category);
+      bucket.set(group, (bucket.get(group) ?? 0) + 1);
+    }
+    // text：给小豆看的紧凑清单，按大类一行、系列按件数从多到少，
+    // 每类最多 14 个（再多它也念不完，用户更看不完）。
+    const lines = [];
+    for (const category of MAJOR_CATEGORIES) {
+      const bucket = byCategory.get(category);
+      if (!bucket || bucket.size === 0) continue;
+      const entries = [...bucket.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14);
+      lines.push(`${category}：${entries.map(([name, count]) => `${name}(${count}件)`).join('、')}`);
+    }
+    _seriesDirectoryCache = { names, text: lines.join('\n') };
+    _seriesDirectoryBuiltAt = Date.now();
+    return _seriesDirectoryCache;
+  } catch (error) {
+    log.warn('小豆', '系列目录生成失败，本轮先不带清单', error);
+    return { names: new Set(), text: '' };
+  }
+}
+
 // 给出选项：模型提问时自带短选项，服务端只做清洗（去空、去重、
 // 截断、限量），不记办事清单、不算办事。清洗后不足 2 个当没给，
 // 外层会走事后补生成的安全网。
-function suggestOptions(args) {
+// 2026-11-26 分组问法（hx 定挑礼物问法）：groups 给了就走分组清洗——
+// mode=each 每组必选一个（送给谁+预算合并问）；mode=multi 两组共选
+// 1~2 个、每组最多 1 个（类型+系列）；anyOption 是单独提交的兜底项。
+function cleanOptionText(raw, seen) {
+  const text = String(raw ?? '').trim().replace(/\s+/g, ' ');
+  if (!text || text.length > 12 || seen.has(text)) return null;
+  seen.add(text);
+  return text;
+}
+
+async function suggestOptions(args) {
+  if (Array.isArray(args.groups) && args.groups.length > 0) {
+    const seen = new Set();
+    const groups = [];
+    for (const rawGroup of args.groups.slice(0, 3)) {
+      const label = String(rawGroup?.label ?? '').trim().slice(0, 6);
+      const options = [];
+      for (const raw of Array.isArray(rawGroup?.options) ? rawGroup.options : []) {
+        const text = cleanOptionText(raw, seen);
+        if (text) options.push(text);
+        if (options.length >= 10) break;
+      }
+      if (label && options.length >= 2) groups.push({ label, options });
+    }
+    const mode = args.mode === 'multi' ? 'multi' : 'each';
+    const anyText = args.anyOption ? cleanOptionText(args.anyOption, seen) : null;
+    if (groups.length < 2) {
+      return { ok: false, quiet: true, error: '分组选项不足两组，已忽略' };
+    }
+    return {
+      ok: true,
+      quiet: true,
+      suggestedOptionSet: { mode, groups, ...(anyText ? { anyOption: anyText } : {}) },
+      note:
+        mode === 'each'
+          ? '分组选项已收下：每组选一个、都选完他点「选好了」会把两个答案一起发给你；正文里把两个问题都问清楚，不要把选项再念一遍。'
+          : '分组选项已收下：他可以选 1~2 个（每组最多一个）再点提交，也可以直接点兜底项；正文里把问题问清楚，不要把选项再念一遍。',
+    };
+  }
   const seen = new Set();
-  const options = [];
+  const cleaned = [];
   for (const raw of Array.isArray(args.options) ? args.options : []) {
-    const text = String(raw ?? '').trim().replace(/\s+/g, ' ');
-    if (!text || text.length > 12 || seen.has(text)) continue;
-    seen.add(text);
-    options.push(text);
-    if (options.length >= 4) break;
+    const text = cleanOptionText(raw, seen);
+    if (text) cleaned.push(text);
+  }
+  // 常规问题仍最多 4 个；超过 4 个的部分只有系列目录里的真系列/角色
+  // 名才放行（问系列时一次给全），上限 10——目录外的词照样截断，
+  // 防止普通问题被模型塞成长串（2026-11-26 hx 选 A 方案）。
+  const options = cleaned.slice(0, 4);
+  if (cleaned.length > 4) {
+    const { names } = await getSeriesDirectory();
+    for (const text of cleaned.slice(4)) {
+      if (options.length >= 10) break;
+      if (names.has(text) || names.has(text.toUpperCase())) options.push(text);
+    }
   }
   if (options.length < 2) {
     return { ok: false, quiet: true, error: '选项不足两个，已忽略' };
@@ -1415,7 +1653,7 @@ async function dispatchXiaodouTool(name, rawArgs, context = {}) {
   if (name === 'get_promotions') return getPromotions();
   if (name === 'get_user_context') return getUserContext(context.userId);
   if (name === 'propose_add_to_cart') return proposeAddToCart(args);
-  if (name === 'claim_coupon') return claimCoupon(args, context);
+  if (name === 'list_claimable_coupons') return listClaimableCoupons(context);
   if (name === 'add_to_cart') return addToCart(args, context);
   if (name === 'update_cart') return updateCart(args, context);
   if (name === 'add_favorite') return addFavorite(args, context);

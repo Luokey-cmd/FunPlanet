@@ -4,6 +4,7 @@ import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
 import { saveReviewImage } from '../utils/review-media.js';
 import { refreshProductRating, serializeReview, serializeReviewComment } from '../utils/review.js';
+import { markWeeklyTaskDone } from '../utils/daily-tasks.js';
 
 const router = Router();
 
@@ -119,6 +120,7 @@ router.post('/', authRequired, async (req, res) => {
   });
 
   await refreshProductRating(prisma, productId);
+  await markWeeklyTaskDone(req.user.sub, 'weeklyReviewDone');
 
   ok(res, { review: serializeReview(review, user, []) });
 });

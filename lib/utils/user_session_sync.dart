@@ -12,13 +12,16 @@ import '../providers/starwish_profile_provider.dart';
 
 Timer? _sessionPollTimer;
 
-/// 轻量刷新：订单状态 + 消息通知（不拉全量用户资料）
+/// 轻量刷新：订单状态 + 消息通知 + 社区未读回复数（不拉全量用户资料）。
+/// 社区未读挂在这里，底部导航消息角标才能每 12 秒自己更新——有人回复
+/// 我的帖子时不必进消息页也能看到角标亮起来。
 Future<void> refreshSessionData(BuildContext context) async {
   final orders = context.read<OrderProvider>();
   final user = context.read<UserProvider>();
   final tasks = <Future<void>>[];
   if (orders.isCloudSync) tasks.add(orders.loadFromRemote());
   if (user.isCloudSync) tasks.add(user.refreshNotifications());
+  if (user.isCloudSync) tasks.add(user.refreshCommunityUnread());
   if (tasks.isEmpty) return;
   await Future.wait(tasks);
 }

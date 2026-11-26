@@ -57,12 +57,15 @@ class AppTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalCount = context.watch<CartProvider>().totalCount;
-    // 消息角标 = 消息页三行角标之和（hx 2026-11-23 定：内外必须一致）：
-    // 未读通知 + 客服未读 + 小豆盘点事项数（待付款笔数 + 快到期券张数）。
-    // 小豆事项办完/过期后盘点自然归零，角标跟着消，不会赖着不走。
+    // 消息角标 = 消息页四行角标之和（hx 2026-11-23 定：内外必须一致；
+    // 2026-11-26 社区行加未读回复角标后扩为四路）：
+    // 未读通知 + 客服未读 + 小豆盘点事项数（待付款笔数 + 快到期券张数）
+    // + 社区未读回复数（我的帖子收到的他人新评论，进社区页即清零）。
+    // 小豆事项办完/过期后盘点自然归零、社区看过即消，角标跟着消，不会赖着不走。
     final messageCount = context.watch<UserProvider>().unreadNotificationCount +
         context.watch<SupportChatProvider>().supportUnreadTotal +
-        context.watch<XiaodouChatProvider>().briefingMatters.length;
+        context.watch<XiaodouChatProvider>().briefingMatters.length +
+        context.watch<UserProvider>().communityUnreadReplies;
 
     return Container(
       decoration: const BoxDecoration(
@@ -76,7 +79,7 @@ class AppTabBar extends StatelessWidget {
       child: Row(
         children: _tabs.map((tab) {
           final isActive = active == tab.$1;
-          // 角标数按格子分开算：购物车数件数、消息数三行之和，其余格子不挂。
+          // 角标数按格子分开算：购物车数件数、消息数四行之和，其余格子不挂。
           final badgeCount = tab.$1 == AppTab.cart
               ? totalCount
               : tab.$1 == AppTab.message

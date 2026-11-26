@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
 import { log } from '../utils/log.js';
+import { markDailyTaskDone } from '../utils/daily-tasks.js';
 import {
   assertUserOwnsImagePath,
   saveCommunityImage,
@@ -161,6 +162,48 @@ router.get('/feed', authRequired, async (req, res) => {
   });
 });
 
+// 社区未读回复数（hx 2026-11-26 拍板）：口径只认评论不认点赞——帖子作者是
+// 当前用户、评论时间晚于已读标记、且评论者不是本人（AI 好友的自动回复算
+// 「有人回复」，其他真实用户也算；本人在自己帖子下的评论不算）。
+// 已读标记 communityLastReadAt 为空 = 从没标过：先把标记立在当前时间再返 0，
+// 防功能首次启用时把历史回复全算成未读（倒灌）。
+router.get('/unread-replies', authRequired, async (req, res) => {
+  const me = req.user.sub;
+  const profile = await prisma.userProfile.findUnique({
+    where: { userId: me },
+    select: { communityLastReadAt: true },
+  });
+  if (!profile?.communityLastReadAt) {
+    await prisma.userProfile.upsert({
+      where: { userId: me },
+      update: { communityLastReadAt: new Date() },
+      create: { userId: me, communityLastReadAt: new Date() },
+    });
+    return ok(res, { unreadCount: 0 });
+  }
+  const unreadCount = await prisma.aiCommunityComment.count({
+    where: {
+      createdAt: { gt: profile.communityLastReadAt },
+      post: { authorType: 'user', userId: me },
+      // NOT(作者是本人)：AI 好友评论 authorType 是 ai_friend 天然通过，
+      // 真人评论里只排除我自己写的那几条。
+      NOT: { authorType: 'user', userId: me },
+    },
+  });
+  ok(res, { unreadCount });
+});
+
+// 标已读：进社区页时调，把已读标记推到当前时间，未读数归零。
+router.post('/unread-replies/read', authRequired, async (req, res) => {
+  const me = req.user.sub;
+  await prisma.userProfile.upsert({
+    where: { userId: me },
+    update: { communityLastReadAt: new Date() },
+    create: { userId: me, communityLastReadAt: new Date() },
+  });
+  ok(res, { unreadCount: 0 });
+});
+
 router.get('/posts/:id', authRequired, async (req, res) => {
   const id = String(req.params.id ?? '').trim();
   const row = await prisma.aiCommunityPost.findUnique({
@@ -246,6 +289,7 @@ router.post('/posts/:id/like', authRequired, async (req, res) => {
         userId: req.user.sub,
       },
     });
+    await markDailyTaskDone(req.user.sub, 'dailyCommunityDone');
   }
 
   const row = await prisma.aiCommunityPost.findUnique({

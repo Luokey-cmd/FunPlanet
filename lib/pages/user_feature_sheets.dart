@@ -14,6 +14,9 @@ import '../widgets/feature_page_scaffold.dart';
 import 'address_edit_page.dart';
 import 'member_benefit_page.dart';
 import 'product_detail_page.dart';
+import 'ai_community_page.dart';
+import 'orders_sheet.dart';
+import 'xiaodou_chat_page.dart';
 import 'support_chat_page.dart';
 
 import '../widgets/click_effect/app_pressable.dart';
@@ -336,11 +339,27 @@ class UserFeatureSheets {
                       gradient: AppColors.profileMemberGradient,
                       borderRadius: BorderRadius.circular(AppScale.s(12)),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Text('当前趣玩币', style: FeaturePageStyle.secondary(color: Colors.white70)),
-                        Text('${user.funCoins}', style: FeaturePageStyle.display(color: Colors.white)),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('当前趣玩币', style: FeaturePageStyle.secondary(color: Colors.white70)),
+                              Text('${user.funCoins}', style: FeaturePageStyle.display(color: Colors.white)),
+                            ],
+                          ),
+                        ),
+                        // 去充值：白色描边小按钮，点开充值页选档位（1 元 = 15 币）。
+                        AppOutlinedButton(
+                          onPressed: () => showCoinRecharge(context),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white70),
+                            minimumSize: Size(AppScale.s(76), AppScale.s(36)),
+                          ),
+                          child: Text('去充值', style: FeaturePageStyle.buttonLabel(color: Colors.white)),
+                        ),
                       ],
                     ),
                   ),
@@ -370,6 +389,156 @@ class UserFeatureSheets {
           );
         },
       ),
+    );
+  }
+
+  // 趣玩币充值页（2026-11-26，比例 1 元 = 15 币）：档位卡点选、默认选中
+  // ¥20 档（320 币，正好够开一个月会员还剩 21）。支付与订单付款同口径，
+  // 是模拟支付、无真实网关；点「立即充值」调 UserProvider.rechargeCoins，
+  // 成功后余额由 Consumer 自动刷新，明细里会多一条「充值」流水（服务端记账）。
+  static void showCoinRecharge(BuildContext context) {
+    var selected = 2;
+    _showSheet(
+      context,
+      title: '充值趣玩币',
+      child: Consumer<UserProvider>(
+        builder: (context, user, _) {
+          return StatefulBuilder(
+            builder: (context, setState) {
+              final pack = coinRechargePackages[selected];
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('当前趣玩币 ${user.funCoins}', style: FeaturePageStyle.bodyBold()),
+                  SizedBox(height: AppScale.s(4)),
+                  Text('充值比例：1 元 = 15 币 · 大档位有赠送', style: FeaturePageStyle.secondary()),
+                  SizedBox(height: AppScale.s(14)),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: coinRechargePackages.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      mainAxisSpacing: AppScale.s(10),
+                      crossAxisSpacing: AppScale.s(10),
+                      childAspectRatio: 0.92,
+                    ),
+                    itemBuilder: (context, i) {
+                      final p = coinRechargePackages[i];
+                      final active = i == selected;
+                      return GestureDetector(
+                        onTap: () => setState(() => selected = i),
+                        child: Container(
+                          padding: EdgeInsets.all(AppScale.s(10)),
+                          decoration: BoxDecoration(
+                            color: active ? AppColors.secondary : AppColors.muted,
+                            borderRadius: BorderRadius.circular(AppScale.s(12)),
+                            border: Border.all(color: active ? AppColors.primary : AppColors.border.withValues(alpha: 0.5)),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text('${p.coins}', style: FeaturePageStyle.title(color: active ? AppColors.primary : null)),
+                              Text('趣玩币', style: FeaturePageStyle.caption()),
+                              SizedBox(height: AppScale.s(4)),
+                              Text('¥${p.yuan}', style: FeaturePageStyle.bodyBold()),
+                              if (p.bonus > 0) Text('送 ${p.bonus} 币', style: FeaturePageStyle.caption(color: AppColors.primary)),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(height: AppScale.s(16)),
+                  AppFilledButton(
+                    onPressed: () async {
+                      final err = await user.rechargeCoins(pack);
+                      if (!context.mounted) return;
+                      showTopSnackBar(
+                        context,
+                        content: Text(
+                          err ?? '充值成功，+${pack.coins} 趣玩币已到账',
+                          style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600),
+                        ),
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      minimumSize: Size(double.infinity, FeaturePageStyle.buttonHeight),
+                    ),
+                    child: Text('立即充值 ¥${pack.yuan}', style: FeaturePageStyle.buttonLabel(color: Colors.white)),
+                  ),
+                  SizedBox(height: AppScale.s(10)),
+                  Text('模拟支付，支付成功立即到账；充值记录可在趣玩币明细里查看。', style: FeaturePageStyle.caption()),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  // 开通会员时趣玩币不足的弹窗：写清需要/现有/还差，两个出路——
+  // 「去充值」打开充值页、「去赚取」打开每日任务页；点「再想想」或弹窗外关闭。
+  static void showCoinShortageDialog(BuildContext context, {required int current, required int cost}) {
+    final diff = cost - current;
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('趣玩币不足'),
+          content: Text('开通会员需要 $cost 趣玩币，你当前有 $current，还差 $diff。\n可以充值，也可以做每日任务赚取。'),
+          actions: [
+            AppTextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('再想想', style: FeaturePageStyle.action(color: AppColors.mutedForeground)),
+            ),
+            AppTextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                showDailyTasks(context);
+              },
+              child: Text('去赚取', style: FeaturePageStyle.action()),
+            ),
+            AppTextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                showCoinRecharge(context);
+              },
+              child: Text('去充值', style: FeaturePageStyle.action()),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 非会员点首页「会员每日礼包」时的提示弹窗：先把专享口径与礼包内容
+  // 说清，再给开通入口——绝不能让非会员直接领到（服务端也会 403 拦）。
+  // 「去开通会员」打开现成的会员权益页（里面就是开通流程），不另造页面。
+  static void showMemberDailyGiftLockedDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('会员专享'),
+          content: const Text('会员每日礼包是 VIP2 会员专享，开通后每天可领一份：积分 +10、趣玩币 +5、满30减5礼包券。'),
+          actions: [
+            AppTextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('再看看', style: FeaturePageStyle.action(color: AppColors.mutedForeground)),
+            ),
+            AppTextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                showMemberBenefits(context);
+              },
+              child: Text('去开通会员', style: FeaturePageStyle.action()),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -439,6 +608,9 @@ class UserFeatureSheets {
           }
           if (owned.isEmpty) return _empty('盒柜还是空的，下单的宝贝发货后会出现在这里');
           return ListView.separated(
+            // padding 显式归零：不写时 ListView 会自带一份顶部安全区
+            // 留白，和页面外框的间距叠加，列表顶部会空出一大截。
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             itemCount: owned.length,
             separatorBuilder: (_, _) => SizedBox(height: AppScale.s(10)),
@@ -512,6 +684,9 @@ class UserFeatureSheets {
                 _empty('还没有收货地址')
               else
                 ListView.separated(
+                  // padding 显式归零：不写时 ListView 会自带一份顶部
+                  // 安全区留白，和页面外框的间距叠加，空出一大截。
+                  padding: EdgeInsets.zero,
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: user.addresses.length,
@@ -624,6 +799,9 @@ class UserFeatureSheets {
           final items = user.favoriteProducts;
           if (items.isEmpty) return _empty('还没有收藏商品');
           return ListView.separated(
+            // padding 显式归零：不写时 ListView 会自带一份顶部安全区
+            // 留白，和页面外框的间距叠加，列表顶部会空出一大截。
+            padding: EdgeInsets.zero,
             shrinkWrap: true,
             itemCount: items.length,
             separatorBuilder: (_, _) => SizedBox(height: AppScale.s(10)),
@@ -710,7 +888,7 @@ class UserFeatureSheets {
 
   static void showMemberBenefits(BuildContext context, {String? highlight}) {
     const items = [
-      ('每月赠券', 'VIP 每月可领 1 张满99减20 优惠券，当月有效。'),
+      ('每月赠券', 'VIP 每月可领 1 张满88减20 优惠券，当月有效。'),
       ('积分加成', 'VIP2 购物积分 ×1.5 倍，下单自动累计。'),
       ('专属折扣', '指定潮玩/谷子商品享 95 折，结算页自动抵扣。'),
       ('生日礼包', '生日当月可领限定徽章 + 50 趣玩币礼包。'),
@@ -816,10 +994,16 @@ class UserFeatureSheets {
                     final err = await user.subscribeMember();
                     if (!context.mounted) return;
                     if (err != null) {
-                      showTopSnackBar(
-                        context,
-                        content: Text(err, style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-                      );
+                      // 币不足不再只飘一条提示：弹窗给出充值/赚取两个出路；
+                      // 其他错误（已是会员等）仍走原来的顶部提示。
+                      if (err.contains('趣玩币不足')) {
+                        showCoinShortageDialog(context, current: user.funCoins, cost: memberSubscribeCoinPrice);
+                      } else {
+                        showTopSnackBar(
+                          context,
+                          content: Text(err, style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+                        );
+                      }
                     } else {
                       showTopSnackBar(
                         context,
@@ -892,39 +1076,153 @@ class UserFeatureSheets {
     );
   }
 
+  // 任务页统一的小提示，省得每个任务都写一长串
+  static void _taskSnack(BuildContext context, String message) {
+    showTopSnackBar(
+      context,
+      content: Text(message, style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+    );
+  }
+
+  // 顶部汇总卡：今日已赚（服务端按当天任务流水汇总下发）+ 我的余额
+  static Widget _tasksSummaryCard(UserProvider user) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(AppScale.s(14)),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [AppColors.primaryLight, AppColors.secondary]),
+        borderRadius: BorderRadius.circular(AppScale.s(12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('今日已赚 ${user.dailyEarnedPoints} 积分 · ${user.dailyEarnedCoins} 趣玩币', style: FeaturePageStyle.bodyBold()),
+          SizedBox(height: AppScale.s(4)),
+          Text('我的积分 ${user.points} · 趣玩币 ${user.funCoins}', style: FeaturePageStyle.secondary()),
+        ],
+      ),
+    );
+  }
+
+  // 连签条：按用户自己的连签节奏点亮 7 格（不是自然周），第 3 格 +30、
+  // 第 7 格 +100 直接标在格子下面；今天还没签时，下一格描边高亮。
+  static Widget _checkInStreakBar(UserProvider user) {
+    final streak = user.checkInStreak;
+    var signedDots = streak == 0 ? 0 : ((streak - 1) % 7) + 1;
+    var pendingIndex = -1;
+    if (!user.dailyCheckInDone) {
+      if (signedDots == 7) {
+        signedDots = 0;
+        pendingIndex = 0;
+      } else {
+        pendingIndex = signedDots;
+      }
+    }
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(AppScale.s(14)),
+      decoration: BoxDecoration(
+        color: AppColors.muted,
+        borderRadius: BorderRadius.circular(AppScale.s(12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('连续签到', style: FeaturePageStyle.bodyBold()),
+              SizedBox(width: AppScale.s(8)),
+              Text(streak > 0 ? '已连签 $streak 天' : '签到开启连签', style: FeaturePageStyle.secondary()),
+            ],
+          ),
+          SizedBox(height: AppScale.s(10)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(7, (i) {
+              final signed = i < signedDots;
+              final pending = i == pendingIndex;
+              final bonusDay = i == 2 || i == 6;
+              final label = i == 2 ? '+30' : i == 6 ? '+100' : '第${i + 1}天';
+              return Column(
+                children: [
+                  Container(
+                    width: AppScale.s(32),
+                    height: AppScale.s(32),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: signed ? AppColors.primary : Colors.transparent,
+                      border: Border.all(
+                        color: signed || pending ? AppColors.primary : AppColors.mutedForeground.withValues(alpha: 0.4),
+                        width: pending ? 2 : 1,
+                      ),
+                    ),
+                    child: signed ? Icon(Icons.check, size: AppScale.s(16), color: Colors.white) : null,
+                  ),
+                  SizedBox(height: AppScale.s(4)),
+                  Text(
+                    label,
+                    style: FeaturePageStyle.caption(
+                      color: bonusDay ? AppColors.primary : null,
+                      weight: bonusDay ? FontWeight.w600 : null,
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
   static void showDailyTasks(BuildContext context) {
+    // 进门先拉一次最新资料：收藏/加购/聊天/点赞的进度都是服务端记的，
+    // 不刷新会看到上次打开时的旧状态
+    context.read<UserProvider>().refreshProfileFromRemote();
     _showSheet(
       context,
       title: '每日任务',
       child: Consumer<UserProvider>(
         builder: (context, user, _) {
+          void goMall() {
+            Navigator.pop(context);
+            context.read<AppTabProvider>().goTo(AppTab.mall);
+          }
+
           return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _tasksSummaryCard(user),
+              SizedBox(height: AppScale.s(12)),
+              _checkInStreakBar(user),
+              SizedBox(height: AppScale.s(16)),
+              Text('每日任务', style: FeaturePageStyle.sectionTitle()),
+              SizedBox(height: AppScale.s(10)),
               _taskTile(
                 context,
+                icon: Icons.event_available_outlined,
                 title: '每日签到',
                 reward: '+50 积分',
+                subtitle: user.checkInStreak > 0 ? '已连签 ${user.checkInStreak} 天' : '连签第 3 天、第 7 天有额外奖励',
                 done: user.dailyCheckInDone,
                 actionLabel: user.dailyCheckInDone ? '已完成' : '签到',
                 onAction: user.dailyCheckInDone
                     ? null
                     : () {
-                        if (user.dailyCheckIn()) {
-                          showTopSnackBar(
-                            context,
-                            content: Text('签到成功，获得 50 积分', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-                          );
-                        }
+                        if (user.dailyCheckIn()) _taskSnack(context, '签到成功，获得 50 积分');
                       },
               ),
               _taskTile(
                 context,
+                icon: Icons.explore_outlined,
                 title: '浏览 3 件商品',
                 reward: '+30 趣玩币',
                 done: user.dailyBrowseRewardClaimed,
-                subtitle: '进度 ${user.dailyBrowseCount.clamp(0, 3)}/3',
+                progress: user.dailyBrowseCount.clamp(0, 3) / 3,
+                progressText: '进度 ${user.dailyBrowseCount.clamp(0, 3)}/3',
+                claimReady: !user.dailyBrowseRewardClaimed && user.dailyBrowseCount >= 3,
                 actionLabel: user.dailyBrowseRewardClaimed
-                    ? '已完成'
+                    ? '已领取'
                     : user.dailyBrowseCount >= 3
                         ? '领取'
                         : '去完成',
@@ -932,35 +1230,174 @@ class UserFeatureSheets {
                     ? null
                     : user.dailyBrowseCount >= 3
                         ? () {
-                            if (user.claimDailyBrowseReward()) {
-                              showTopSnackBar(
-                                context,
-                                content: Text('任务完成，获得 30 趣玩币', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-                              );
-                            }
+                            if (user.claimDailyBrowseReward()) _taskSnack(context, '任务完成，获得 30 趣玩币');
+                          }
+                        : goMall,
+              ),
+              _taskTile(
+                context,
+                icon: Icons.favorite_border,
+                title: '收藏 1 件商品',
+                reward: '+15 趣玩币',
+                done: user.dailyFavoriteClaimed,
+                claimReady: user.dailyFavoriteDone && !user.dailyFavoriteClaimed,
+                actionLabel: user.dailyFavoriteClaimed
+                    ? '已领取'
+                    : user.dailyFavoriteDone
+                        ? '领取'
+                        : '去完成',
+                onAction: user.dailyFavoriteClaimed
+                    ? null
+                    : user.dailyFavoriteDone
+                        ? () {
+                            if (user.claimDailyFavoriteReward()) _taskSnack(context, '任务完成，获得 15 趣玩币');
+                          }
+                        : goMall,
+              ),
+              _taskTile(
+                context,
+                icon: Icons.add_shopping_cart_outlined,
+                title: '加入购物车 1 件',
+                reward: '+15 趣玩币',
+                done: user.dailyCartClaimed,
+                claimReady: user.dailyCartDone && !user.dailyCartClaimed,
+                actionLabel: user.dailyCartClaimed
+                    ? '已领取'
+                    : user.dailyCartDone
+                        ? '领取'
+                        : '去完成',
+                onAction: user.dailyCartClaimed
+                    ? null
+                    : user.dailyCartDone
+                        ? () {
+                            if (user.claimDailyCartReward()) _taskSnack(context, '任务完成，获得 15 趣玩币');
+                          }
+                        : goMall,
+              ),
+              _taskTile(
+                context,
+                icon: Icons.chat_bubble_outline,
+                title: '和小豆聊一句',
+                reward: '+20 积分',
+                done: user.dailyChatClaimed,
+                claimReady: user.dailyChatDone && !user.dailyChatClaimed,
+                actionLabel: user.dailyChatClaimed
+                    ? '已领取'
+                    : user.dailyChatDone
+                        ? '领取'
+                        : '去完成',
+                onAction: user.dailyChatClaimed
+                    ? null
+                    : user.dailyChatDone
+                        ? () {
+                            if (user.claimDailyChatReward()) _taskSnack(context, '任务完成，获得 20 积分');
                           }
                         : () {
                             Navigator.pop(context);
-                            context.read<AppTabProvider>().goTo(AppTab.mall);
+                            XiaodouChatPage.open(context);
                           },
               ),
               _taskTile(
                 context,
-                title: '分享一次商品',
-                reward: '+20 趣玩币',
-                done: user.dailyShareDone,
-                actionLabel: user.dailyShareDone ? '已完成' : '分享',
-                onAction: user.dailyShareDone
+                icon: Icons.thumb_up_outlined,
+                title: 'AI 社区点赞 1 次',
+                reward: '+20 积分',
+                done: user.dailyCommunityClaimed,
+                claimReady: user.dailyCommunityDone && !user.dailyCommunityClaimed,
+                actionLabel: user.dailyCommunityClaimed
+                    ? '已领取'
+                    : user.dailyCommunityDone
+                        ? '领取'
+                        : '去完成',
+                onAction: user.dailyCommunityClaimed
                     ? null
-                    : () {
-                        if (user.completeDailyShare()) {
-                          showTopSnackBar(
-                            context,
-                            content: Text('分享成功，获得 20 趣玩币', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-                          );
-                        }
-                      },
+                    : user.dailyCommunityDone
+                        ? () {
+                            if (user.claimDailyCommunityReward()) _taskSnack(context, '任务完成，获得 20 积分');
+                          }
+                        : () {
+                            final navigator = Navigator.of(context);
+                            navigator.pop();
+                            navigator.push(MaterialPageRoute(builder: (_) => const AiCommunityPage()));
+                          },
               ),
+              _taskTile(
+                context,
+                icon: Icons.share_outlined,
+                title: '分享 1 件商品',
+                reward: '+20 趣玩币',
+                subtitle: '在商品详情页点右上角分享',
+                done: user.dailyShareDone,
+                actionLabel: user.dailyShareDone ? '已完成' : '去完成',
+                onAction: user.dailyShareDone ? null : goMall,
+              ),
+              SizedBox(height: AppScale.s(6)),
+              Text('每周任务', style: FeaturePageStyle.sectionTitle()),
+              SizedBox(height: AppScale.s(10)),
+              _taskTile(
+                context,
+                icon: Icons.date_range_outlined,
+                title: '本周签到 5 天',
+                reward: '+100 积分',
+                done: user.weeklyCheckInClaimed,
+                progress: user.weeklyCheckInDays.clamp(0, 5) / 5,
+                progressText: '进度 ${user.weeklyCheckInDays.clamp(0, 5)}/5',
+                claimReady: !user.weeklyCheckInClaimed && user.weeklyCheckInDays >= 5,
+                actionLabel: user.weeklyCheckInClaimed
+                    ? '已领取'
+                    : user.weeklyCheckInDays >= 5
+                        ? '领取'
+                        : '进行中',
+                onAction: !user.weeklyCheckInClaimed && user.weeklyCheckInDays >= 5
+                    ? () {
+                        if (user.claimWeeklyCheckInReward()) _taskSnack(context, '每周签到奖励，获得 100 积分');
+                      }
+                    : null,
+              ),
+              _taskTile(
+                context,
+                icon: Icons.receipt_long_outlined,
+                title: '本周完成 1 笔订单',
+                reward: '+50 趣玩币',
+                done: user.weeklyOrderClaimed,
+                claimReady: user.weeklyOrderDone && !user.weeklyOrderClaimed,
+                actionLabel: user.weeklyOrderClaimed
+                    ? '已领取'
+                    : user.weeklyOrderDone
+                        ? '领取'
+                        : '去完成',
+                onAction: user.weeklyOrderClaimed
+                    ? null
+                    : user.weeklyOrderDone
+                        ? () {
+                            if (user.claimWeeklyOrderReward()) _taskSnack(context, '每周下单奖励，获得 50 趣玩币');
+                          }
+                        : goMall,
+              ),
+              _taskTile(
+                context,
+                icon: Icons.rate_review_outlined,
+                title: '本周评价 1 件商品',
+                reward: '+30 趣玩币',
+                done: user.weeklyReviewClaimed,
+                claimReady: user.weeklyReviewDone && !user.weeklyReviewClaimed,
+                actionLabel: user.weeklyReviewClaimed
+                    ? '已领取'
+                    : user.weeklyReviewDone
+                        ? '领取'
+                        : '去完成',
+                onAction: user.weeklyReviewClaimed
+                    ? null
+                    : user.weeklyReviewDone
+                        ? () {
+                            if (user.claimWeeklyReviewReward()) _taskSnack(context, '每周评价奖励，获得 30 趣玩币');
+                          }
+                        : () {
+                            Navigator.pop(context);
+                            OrdersSheet.show(context, filterLabel: '待评价');
+                          },
+              ),
+              Text('每日任务 0 点刷新，每周任务周一刷新（北京时间）', style: FeaturePageStyle.caption()),
             ],
           );
         },
@@ -974,76 +1411,128 @@ class UserFeatureSheets {
       title: '领券中心',
       child: Consumer<UserProvider>(
         builder: (context, user, _) {
-          final claimed = user.coupons.any((c) => c.id == 'c6');
+          void toastClaimed() {
+            showTopSnackBar(
+              context,
+              content: Text('领券成功，已放入账户', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+            );
+          }
+
+          final isMember = user.vipLevel >= memberTargetVipLevel;
           return Column(
             children: [
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(AppScale.s(14)),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [AppColors.primaryLight, AppColors.secondary]),
-                  borderRadius: BorderRadius.circular(AppScale.s(12)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('满120减25', style: FeaturePageStyle.title()),
-                    SizedBox(height: AppScale.s(6)),
-                    Text('全场潮玩通用 · 领取后 30 天有效', style: FeaturePageStyle.secondary()),
-                    SizedBox(height: AppScale.s(10)),
-                    AppFilledButton(
-                      onPressed: claimed
-                          ? null
-                          : () {
-                              if (user.claimCouponCenterGift()) {
-                                showTopSnackBar(
-                                  context,
-                                  content: Text('领券成功，已放入账户', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-                                );
-                              }
-                            },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        disabledBackgroundColor: AppColors.muted,
-                        minimumSize: Size(double.infinity, FeaturePageStyle.buttonHeight),
-                      ),
-                      child: Text(
-                        claimed ? '已领取' : '立即领取',
-                        style: FeaturePageStyle.buttonLabel(color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
+              _couponCenterCard(
+                title: '新人券包',
+                subtitle: '满30减5 · 满50减10 · 两张一起领',
+                claimed: user.newcomerClaimed,
+                onClaim: () {
+                  if (user.claimNewcomerCoupon()) toastClaimed();
+                },
               ),
               SizedBox(height: AppScale.s(12)),
-              if (!user.newcomerClaimed)
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(AppScale.s(14)),
-                  decoration: BoxDecoration(
-                    color: AppColors.muted,
-                    borderRadius: BorderRadius.circular(AppScale.s(12)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('新人券包', style: FeaturePageStyle.bodyBold()),
-                      SizedBox(height: AppScale.s(6)),
-                      Text('满30减5 · 满50减10', style: FeaturePageStyle.secondary()),
-                      SizedBox(height: AppScale.s(10)),
-                      AppTextButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          context.read<AppTabProvider>().goTo(AppTab.profile);
-                        },
-                        child: Text('去我的页领取', style: FeaturePageStyle.action()),
-                      ),
-                    ],
-                  ),
-                ),
+              _couponCenterCard(
+                title: '满120减25',
+                subtitle: '全场潮玩通用 · 领取后 30 天有效',
+                claimed: user.coupons.any((c) => c.id == 'c6'),
+                highlight: true,
+                onClaim: () {
+                  if (user.claimCouponCenterGift()) toastClaimed();
+                },
+              ),
+              SizedBox(height: AppScale.s(12)),
+              _couponCenterCard(
+                title: '满200减40',
+                subtitle: '全场潮玩通用 · 领取后 30 天有效',
+                claimed: user.coupons.any((c) => c.id == 'c8'),
+                onClaim: () {
+                  if (user.claimCouponCenterSingle(
+                    couponId: 'c8',
+                    title: '领券中心满200减40',
+                    discount: 40,
+                    condition: '满200可用',
+                  )) {
+                    toastClaimed();
+                  }
+                },
+              ),
+              SizedBox(height: AppScale.s(12)),
+              _couponCenterCard(
+                title: '满300减80',
+                subtitle: '全场潮玩通用 · 领取后 30 天有效',
+                claimed: user.coupons.any((c) => c.id == 'c3'),
+                onClaim: () {
+                  if (user.claimCouponCenterSingle(
+                    couponId: 'c3',
+                    title: '满300减80',
+                    discount: 80,
+                    condition: '满300可用',
+                  )) {
+                    toastClaimed();
+                  }
+                },
+              ),
+              SizedBox(height: AppScale.s(12)),
+              _couponCenterCard(
+                title: '会员每月赠券 · 满88减20',
+                subtitle: isMember ? 'VIP2 会员每月 1 张 · 当月有效' : 'VIP2 会员专享 · 每月 1 张',
+                claimed: user.memberMonthlyCouponClaimed,
+                claimLabel: isMember ? '立即领取' : 'VIP2 可领',
+                onClaim: () {
+                  if (!isMember) {
+                    showTopSnackBar(
+                      context,
+                      content: Text('开通会员（VIP2）后每月可领', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+                    );
+                    return;
+                  }
+                  if (user.claimMemberMonthlyCoupon()) toastClaimed();
+                },
+              ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  // 领券中心的单张券卡：标题 + 说明 + 整宽领取按钮，5 张卡共用一个样子。
+  // claimed=true 时按钮变灰禁用并显示「已领取」；highlight=true 用紫色渐变突出主推券。
+  static Widget _couponCenterCard({
+    required String title,
+    required String subtitle,
+    required bool claimed,
+    required VoidCallback onClaim,
+    String claimLabel = '立即领取',
+    bool highlight = false,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(AppScale.s(14)),
+      decoration: BoxDecoration(
+        gradient: highlight ? LinearGradient(colors: [AppColors.primaryLight, AppColors.secondary]) : null,
+        color: highlight ? null : AppColors.muted,
+        borderRadius: BorderRadius.circular(AppScale.s(12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: FeaturePageStyle.bodyBold()),
+          SizedBox(height: AppScale.s(6)),
+          Text(subtitle, style: FeaturePageStyle.secondary()),
+          SizedBox(height: AppScale.s(10)),
+          AppFilledButton(
+            onPressed: claimed ? null : onClaim,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              disabledBackgroundColor: AppColors.muted,
+              minimumSize: Size(double.infinity, FeaturePageStyle.buttonHeight),
+            ),
+            child: Text(
+              claimed ? '已领取' : claimLabel,
+              style: FeaturePageStyle.buttonLabel(color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1056,6 +1545,10 @@ class UserFeatureSheets {
     required String actionLabel,
     String? subtitle,
     VoidCallback? onAction,
+    IconData? icon,
+    double? progress,
+    String? progressText,
+    bool claimReady = false,
   }) {
     return Container(
       margin: EdgeInsets.only(bottom: AppScale.s(10)),
@@ -1066,17 +1559,66 @@ class UserFeatureSheets {
       ),
       child: Row(
         children: [
+          if (icon != null) ...[
+            Container(
+              width: AppScale.s(38),
+              height: AppScale.s(38),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppScale.s(10)),
+              ),
+              child: Icon(icon, size: AppScale.s(20), color: AppColors.primary),
+            ),
+            SizedBox(width: AppScale.s(10)),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: FeaturePageStyle.bodyBold()),
                 if (subtitle != null) Text(subtitle, style: FeaturePageStyle.secondary()),
+                if (progress != null) ...[
+                  SizedBox(height: AppScale.s(6)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(AppScale.s(3)),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: AppScale.s(6),
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          ),
+                        ),
+                      ),
+                      if (progressText != null) ...[
+                        SizedBox(width: AppScale.s(8)),
+                        Text(progressText, style: FeaturePageStyle.caption()),
+                      ],
+                    ],
+                  ),
+                  SizedBox(height: AppScale.s(2)),
+                ],
                 Text(reward, style: FeaturePageStyle.action()),
               ],
             ),
           ),
-          AppTextButton(onPressed: onAction, child: Text(actionLabel, style: FeaturePageStyle.action())),
+          if (claimReady)
+            AppFilledButton(
+              onPressed: onAction,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                minimumSize: Size(AppScale.s(64), AppScale.s(34)),
+                padding: EdgeInsets.symmetric(horizontal: AppScale.s(12)),
+              ),
+              child: Text(actionLabel, style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600, color: Colors.white)),
+            )
+          else
+            AppTextButton(
+              onPressed: onAction,
+              child: Text(actionLabel, style: FeaturePageStyle.action(color: done || onAction == null ? AppColors.mutedForeground : null)),
+            ),
         ],
       ),
     );

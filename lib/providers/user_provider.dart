@@ -6,12 +6,15 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/product_data.dart';
+import '../services/ai_community_service.dart';
 import '../services/api_client.dart';
 import '../services/user_cloud_api_service.dart';
 import '../widgets/user_avatar_image.dart';
 
 class UserProvider extends ChangeNotifier {
-  UserProvider({UserCloudApiService? cloudApi}) : _cloudApi = cloudApi ?? UserCloudApiService() {
+  UserProvider({UserCloudApiService? cloudApi, AiCommunityService? communityApi})
+      : _cloudApi = cloudApi ?? UserCloudApiService(),
+        _communityApi = communityApi ?? AiCommunityService() {
     applyFreshInitialState(keepNickname: true, keepUserId: true);
     unawaited(_restoreLocalAvatarCache());
   }
@@ -19,6 +22,8 @@ class UserProvider extends ChangeNotifier {
   static const _avatarCacheKey = 'user_avatar_path';
 
   final UserCloudApiService _cloudApi;
+  // 社区未读回复数走社区自己的服务（未读/已读两口都在 ai-community 路由下）。
+  final AiCommunityService _communityApi;
   bool _cloudSync = false;
 
   String nickname = 'Luca123';
@@ -42,7 +47,32 @@ class UserProvider extends ChangeNotifier {
   bool dailyShareDone = false;
   bool dailyBrowseRewardClaimed = false;
   int dailyBrowseCount = 0;
+  // 每日/每周任务扩展（2026-11-26）：Done 是服务端行为埋点记的进度、
+  // Claimed 是已领奖；今日已赚由服务端按当天流水汇总下发。
+  bool dailyFavoriteDone = false;
+  bool dailyFavoriteClaimed = false;
+  bool dailyCartDone = false;
+  bool dailyCartClaimed = false;
+  bool dailyChatDone = false;
+  bool dailyChatClaimed = false;
+  bool dailyCommunityDone = false;
+  bool dailyCommunityClaimed = false;
+  int checkInStreak = 0;
+  int dailyEarnedPoints = 0;
+  int dailyEarnedCoins = 0;
+  int weeklyCheckInDays = 0;
+  bool weeklyCheckInClaimed = false;
+  bool weeklyOrderDone = false;
+  bool weeklyOrderClaimed = false;
+  bool weeklyReviewDone = false;
+  bool weeklyReviewClaimed = false;
   bool memberMonthlyCouponClaimed = false;
+  // 会员每日礼包今日是否已领：以服务端券状态接口下发的为准（按中国日期
+  // 判断），本地不自己算日期，防手机时区/改时间把口径弄乱。
+  bool memberDailyGiftClaimedToday = false;
+  // AI 社区未读回复数：我的帖子收到、且晚于上次进社区页时间的他人评论条数
+  // （口径在服务端，本地只存数字）。消息页社区行角标与底部导航消息角标都读它。
+  int communityUnreadReplies = 0;
 
   final Set<String> _favoriteIds = {};
   final List<String> _browseHistory = [];
@@ -90,6 +120,23 @@ class UserProvider extends ChangeNotifier {
     dailyBrowseRewardClaimed =
         json['dailyBrowseRewardClaimed'] as bool? ?? dailyBrowseRewardClaimed;
     dailyBrowseCount = json['dailyBrowseCount'] as int? ?? dailyBrowseCount;
+    dailyFavoriteDone = json['dailyFavoriteDone'] as bool? ?? dailyFavoriteDone;
+    dailyFavoriteClaimed = json['dailyFavoriteClaimed'] as bool? ?? dailyFavoriteClaimed;
+    dailyCartDone = json['dailyCartDone'] as bool? ?? dailyCartDone;
+    dailyCartClaimed = json['dailyCartClaimed'] as bool? ?? dailyCartClaimed;
+    dailyChatDone = json['dailyChatDone'] as bool? ?? dailyChatDone;
+    dailyChatClaimed = json['dailyChatClaimed'] as bool? ?? dailyChatClaimed;
+    dailyCommunityDone = json['dailyCommunityDone'] as bool? ?? dailyCommunityDone;
+    dailyCommunityClaimed = json['dailyCommunityClaimed'] as bool? ?? dailyCommunityClaimed;
+    checkInStreak = json['checkInStreak'] as int? ?? checkInStreak;
+    dailyEarnedPoints = json['dailyEarnedPoints'] as int? ?? dailyEarnedPoints;
+    dailyEarnedCoins = json['dailyEarnedCoins'] as int? ?? dailyEarnedCoins;
+    weeklyCheckInDays = json['weeklyCheckInDays'] as int? ?? weeklyCheckInDays;
+    weeklyCheckInClaimed = json['weeklyCheckInClaimed'] as bool? ?? weeklyCheckInClaimed;
+    weeklyOrderDone = json['weeklyOrderDone'] as bool? ?? weeklyOrderDone;
+    weeklyOrderClaimed = json['weeklyOrderClaimed'] as bool? ?? weeklyOrderClaimed;
+    weeklyReviewDone = json['weeklyReviewDone'] as bool? ?? weeklyReviewDone;
+    weeklyReviewClaimed = json['weeklyReviewClaimed'] as bool? ?? weeklyReviewClaimed;
     pushEnabled = json['pushEnabled'] as bool? ?? pushEnabled;
     gender = json['gender'] as String? ?? gender;
     birthday = json['birthday'] as String? ?? birthday;
@@ -159,7 +206,26 @@ class UserProvider extends ChangeNotifier {
     dailyShareDone = false;
     dailyBrowseRewardClaimed = false;
     dailyBrowseCount = 0;
+    dailyFavoriteDone = false;
+    dailyFavoriteClaimed = false;
+    dailyCartDone = false;
+    dailyCartClaimed = false;
+    dailyChatDone = false;
+    dailyChatClaimed = false;
+    dailyCommunityDone = false;
+    dailyCommunityClaimed = false;
+    checkInStreak = 0;
+    dailyEarnedPoints = 0;
+    dailyEarnedCoins = 0;
+    weeklyCheckInDays = 0;
+    weeklyCheckInClaimed = false;
+    weeklyOrderDone = false;
+    weeklyOrderClaimed = false;
+    weeklyReviewDone = false;
+    weeklyReviewClaimed = false;
     memberMonthlyCouponClaimed = false;
+    memberDailyGiftClaimedToday = false;
+    communityUnreadReplies = 0;
     gender = '';
     birthday = '';
     bio = '';
@@ -207,7 +273,10 @@ class UserProvider extends ChangeNotifier {
       _addresses = List.from(addresses);
       newcomerClaimed = couponData.newcomerClaimed;
       memberMonthlyCouponClaimed = couponData.memberMonthlyCouponClaimed;
+      memberDailyGiftClaimedToday = couponData.memberDailyGiftClaimedToday;
       couponCount = _coupons.length;
+      // 社区未读跟着全量刷新一起对齐（notify 交给本函数末尾这次，不重复弹）。
+      await refreshCommunityUnread(notify: false);
       notifyListeners();
     } catch (_) {
       await _restoreLocalAvatarCache();
@@ -223,6 +292,33 @@ class UserProvider extends ChangeNotifier {
     } catch (_) {
       // 保留已有通知
     }
+  }
+
+  // 刷新社区未读回复数：拉不到就保留旧值（角标宁可慢一拍，不能闪没）。
+  // 挂载点：loadFromRemote 全量刷新 + 12 秒会话轮询（refreshSessionData），
+  // 所以停在任何页面底部导航角标都能自己更新，不必非进消息页。
+  Future<void> refreshCommunityUnread({bool notify = true}) async {
+    if (!_cloudSync) return;
+    try {
+      communityUnreadReplies = await _communityApi.fetchUnreadReplyCount();
+      if (notify) notifyListeners();
+    } catch (_) {
+      // 保留已有未读数
+    }
+  }
+
+  // 进社区页时标已读：本地先置 0 让角标立刻消（不等网络往返），再调服务端
+  // 把已读标记推到当前时间；服务端失败也只影响下次刷新的数字，不回滚本地，
+  // 下次 refreshCommunityUnread 会把真实未读重新拉回来。
+  Future<void> markCommunityRepliesRead() async {
+    if (communityUnreadReplies != 0) {
+      communityUnreadReplies = 0;
+      notifyListeners();
+    }
+    if (!_cloudSync) return;
+    try {
+      await _communityApi.markRepliesRead();
+    } catch (_) {}
   }
 
   Future<String?> saveProfile({
@@ -337,6 +433,9 @@ class UserProvider extends ChangeNotifier {
       _favoriteIds.remove(productId);
     } else {
       _favoriteIds.add(productId);
+      // 每日收藏任务的本地进度先亮起来（云端模式服务端也会记，
+      // 下次拉资料时以服务端为准覆盖）
+      dailyFavoriteDone = true;
     }
     notifyListeners();
     if (_cloudSync) unawaited(_syncToggleFavorite(productId));
@@ -382,6 +481,10 @@ class UserProvider extends ChangeNotifier {
     }
     dailyCheckInDone = true;
     points += 50;
+    // 本地模式没有服务端的上次签到日期可比，连签天数先顺延 +1 展示，
+    // 云端模式以服务端返回为准
+    checkInStreak += 1;
+    if (weeklyCheckInDays < 7) weeklyCheckInDays += 1;
     notifyListeners();
     return true;
   }
@@ -405,6 +508,90 @@ class UserProvider extends ChangeNotifier {
       return true;
     }
     dailyBrowseRewardClaimed = true;
+    funCoins += 30;
+    notifyListeners();
+    return true;
+  }
+
+  bool claimDailyFavoriteReward() {
+    if (!dailyFavoriteDone || dailyFavoriteClaimed) return false;
+    if (_cloudSync) {
+      unawaited(_profileAction('daily-favorite-reward'));
+      return true;
+    }
+    dailyFavoriteClaimed = true;
+    funCoins += 15;
+    notifyListeners();
+    return true;
+  }
+
+  bool claimDailyCartReward() {
+    if (!dailyCartDone || dailyCartClaimed) return false;
+    if (_cloudSync) {
+      unawaited(_profileAction('daily-cart-reward'));
+      return true;
+    }
+    dailyCartClaimed = true;
+    funCoins += 15;
+    notifyListeners();
+    return true;
+  }
+
+  bool claimDailyChatReward() {
+    if (!dailyChatDone || dailyChatClaimed) return false;
+    if (_cloudSync) {
+      unawaited(_profileAction('daily-chat-reward'));
+      return true;
+    }
+    dailyChatClaimed = true;
+    points += 20;
+    notifyListeners();
+    return true;
+  }
+
+  bool claimDailyCommunityReward() {
+    if (!dailyCommunityDone || dailyCommunityClaimed) return false;
+    if (_cloudSync) {
+      unawaited(_profileAction('daily-community-reward'));
+      return true;
+    }
+    dailyCommunityClaimed = true;
+    points += 20;
+    notifyListeners();
+    return true;
+  }
+
+  bool claimWeeklyCheckInReward() {
+    if (weeklyCheckInClaimed || weeklyCheckInDays < 5) return false;
+    if (_cloudSync) {
+      unawaited(_profileAction('weekly-checkin-reward'));
+      return true;
+    }
+    weeklyCheckInClaimed = true;
+    points += 100;
+    notifyListeners();
+    return true;
+  }
+
+  bool claimWeeklyOrderReward() {
+    if (!weeklyOrderDone || weeklyOrderClaimed) return false;
+    if (_cloudSync) {
+      unawaited(_profileAction('weekly-order-reward'));
+      return true;
+    }
+    weeklyOrderClaimed = true;
+    funCoins += 50;
+    notifyListeners();
+    return true;
+  }
+
+  bool claimWeeklyReviewReward() {
+    if (!weeklyReviewDone || weeklyReviewClaimed) return false;
+    if (_cloudSync) {
+      unawaited(_profileAction('weekly-review-reward'));
+      return true;
+    }
+    weeklyReviewClaimed = true;
     funCoins += 30;
     notifyListeners();
     return true;
@@ -476,6 +663,26 @@ class UserProvider extends ChangeNotifier {
     }
   }
 
+  // 趣玩币充值（模拟支付）：输入是档位（id 只用来告诉服务端选了哪一档）；
+  // 输出 null=成功、字符串=失败原因。云端模式到账币数以服务端查表为准，
+  // 成功后用返回的 profile 刷新余额；本地模式按同一张档位表直接加币。
+  Future<String?> rechargeCoins(CoinRechargePackage pack) async {
+    if (!_cloudSync) {
+      funCoins += pack.coins;
+      notifyListeners();
+      return null;
+    }
+    try {
+      final profile = await _cloudApi.profileAction('recharge-coins', body: {'packageId': pack.id});
+      _applyProfileJson(profile);
+      notifyListeners();
+      return null;
+    } catch (e) {
+      if (e is ApiException) return e.message;
+      return e.toString();
+    }
+  }
+
   bool claimMemberMonthlyCoupon() {
     if (vipLevel < memberTargetVipLevel) return false;
     if (memberMonthlyCouponClaimed) return false;
@@ -491,7 +698,7 @@ class UserProvider extends ChangeNotifier {
         id: 'c5',
         title: '会员每月赠券',
         discount: 20,
-        condition: '满99可用',
+        condition: '满88可用',
         expire: '2025-12-31',
       ),
     );
@@ -502,6 +709,43 @@ class UserProvider extends ChangeNotifier {
   Future<void> _claimMemberMonthlyRemote() async {
     try {
       await _cloudApi.claimMemberMonthly();
+      await loadFromRemote();
+    } catch (_) {}
+  }
+
+  // 会员每日礼包领取：输入无，输出 true=已受理领取。
+  // 门槛（VIP2、今日未领）先在本地挡一道，服务端还会再判一遍并以它为准；
+  // 云端模式下三件奖励（积分 +10、趣玩币 +5、礼包券）全是服务端发的，
+  // 本地不预加，领完整表刷新一次把余额、券包、已领状态一起对齐。
+  // 本地（未接云）模式按同一口径在本地发：数值与服务端常量保持一致。
+  bool claimMemberDailyGift() {
+    if (vipLevel < memberTargetVipLevel) return false;
+    if (memberDailyGiftClaimedToday) return false;
+    if (_cloudSync) {
+      unawaited(_claimMemberDailyGiftRemote());
+      return true;
+    }
+    memberDailyGiftClaimedToday = true;
+    points += 10;
+    funCoins += 5;
+    couponCount += 1;
+    _coupons.insert(
+      0,
+      const Coupon(
+        id: 'c9',
+        title: '会员每日礼包券',
+        discount: 5,
+        condition: '满30可用',
+        expire: '2026-12-31',
+      ),
+    );
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> _claimMemberDailyGiftRemote() async {
+    try {
+      await _cloudApi.claimMemberDailyGift();
       await loadFromRemote();
     } catch (_) {}
   }
@@ -531,6 +775,49 @@ class UserProvider extends ChangeNotifier {
   Future<void> _claimCenterRemote() async {
     try {
       await _cloudApi.claimCenter();
+      await loadFromRemote();
+    } catch (_) {}
+  }
+
+  // 领券中心单张券领取（满200减40 c8 / 满300减80 c3 共用）：
+  // 输入是券模板 id 与本地兜底用的券面信息；输出 true=已受理领取。
+  // 坑：云端模式下真正的入账以服务端为准，这里只发请求再整表刷新，
+  // 不要在本地先塞一张假券，否则服务端失败时用户会看到一张用不了的券。
+  bool claimCouponCenterSingle({
+    required String couponId,
+    required String title,
+    required double discount,
+    required String condition,
+  }) {
+    if (_coupons.any((c) => c.id == couponId)) return false;
+    if (_cloudSync) {
+      unawaited(_claimCenterSingleRemote(couponId));
+      return true;
+    }
+    couponCount += 1;
+    _coupons.insert(
+      0,
+      Coupon(
+        id: couponId,
+        title: title,
+        discount: discount,
+        condition: condition,
+        expire: '2026-12-31',
+      ),
+    );
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> _claimCenterSingleRemote(String couponId) async {
+    try {
+      if (couponId == 'c8') {
+        await _cloudApi.claimCenter200();
+      } else if (couponId == 'c3') {
+        await _cloudApi.claimCenter300();
+      } else {
+        return;
+      }
       await loadFromRemote();
     } catch (_) {}
   }

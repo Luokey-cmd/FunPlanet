@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
 import { fail, ok } from '../utils/response.js';
 import { log } from '../utils/log.js';
+import { markDailyTaskDone } from '../utils/daily-tasks.js';
 
 const router = Router();
 
@@ -35,6 +36,7 @@ router.post('/toggle', authRequired, async (req, res) => {
   await prisma.favorite.create({
     data: { userId: req.user.sub, productId },
   });
+  await markDailyTaskDone(req.user.sub, 'dailyFavoriteDone');
   log.info('收藏', `收藏了商品 ${productId}`);
   ok(res, { productId, favorited: true });
 });

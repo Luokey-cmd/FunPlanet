@@ -12,7 +12,9 @@ import '../models/chat_message.dart';
 import '../providers/cart_provider.dart';
 import '../providers/order_provider.dart';
 import '../providers/starwish_profile_provider.dart';
+import '../providers/user_provider.dart';
 import '../providers/xiaodou_chat_provider.dart';
+import 'member_benefit_page.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../data/xiaodou_copy.dart';
@@ -25,6 +27,7 @@ import '../widgets/product_image.dart';
 import '../widgets/sparkle_background.dart';
 import '../widgets/starwish_dossier_sheet.dart';
 import '../widgets/xiaodou_agent_card.dart';
+import '../widgets/xiaodou_coupon_card.dart';
 import '../widgets/xiaodou_fate_section.dart';
 import '../widgets/xiaodou_home.dart';
 import '../widgets/xiaodou_product_card.dart';
@@ -412,6 +415,8 @@ class _MessageListState extends State<_MessageList> {
   final _scrollController = ScrollController();
   int _lastMessageCount = 0;
   int _lastContentLength = 0;
+  // 上一帧的键盘高度：用来识别「键盘刚弹起」这一刻，触发滚到底（见 build）。
+  double _lastKeyboardInset = 0;
 
   @override
   void dispose() {
@@ -443,6 +448,24 @@ class _MessageListState extends State<_MessageList> {
       // 首页区在场时保持停在顶部，用户自己往下滑。
       if (chat.messages.any((m) => m.role == ChatRole.user)) {
         _scrollToBottom();
+      }
+    }
+    // 键盘弹起时把对话推到键盘上方：页面布局本身会随键盘变矮（输入栏已
+    // 经贴在键盘上沿），但列表的滚动位置不会自己动——视口一变矮，最新
+    // 回复的下半截就掉出可视区，看着像被键盘挡住（2026-11-26 hx 截图）。
+    // 所以键盘从无到有这一刻补一次滚到底，行为与微信等聊天 App 一致。
+    // 守卫与上面同一条：首页区还在时（没发过消息）不滚，进门仍停在顶部。
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    if (keyboardInset != _lastKeyboardInset) {
+      final keyboardOpened = keyboardInset > _lastKeyboardInset;
+      _lastKeyboardInset = keyboardInset;
+      if (keyboardOpened && chat.messages.any((m) => m.role == ChatRole.user)) {
+        _scrollToBottom();
+        // 键盘弹出动画约 300ms、视口是逐帧变矮的，第一下滚到的不是
+        // 最终底部；等动画落定再补滚一次，保证停在真正的最后一行。
+        Future.delayed(const Duration(milliseconds: 320), () {
+          if (mounted) _scrollToBottom();
+        });
       }
     }
     // 首页区显隐只看一条规则：对话里还没有任何用户消息就显示，发第一句后整体消失。
@@ -746,10 +769,32 @@ class _MessageBubble extends StatelessWidget {
                             onTarget: (action) => openAgentActionTarget(context, action),
                             onPay: (action) => _payAgentOrder(context, msgIndex, action),
                           ),
+                        // 可领券清单卡（找优惠时下发）：只列不代领，
+                        // 每行一个领取按钮，点了才真领这一组。
+                        if (message.couponChoices.isNotEmpty)
+                          XiaodouCouponCard(
+                            choices: message.couponChoices,
+                            onClaim: (choice) async {
+                              final ok = await context
+                                  .read<XiaodouChatProvider>()
+                                  .claimCouponChoice(msgIndex, choice.group);
+                              if (ok && context.mounted) {
+                                context.read<UserProvider>().refreshProfileFromRemote();
+                              }
+                            },
+                            onMember: () => MemberBenefitPage.open(context, MemberBenefitKind.monthlyCoupon),
+                          ),
                         // 提问选项：小豆问了问题、服务端随信给了短回答
                         // 选项时，气泡下挂一排按钮，点一下就替用户把
                         // 这句发出去（hx 2026-11-23 定，省得打字）。
-                        if (message.options.isNotEmpty && !message.optionsUsed && isLastMessage && !sending)
+                        // 分组选项（挑礼物两步问法）优先渲染成分组多选。
+                        if (message.optionSet != null && !message.optionsUsed && isLastMessage && !sending)
+                          _GroupedQuestionOptions(
+                            optionSet: message.optionSet!,
+                            onPick: (text) =>
+                                context.read<XiaodouChatProvider>().chooseOption(msgIndex, text),
+                          )
+                        else if (message.options.isNotEmpty && !message.optionsUsed && isLastMessage && !sending)
                           _QuestionOptions(
                             options: message.options,
                             onPick: (text) =>
@@ -1022,6 +1067,163 @@ class _QuestionOptions extends StatelessWidget {
   }
 }
 
+/// 分组提问选项（挑礼物两步问法，2026-11-26 hx 定）：
+/// · mode=each（送给谁+预算）：每组点一个，两组都选齐后「选好了」
+///   按钮点亮，点它把两个答案拼成一句发出去；
+/// · mode=multi（类型+系列）：每组最多选一个、两组共选 1~2 个，
+///   选满或只选一个都行，点提交按钮发送；
+/// · anyOption（你帮我定）：单独一颗，点它直接发送、不等选组。
+/// 选中态是实心紫，未选是白底紫边（与单组 _QuestionOptions 同款）。
+class _GroupedQuestionOptions extends StatefulWidget {
+  const _GroupedQuestionOptions({required this.optionSet, required this.onPick});
+
+  final XiaodouOptionSet optionSet;
+  final ValueChanged<String> onPick;
+
+  @override
+  State<_GroupedQuestionOptions> createState() => _GroupedQuestionOptionsState();
+}
+
+class _GroupedQuestionOptionsState extends State<_GroupedQuestionOptions> {
+  // 组下标 -> 选中的选项文字；每组最多一个（点同组另一个自动换选，
+  // 再点已选的取消）。each 靠「每组都有」判齐，multi 靠总数判 1~2。
+  final Map<int, String> _picked = {};
+
+  bool get _isEach => widget.optionSet.mode == 'each';
+
+  bool get _canSubmit {
+    if (_isEach) return _picked.length == widget.optionSet.groups.length;
+    return _picked.isNotEmpty && _picked.length <= 2;
+  }
+
+  void _toggle(int groupIndex, String option) {
+    setState(() {
+      if (_picked[groupIndex] == option) {
+        _picked.remove(groupIndex);
+      } else {
+        // multi 总数上限 2：已选满两组时，点未选组的选项不响应
+        // （同组内换选不受限，因为总数不变）。
+        if (!_isEach && !_picked.containsKey(groupIndex) && _picked.length >= 2) return;
+        _picked[groupIndex] = option;
+      }
+    });
+  }
+
+  void _submit() {
+    if (!_canSubmit) return;
+    final parts = <String>[
+      for (var i = 0; i < widget.optionSet.groups.length; i++)
+        if (_picked[i] != null) _picked[i]!,
+    ];
+    widget.onPick(parts.join('，'));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final set = widget.optionSet;
+    return Padding(
+      padding: EdgeInsets.only(top: _xs(10)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < set.groups.length; i++) ...[
+            Text(
+              set.groups[i].label,
+              style: TextStyle(
+                fontSize: _xs(11) + AppScale.fontBump,
+                fontWeight: FontWeight.w600,
+                color: AppColors.mutedForeground,
+              ),
+            ),
+            SizedBox(height: _xs(6)),
+            Wrap(
+              spacing: _xs(8),
+              runSpacing: _xs(8),
+              children: [
+                for (final option in set.groups[i].options)
+                  GestureDetector(
+                    onTap: () => _toggle(i, option),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: _xs(12), vertical: _xs(7)),
+                      decoration: BoxDecoration(
+                        color: _picked[i] == option ? AppColors.primary : AppColors.card,
+                        borderRadius: BorderRadius.circular(_xs(999)),
+                        border: Border.all(color: AppColors.primaryLight),
+                      ),
+                      child: Text(
+                        option,
+                        style: TextStyle(
+                          fontSize: _xs(12) + AppScale.fontBump,
+                          fontWeight: FontWeight.w600,
+                          color: _picked[i] == option ? Colors.white : AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(height: _xs(10)),
+          ],
+          Row(
+            children: [
+              GestureDetector(
+                onTap: _canSubmit ? _submit : null,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: _xs(16), vertical: _xs(8)),
+                  decoration: BoxDecoration(
+                    color: _canSubmit ? AppColors.primary : AppColors.muted,
+                    borderRadius: BorderRadius.circular(_xs(999)),
+                  ),
+                  child: Text(
+                    _isEach ? '选好了' : '就这样，帮我挑',
+                    style: TextStyle(
+                      fontSize: _xs(12) + AppScale.fontBump,
+                      fontWeight: FontWeight.w700,
+                      color: _canSubmit ? Colors.white : AppColors.mutedForeground,
+                    ),
+                  ),
+                ),
+              ),
+              if (set.anyOption != null) ...[
+                SizedBox(width: _xs(8)),
+                GestureDetector(
+                  onTap: () => widget.onPick(set.anyOption!),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: _xs(12), vertical: _xs(7)),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(_xs(999)),
+                      border: Border.all(color: AppColors.primaryLight),
+                    ),
+                    child: Text(
+                      set.anyOption!,
+                      style: TextStyle(
+                        fontSize: _xs(12) + AppScale.fontBump,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              if (!_isEach) ...[
+                SizedBox(width: _xs(8)),
+                Text(
+                  '选 1~2 个',
+                  style: TextStyle(
+                    fontSize: _xs(11) + AppScale.fontBump,
+                    color: AppColors.mutedForeground,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RecommendActions extends StatelessWidget {
   const _RecommendActions({required this.enabled});
 
@@ -1148,11 +1350,13 @@ class _GuideChips extends StatelessWidget {
   // 快捷词（第二批换词，2026-11-23 hx 对着千问定的形态）：学淘宝
   // 闪购那排——按钮上只放 2~4 字的场景名配小图标，是「入口」不是
   // 「例句」；点下去发的话也短，场景名本身就是一句完整需求。
-  // 五个入口各通一种导购动作：找优惠（领券办事）、挑礼物（送礼
-  // 流程）、翻三张牌（亮牌）、本周热卖（销量搜）、50 元内（预算搜）。
+  // 六个入口各通一种导购动作：找优惠（领券办事）、挑手办（手办
+  // 直挑）、挑礼物（送礼流程）、翻三张牌（亮牌）、本周热卖（销量
+  // 搜）、50 元内（预算搜）。
   // （第一批的「点亮星签」是旧问卷入口，早已删掉，别再加回来。）
   static const _chips = <(IconData, String, String)>[
     (Icons.local_offer_outlined, '找优惠', '找优惠'),
+    (Icons.toys_outlined, '挑手办', '帮我挑手办'),
     (Icons.card_giftcard, '挑礼物', '帮我挑礼物'),
     (Icons.style_outlined, '翻牌推荐', '翻三张牌'),
     (Icons.whatshot_outlined, '本周热卖', '本周热卖'),

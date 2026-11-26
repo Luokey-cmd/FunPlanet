@@ -65,6 +65,10 @@ class _AiCommunityPageState extends State<AiCommunityPage> {
   }
 
   Future<void> _bootstrap() async {
+    // 进社区页即标已读（hx 2026-11-26 口径：从任何入口进来都算看过）：
+    // 本地角标先清零、服务端已读标记随后推到当前时间，不等它回来再加载，
+    // 和本页自身拉流互不阻塞。
+    unawaited(context.read<UserProvider>().markCommunityRepliesRead());
     await context.read<UserProvider>().refreshProfileFromRemote();
     if (mounted) _loadFeed();
   }
