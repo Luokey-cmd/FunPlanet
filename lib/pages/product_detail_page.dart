@@ -167,16 +167,16 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     return MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(_detailFontScale)),
       child: Scaffold(
-        backgroundColor: AppColors.background,
-        body: SparkleBackground(
+      backgroundColor: AppColors.background,
+      body: SparkleBackground(
           child: Stack(
             children: [
               Column(
-                children: [
-                  Expanded(
-                    child: CustomScrollView(
+          children: [
+            Expanded(
+              child: CustomScrollView(
                       controller: _scrollController,
-                      slivers: [
+                slivers: [
                         SliverToBoxAdapter(child: _buildMediaCarousel(context)),
                         SliverToBoxAdapter(child: _PriceTitleBlock(product: product, reviewCount: _reviews?.length)),
                         SliverToBoxAdapter(child: _SectionGap()),
@@ -185,7 +185,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         SliverToBoxAdapter(child: _ServiceRows(product: product)),
                         SliverToBoxAdapter(
                           child: _SpecRow(
-                            product: product,
+                    product: product,
                             onTap: () => _showPurchaseSheet(context, product, buyNow: false),
                           ),
                         ),
@@ -227,13 +227,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                           ),
                         ],
                         SliverToBoxAdapter(child: SizedBox(height: AppScale.s(24))),
-                      ],
-                    ),
-                  ),
-                  _BottomBar(
-                    product: product,
-                    isFavorite: isFavorite,
-                    onFavorite: () => context.read<UserProvider>().toggleFavorite(product.id),
+                ],
+              ),
+            ),
+            _BottomBar(
+              product: product,
+              isFavorite: isFavorite,
+              onFavorite: () => context.read<UserProvider>().toggleFavorite(product.id),
                     onAddToCart: () => _showPurchaseSheet(context, product, buyNow: false),
                     onBuyNow: () => _showPurchaseSheet(context, product, buyNow: true),
                   ),
@@ -249,11 +249,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   activeAnchor: _activeAnchor,
                   onAnchorTap: _scrollToAnchor,
                 ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    ),
     );
   }
 
@@ -404,7 +404,7 @@ class _VideoSlideState extends State<_VideoSlide> {
       );
     }
     return AppGestureDetector(
-      onTap: () {
+            onTap: () {
         if (controller.value.isPlaying) {
           controller.pause();
         } else {
@@ -453,18 +453,18 @@ class _TopChrome extends StatelessWidget {
   final void Function(int index) onAnchorTap;
 
   void _share(BuildContext context) {
-    final user = context.read<UserProvider>();
-    if (user.completeDailyShare()) {
-      showTopSnackBar(
-        context,
-        content: Text('分享成功，获得 20 趣玩币', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-      );
-    } else {
-      showTopSnackBar(
-        context,
-        content: Text('已分享「${product.name}」', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-      );
-    }
+              final user = context.read<UserProvider>();
+              if (user.completeDailyShare()) {
+                showTopSnackBar(
+                  context,
+                  content: Text('分享成功，获得 20 趣玩币', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+                );
+              } else {
+                showTopSnackBar(
+                  context,
+                  content: Text('已分享「${product.name}」', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+                );
+              }
   }
 
   @override
@@ -636,7 +636,7 @@ class _PriceTitleBlock extends StatelessWidget {
               if (product.hasPromo) ...[
                 if (!hasDiscount) ...[
                   SizedBox(width: AppScale.s(8)),
-                  Padding(
+              Padding(
                     padding: EdgeInsets.only(bottom: AppScale.s(2)),
                     child: Text(
                       '¥${_priceText(product.price)}',
@@ -687,7 +687,7 @@ class _PriceTitleBlock extends StatelessWidget {
                   SizedBox(width: AppScale.s(8)),
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: AppScale.s(6), vertical: AppScale.s(1.5)),
-                    decoration: BoxDecoration(
+                                decoration: BoxDecoration(
                       border: Border.all(color: AppColors.gold),
                       borderRadius: BorderRadius.circular(AppScale.s(4)),
                     ),
@@ -761,7 +761,7 @@ class _CouponStrip extends StatelessWidget {
               Icon(Icons.local_offer_outlined, size: AppScale.s(16), color: AppColors.primaryDark),
               SizedBox(width: AppScale.s(6)),
               Expanded(
-                child: Text(
+                                child: Text(
                   text,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -817,10 +817,10 @@ class _CouponStrip extends StatelessWidget {
                             ],
                           ),
                         ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
                 Text('结算时自动可选用，优惠金额以下单页为准。', style: TextStyle(fontSize: AppScale.t(11), color: AppColors.mutedForeground)),
               ],
             ),
@@ -1040,20 +1040,20 @@ void _showPurchaseSheet(BuildContext context, Product product, {required bool bu
           return SafeArea(
             child: Padding(
               padding: EdgeInsets.fromLTRB(AppScale.s(20), AppScale.s(16), AppScale.s(20), AppScale.s(16)),
-              child: Column(
+      child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                       ProductThumbnail(product: product, width: AppScale.s(72), height: AppScale.s(72), borderRadius: AppScale.s(10), fit: BoxFit.cover),
                       SizedBox(width: AppScale.s(12)),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                               '¥${_priceText(product.effectivePrice)}',
                               style: TextStyle(fontSize: AppScale.t(19), fontWeight: FontWeight.bold, color: AppColors.primaryDark),
                             ),
@@ -1063,28 +1063,28 @@ void _showPurchaseSheet(BuildContext context, Product product, {required bool bu
                               style: TextStyle(fontSize: AppScale.t(12), color: soldOut ? AppColors.priceRed : AppColors.mutedForeground),
                             ),
                             SizedBox(height: AppScale.s(2)),
-                            Text(
+                      Text(
                               product.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground),
-                            ),
-                          ],
-                        ),
-                      ),
-                      AppGestureDetector(
-                        onTap: () => Navigator.pop(sheetContext),
-                        child: Icon(Icons.close, size: AppScale.s(20), color: AppColors.mutedForeground),
+                        style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground),
                       ),
                     ],
                   ),
+                ),
+                      AppGestureDetector(
+                        onTap: () => Navigator.pop(sheetContext),
+                        child: Icon(Icons.close, size: AppScale.s(20), color: AppColors.mutedForeground),
+                ),
+              ],
+            ),
                   SizedBox(height: AppScale.s(16)),
                   Text('规格', style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.bold, color: AppColors.foreground)),
                   SizedBox(height: AppScale.s(8)),
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: AppScale.s(12), vertical: AppScale.s(7)),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondary,
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary,
                       border: Border.all(color: AppColors.primary),
                       borderRadius: BorderRadius.circular(AppScale.s(8)),
                     ),
@@ -1257,7 +1257,7 @@ class _SeriesSectionState extends State<_SeriesSection> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Text(
+          Text(
                 '共 ${list.length} 款${_ownedLoaded && ownedCount > 0 ? ' · 已拥有 $ownedCount 款' : ''}',
                 style: TextStyle(fontSize: AppScale.t(11), color: AppColors.mutedForeground),
               ),
@@ -1450,7 +1450,7 @@ class _AllReviewsPage extends StatelessWidget {
         elevation: 0,
       ),
       body: ListView(
-        padding: EdgeInsets.all(AppScale.s(16)),
+      padding: EdgeInsets.all(AppScale.s(16)),
         children: reviews
             .map(
               (review) => Padding(
@@ -1458,8 +1458,8 @@ class _AllReviewsPage extends StatelessWidget {
                 child: ProductReviewCard(review: review),
               ),
             )
-            .toList(),
-      ),
+                .toList(),
+          ),
     );
   }
 }
@@ -1633,40 +1633,40 @@ class _BottomBar extends StatelessWidget {
               ),
             )
           else ...[
-            Expanded(
-              child: AppOutlinedButton(
+          Expanded(
+            child: AppOutlinedButton(
                 onPressed: onAddToCart,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
                   side: const BorderSide(color: AppColors.primary),
-                  padding: EdgeInsets.symmetric(vertical: AppScale.s(12)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppScale.s(999))),
-                ),
-                child: Text('加入购物车', style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600)),
+                padding: EdgeInsets.symmetric(vertical: AppScale.s(12)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppScale.s(999))),
               ),
+              child: Text('加入购物车', style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600)),
             ),
-            SizedBox(width: AppScale.s(10)),
-            Expanded(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(AppScale.s(999)),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: AppInkWell(
+          ),
+          SizedBox(width: AppScale.s(10)),
+          Expanded(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: AppColors.primaryGradient,
+                borderRadius: BorderRadius.circular(AppScale.s(999)),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: AppInkWell(
                     onTap: onBuyNow,
-                    borderRadius: BorderRadius.circular(AppScale.s(999)),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: AppScale.s(12)),
-                      child: Center(
-                        child: Text('立即购买', style: TextStyle(color: Colors.white, fontSize: AppScale.t(13), fontWeight: FontWeight.w600)),
-                      ),
+                  borderRadius: BorderRadius.circular(AppScale.s(999)),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppScale.s(12)),
+                    child: Center(
+                      child: Text('立即购买', style: TextStyle(color: Colors.white, fontSize: AppScale.t(13), fontWeight: FontWeight.w600)),
                     ),
                   ),
                 ),
               ),
             ),
+          ),
           ],
         ],
       ),

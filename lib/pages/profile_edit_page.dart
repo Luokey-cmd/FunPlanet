@@ -32,6 +32,16 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   Uint8List? _pendingAvatarBytes;
   String? _pendingAvatarMime;
 
+  // 进门时的原值快照：判断用户改没改过东西。改了没保存就返回，
+  // 要先弹窗提醒（见 _confirmLeave）；一个字没动则直接放行。
+  late final String _initialNickname;
+  late final String _initialBio;
+  late final String _initialAvatar;
+  late final String _initialGender;
+  late final String _initialBirthday;
+  // 弹窗里确认「不保存离开」或保存成功后置 true，放行这一次返回。
+  bool _allowLeave = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +51,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _selectedAvatar = user.avatarPath;
     _gender = user.gender;
     _birthday = user.birthday;
+    _initialNickname = user.nickname;
+    _initialBio = user.bio;
+    _initialAvatar = user.avatarPath;
+    _initialGender = user.gender;
+    _initialBirthday = user.birthday;
   }
 
   @override
@@ -144,6 +159,55 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     );
   }
 
+  // 有没有改过：头像选了新图、或任一字段与进门快照不同，都算改过。
+  // 注意在返回被拦截的那一刻现算，输入框打字不触发重建也骗不过它。
+  bool get _isDirty =>
+      _pendingAvatarBytes != null ||
+      _selectedAvatar != _initialAvatar ||
+      _nameController.text.trim() != _initialNickname.trim() ||
+      _bioController.text.trim() != _initialBio.trim() ||
+      _gender != _initialGender ||
+      _birthday != _initialBirthday;
+
+  // 真正离开：先放行再返回。PopScope 的 canPop 靠重建生效，
+  // 所以等下一帧再 pop，免得被自己拦住。
+  void _leave() {
+    if (_allowLeave) return;
+    setState(() => _allowLeave = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.pop(context);
+    });
+  }
+
+  // 未保存提醒弹窗：不保存离开 = 丢掉修改走人；保存离开 = 先走一遍
+  // 正常保存流程，保存成功才离开，失败就留在本页并按原样报错。
+  // 点弹窗外区域关掉弹窗 = 两个都不选，继续编辑。
+  Future<void> _confirmLeave() async {
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('资料尚未保存', style: TextStyle(fontSize: AppScale.t(16), fontWeight: FontWeight.bold)),
+        content: Text('您已对个人资料作出修改，但尚未保存', style: TextStyle(fontSize: AppScale.t(14), height: 1.5)),
+        actions: [
+          AppTextButton(
+            onPressed: () => Navigator.pop(ctx, 'discard'),
+            child: Text('不保存离开', style: TextStyle(color: AppColors.priceRed)),
+          ),
+          AppTextButton(
+            onPressed: () => Navigator.pop(ctx, 'save'),
+            child: Text('保存离开', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (action == 'discard') {
+      _leave();
+    } else if (action == 'save') {
+      await _save();
+    }
+  }
+
   Future<void> _save() async {
     final user = context.read<UserProvider>();
     final name = _nameController.text.trim();
@@ -175,7 +239,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       context,
       content: Text('资料已保存', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
     );
-    Navigator.pop(context);
+    _leave();
   }
 
   BoxDecoration _fieldBoxDecoration() {
@@ -215,187 +279,198 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final user = context.watch<UserProvider>();
     final top = MediaQuery.paddingOf(context).top;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SparkleBackground(
-        child: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(AppScale.s(8), top + AppScale.s(8), AppScale.s(16), AppScale.s(8)),
-              child: Row(
-                children: [
-                  AppIconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.arrow_back, size: AppScale.s(22), color: AppColors.foreground),
-                  ),
-                  Expanded(
-                    child: Text(
-                      '个人资料',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: AppScale.t(17), fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  AppTextButton(
-                    onPressed: _save,
-                    child: Text('保存', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.w600, color: AppColors.primary)),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.all(AppScale.s(16)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return PopScope(
+      canPop: _allowLeave,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_isDirty) {
+          _confirmLeave();
+        } else {
+          _leave();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SparkleBackground(
+          child: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(AppScale.s(8), top + AppScale.s(8), AppScale.s(16), AppScale.s(8)),
+                child: Row(
                   children: [
-                    Text('头像', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
-                    SizedBox(height: AppScale.s(10)),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: AppScale.s(14), vertical: AppScale.s(10)),
-                      decoration: _fieldBoxDecoration(),
-                      child: Row(
-                        children: [
-                          AppGestureDetector(
-                            onTap: _previewAvatar,
-                            child: Container(
-                              width: AppScale.s(52),
-                              height: AppScale.s(52),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.6)),
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: UserAvatarImage(path: _selectedAvatar, fit: BoxFit.cover),
-                            ),
-                          ),
-                          const Spacer(),
-                          AppGestureDetector(
-                            onTap: _pickAvatar,
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: AppScale.s(8), horizontal: AppScale.s(4)),
-                              child: Text(
-                                '更换头像',
-                                style: TextStyle(fontSize: AppScale.t(14), color: AppColors.primary, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ),
-                        ],
+                    AppIconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.arrow_back, size: AppScale.s(22), color: AppColors.foreground),
+                    ),
+                    Expanded(
+                      child: Text(
+                        '个人资料',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: AppScale.t(17), fontWeight: FontWeight.bold),
                       ),
                     ),
-                    SizedBox(height: AppScale.s(24)),
-                    Text('昵称', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
-                    SizedBox(height: AppScale.s(10)),
-                    AppTextField(
-                      controller: _nameController,
-                      maxLength: 16,
-                      decoration: InputDecoration(
-                        hintText: '请输入昵称',
-                        filled: true,
-                        fillColor: AppColors.card,
-                        counterText: '',
-                        contentPadding: EdgeInsets.symmetric(horizontal: AppScale.s(14), vertical: AppScale.s(12)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppScale.s(12)),
-                          borderSide: BorderSide(color: AppColors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppScale.s(12)),
-                          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.7)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppScale.s(12)),
-                          borderSide: BorderSide(color: AppColors.primary, width: AppScale.s(1.5)),
-                        ),
-                      ),
-                      style: TextStyle(fontSize: AppScale.t(15)),
+                    AppTextButton(
+                      onPressed: _save,
+                      child: Text('保存', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.w600, color: AppColors.primary)),
                     ),
-                    SizedBox(height: AppScale.s(24)),
-                    Text('性别', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
-                    SizedBox(height: AppScale.s(10)),
-                    Row(
-                      children: [
-                        _genderChip('', '保密'),
-                        SizedBox(width: AppScale.s(10)),
-                        _genderChip('male', '男'),
-                        SizedBox(width: AppScale.s(10)),
-                        _genderChip('female', '女'),
-                      ],
-                    ),
-                    SizedBox(height: AppScale.s(24)),
-                    Text('生日', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
-                    SizedBox(height: AppScale.s(10)),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: AppScale.s(14), vertical: AppScale.s(12)),
-                      decoration: _fieldBoxDecoration(),
-                      child: Row(
-                        children: [
-                          Text(
-                            _birthday.isEmpty ? '未设置' : _birthday,
-                            style: TextStyle(
-                              fontSize: AppScale.t(14),
-                              color: _birthday.isEmpty ? AppColors.mutedForeground : AppColors.foreground,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const Spacer(),
-                          if (_birthday.isNotEmpty)
-                            AppGestureDetector(
-                              onTap: () => setState(() => _birthday = ''),
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: AppScale.s(6), vertical: AppScale.s(4)),
-                                child: Text('清除', style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground)),
-                              ),
-                            ),
-                          AppGestureDetector(
-                            onTap: _pickBirthday,
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: AppScale.s(4), vertical: AppScale.s(4)),
-                              child: Text('选择日期', style: TextStyle(fontSize: AppScale.t(14), color: AppColors.primary, fontWeight: FontWeight.w600)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: AppScale.s(24)),
-                    Text('简介', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
-                    SizedBox(height: AppScale.s(10)),
-                    AppTextField(
-                      controller: _bioController,
-                      maxLength: 200,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        hintText: '介绍一下自己吧（选填）',
-                        filled: true,
-                        fillColor: AppColors.card,
-                        counterText: '',
-                        contentPadding: EdgeInsets.symmetric(horizontal: AppScale.s(14), vertical: AppScale.s(12)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppScale.s(12)),
-                          borderSide: BorderSide(color: AppColors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppScale.s(12)),
-                          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.7)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppScale.s(12)),
-                          borderSide: BorderSide(color: AppColors.primary, width: AppScale.s(1.5)),
-                        ),
-                      ),
-                      style: TextStyle(fontSize: AppScale.t(15)),
-                    ),
-                    SizedBox(height: AppScale.s(24)),
-                    Text('账号信息', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
-                    SizedBox(height: AppScale.s(10)),
-                    _InfoTile(label: '用户 ID', value: user.userId),
-                    _InfoTile(label: '会员等级', value: 'VIP${user.vipLevel}'),
-                    _InfoTile(label: '积分', value: '${user.points}'),
-                    _InfoTile(label: '趣玩币', value: '${user.funCoins}'),
                   ],
                 ),
               ),
-            ),
-          ],
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(AppScale.s(16)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('头像', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
+                      SizedBox(height: AppScale.s(10)),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: AppScale.s(14), vertical: AppScale.s(10)),
+                        decoration: _fieldBoxDecoration(),
+                        child: Row(
+                          children: [
+                            AppGestureDetector(
+                              onTap: _previewAvatar,
+                              child: Container(
+                                width: AppScale.s(52),
+                                height: AppScale.s(52),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppColors.primaryLight.withValues(alpha: 0.6)),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: UserAvatarImage(path: _selectedAvatar, fit: BoxFit.cover),
+                              ),
+                            ),
+                            const Spacer(),
+                            AppGestureDetector(
+                              onTap: _pickAvatar,
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: AppScale.s(8), horizontal: AppScale.s(4)),
+                                child: Text(
+                                  '更换头像',
+                                  style: TextStyle(fontSize: AppScale.t(14), color: AppColors.primary, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: AppScale.s(24)),
+                      Text('昵称', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
+                      SizedBox(height: AppScale.s(10)),
+                      AppTextField(
+                        controller: _nameController,
+                        maxLength: 16,
+                        decoration: InputDecoration(
+                          hintText: '请输入昵称',
+                          filled: true,
+                          fillColor: AppColors.card,
+                          counterText: '',
+                          contentPadding: EdgeInsets.symmetric(horizontal: AppScale.s(14), vertical: AppScale.s(12)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppScale.s(12)),
+                            borderSide: BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppScale.s(12)),
+                            borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.7)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppScale.s(12)),
+                            borderSide: BorderSide(color: AppColors.primary, width: AppScale.s(1.5)),
+                          ),
+                        ),
+                        style: TextStyle(fontSize: AppScale.t(15)),
+                      ),
+                      SizedBox(height: AppScale.s(24)),
+                      Text('性别', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
+                      SizedBox(height: AppScale.s(10)),
+                      Row(
+                        children: [
+                          _genderChip('', '保密'),
+                          SizedBox(width: AppScale.s(10)),
+                          _genderChip('male', '男'),
+                          SizedBox(width: AppScale.s(10)),
+                          _genderChip('female', '女'),
+                        ],
+                      ),
+                      SizedBox(height: AppScale.s(24)),
+                      Text('生日', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
+                      SizedBox(height: AppScale.s(10)),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: AppScale.s(14), vertical: AppScale.s(12)),
+                        decoration: _fieldBoxDecoration(),
+                        child: Row(
+                          children: [
+                            Text(
+                              _birthday.isEmpty ? '未设置' : _birthday,
+                              style: TextStyle(
+                                fontSize: AppScale.t(14),
+                                color: _birthday.isEmpty ? AppColors.mutedForeground : AppColors.foreground,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (_birthday.isNotEmpty)
+                              AppGestureDetector(
+                                onTap: () => setState(() => _birthday = ''),
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: AppScale.s(6), vertical: AppScale.s(4)),
+                                  child: Text('清除', style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground)),
+                                ),
+                              ),
+                            AppGestureDetector(
+                              onTap: _pickBirthday,
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: AppScale.s(4), vertical: AppScale.s(4)),
+                                child: Text('选择日期', style: TextStyle(fontSize: AppScale.t(14), color: AppColors.primary, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: AppScale.s(24)),
+                      Text('简介', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
+                      SizedBox(height: AppScale.s(10)),
+                      AppTextField(
+                        controller: _bioController,
+                        maxLength: 200,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          hintText: '介绍一下自己吧（选填）',
+                          filled: true,
+                          fillColor: AppColors.card,
+                          counterText: '',
+                          contentPadding: EdgeInsets.symmetric(horizontal: AppScale.s(14), vertical: AppScale.s(12)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppScale.s(12)),
+                            borderSide: BorderSide(color: AppColors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppScale.s(12)),
+                            borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.7)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(AppScale.s(12)),
+                            borderSide: BorderSide(color: AppColors.primary, width: AppScale.s(1.5)),
+                          ),
+                        ),
+                        style: TextStyle(fontSize: AppScale.t(15)),
+                      ),
+                      SizedBox(height: AppScale.s(24)),
+                      Text('账号信息', style: TextStyle(fontSize: AppScale.t(15), fontWeight: FontWeight.bold)),
+                      SizedBox(height: AppScale.s(10)),
+                      _InfoTile(label: '用户 ID', value: user.userId),
+                      _InfoTile(label: '会员等级', value: 'VIP${user.vipLevel}'),
+                      _InfoTile(label: '积分', value: '${user.points}'),
+                      _InfoTile(label: '趣玩币', value: '${user.funCoins}'),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -228,7 +228,7 @@ def main():
     for i, row in enumerate(rows, start=1):
         pid = f'p{i:02d}'
         src = img_dir / f"{row['name']}.png"
-        dst = OUT_IMG_DIR / f'{pid}.png'
+        dst = OUT_IMG_DIR / f'{pid}.jpg'
         shutil.copy2(src, dst)
 
         major = row['majorCategory']
@@ -243,7 +243,7 @@ def main():
         tag = "'新品'" if i <= 6 else 'null'
         tag_color = "'new'" if i <= 6 else 'null'
         spec = f"'{dart_str(row['subCategory'])}'"
-        image_path = f'assets/images/products/{pid}.png'
+        image_path = f'assets/images/products/{pid}.jpg'
 
         lines.append("  Product(")
         lines.append(f"    id: '{pid}',")

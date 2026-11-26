@@ -36,8 +36,18 @@ export function saveUserAvatar({ userId, imageBase64, mimeType }) {
   const dir = path.join(assetsRoot, 'images/user-avatars');
   fs.mkdirSync(dir, { recursive: true });
 
-  const filename = `${safeId}.${ext}`;
+  // 文件名带时间戳、每次上传都换新名（2026-11-26 修）：旧版固定用
+  // 「用户id.扩展名」，新头像覆盖旧文件、网址一个字不变，而 App 的
+  // 网络图片带磁盘缓存、按网址存图——网址不变就永远端出第一次存的
+  // 那张，表现就是「保存成功了但头像没换过来」。换新名 = 换新网址，
+  // 缓存自然失效；同时把该用户之前的头像文件删掉，免得目录越堆越多。
+  const filename = `${safeId}-${Date.now().toString(36)}.${ext}`;
   fs.writeFileSync(path.join(dir, filename), buffer);
+  for (const old of fs.readdirSync(dir)) {
+    if (old !== filename && (old.startsWith(`${safeId}-`) || old.startsWith(`${safeId}.`))) {
+      try { fs.unlinkSync(path.join(dir, old)); } catch { /* 删不掉不挡上传 */ }
+    }
+  }
 
   return `assets/images/user-avatars/${filename}`;
 }

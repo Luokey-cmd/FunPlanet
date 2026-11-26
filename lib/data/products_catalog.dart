@@ -638,7 +638,7 @@ const catalogProducts = [
     purchaseNotes: '全款预售，预计12月上旬陆续发货。发货地：广州；未拆封7天无理由；徽章避免重压和潮湿。',
     rating: 4.8,
     sales: 326,
-    imagePath: 'assets/images/products/p39.png',
+    imagePath: 'assets/images/products/p39.jpg',
   ),
   Product(
     id: 'p40',
@@ -654,7 +654,7 @@ const catalogProducts = [
     purchaseNotes: '现货。发货地：广州；端盒塑封完好7天无理由；烫金面避免硬物刮擦。',
     rating: 4.9,
     sales: 148,
-    imagePath: 'assets/images/products/p40.png',
+    imagePath: 'assets/images/products/p40.jpg',
   ),
   Product(
     id: 'p41',
@@ -670,7 +670,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；立牌贴膜后再撕，挂件避免拉扯吊绳。',
     rating: 4.8,
     sales: 512,
-    imagePath: 'assets/images/products/p41.png',
+    imagePath: 'assets/images/products/p41.jpg',
   ),
   Product(
     id: 'p42',
@@ -686,7 +686,7 @@ const catalogProducts = [
     purchaseNotes: '发货地：广州；未拆塑封7天无理由；纸制品避免弯折和受潮，色纸建议装册。',
     rating: 4.7,
     sales: 860,
-    imagePath: 'assets/images/products/p42.png',
+    imagePath: 'assets/images/products/p42.jpg',
   ),
   Product(
     id: 'p43',
@@ -702,7 +702,7 @@ const catalogProducts = [
     purchaseNotes: '现货，盲抽不指定角色。发货地：广州；未拆封7天无理由；随机款售出后不支持因款式更换。',
     rating: 4.8,
     sales: 640,
-    imagePath: 'assets/images/products/p43.png',
+    imagePath: 'assets/images/products/p43.jpg',
   ),
   Product(
     id: 'p44',
@@ -718,7 +718,7 @@ const catalogProducts = [
     purchaseNotes: '演示数据，不代表真实展会售票。发货地：广州；电子票样式商品，下单后不支持因日期看错退换。',
     rating: 4.6,
     sales: 220,
-    imagePath: 'assets/images/products/p44.png',
+    imagePath: 'assets/images/products/p44.jpg',
   ),
   Product(
     id: 'p45',
@@ -736,7 +736,7 @@ const catalogProducts = [
     purchaseNotes: '全款预售，预计11月下旬陆续发货。发货地：广州；食品接触杯具收到后清洗再使用；摔破漏液凭开箱照片补发。',
     rating: 4.8,
     sales: 186,
-    imagePath: 'assets/images/products/p45.png',
+    imagePath: 'assets/images/products/p45.jpg',
   ),
   Product(
     id: 'p46',
@@ -752,7 +752,7 @@ const catalogProducts = [
     purchaseNotes: '现货，盲抽随机发货。发货地：广州；未拆封7天无理由；不支持指定角色。',
     rating: 4.7,
     sales: 704,
-    imagePath: 'assets/images/products/p46.png',
+    imagePath: 'assets/images/products/p46.jpg',
   ),
   Product(
     id: 'p47',
@@ -770,7 +770,7 @@ const catalogProducts = [
     purchaseNotes: '全款预售，预计11月下旬陆续发货。发货地：广州；首次使用请清洗；避免跌落，杯盖密封圈丢失不单独补发。',
     rating: 4.8,
     sales: 275,
-    imagePath: 'assets/images/products/p47.png',
+    imagePath: 'assets/images/products/p47.jpg',
   ),
   Product(
     id: 'p48',
@@ -788,7 +788,7 @@ const catalogProducts = [
     purchaseNotes: '全款预售，下单两周后陆续发货。发货地：广州；吊牌完好7天无理由；避免机洗，污渍局部擦拭。',
     rating: 4.7,
     sales: 96,
-    imagePath: 'assets/images/products/p48.png',
+    imagePath: 'assets/images/products/p48.jpg',
   ),
   Product(
     id: 'p49',
@@ -804,7 +804,7 @@ const catalogProducts = [
     purchaseNotes: '现货。发货地：广州；未拆封7天无理由；大徽章请夹在硬纸板中运输，避免弯折。',
     rating: 4.8,
     sales: 433,
-    imagePath: 'assets/images/products/p49.png',
+    imagePath: 'assets/images/products/p49.jpg',
   ),
   Product(
     id: 'p50',
@@ -822,7 +822,7 @@ const catalogProducts = [
     purchaseNotes: '全款预售，下单两周后陆续发货。发货地：广州；未使用7天无理由；建议轻柔手洗，不要高温烘干。',
     rating: 4.7,
     sales: 358,
-    imagePath: 'assets/images/products/p50.png',
+    imagePath: 'assets/images/products/p50.jpg',
   ),
   Product(
     id: 'p51',
@@ -840,7 +840,7 @@ const catalogProducts = [
     purchaseNotes: '全款预售，下单两周后陆续发货。发货地：广州；未使用7天无理由；避免漂白。',
     rating: 4.7,
     sales: 341,
-    imagePath: 'assets/images/products/p51.png',
+    imagePath: 'assets/images/products/p51.jpg',
   ),
   Product(
     id: 'p52',
@@ -856,7 +856,7 @@ const catalogProducts = [
     purchaseNotes: '现货。发货地：广州；端盒封膜完好7天无理由；直径约75mm，请勿弯折。',
     rating: 4.9,
     sales: 87,
-    imagePath: 'assets/images/products/p52.png',
+    imagePath: 'assets/images/products/p52.jpg',
   ),
   Product(
     id: 'p53',
@@ -874,7 +874,7 @@ const catalogProducts = [
     purchaseNotes: '全款预售，下单两周后陆续发货。发货地：广州；伞骨变形或开合失灵凭照片换货；大风天不要硬撑。',
     rating: 4.8,
     sales: 154,
-    imagePath: 'assets/images/products/p53.png',
+    imagePath: 'assets/images/products/p53.jpg',
   ),
   Product(
     id: 'p54',
@@ -892,7 +892,7 @@ const catalogProducts = [
     purchaseNotes: '全款预售，下单两周后陆续发货。发货地：广州；内存卡已装入套装；镜头划伤凭开箱视频处理，不支持因不会使用退货。',
     rating: 4.6,
     sales: 203,
-    imagePath: 'assets/images/products/p54.png',
+    imagePath: 'assets/images/products/p54.jpg',
   ),
   Product(
     id: 'p55',
@@ -908,7 +908,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；色纸避免弯折受潮，立牌灯座不要泡水。',
     rating: 4.8,
     sales: 276,
-    imagePath: 'assets/images/products/p55.png',
+    imagePath: 'assets/images/products/p55.jpg',
   ),
   Product(
     id: 'p56',
@@ -926,7 +926,7 @@ const catalogProducts = [
     purchaseNotes: '全款预售，预计2027年2月陆续发货。发货地：广州；未拆封7天无理由；塑料卡面避免硬物刮花。',
     rating: 4.8,
     sales: 188,
-    imagePath: 'assets/images/products/p56.png',
+    imagePath: 'assets/images/products/p56.jpg',
   ),
   Product(
     id: 'p57',
@@ -942,7 +942,7 @@ const catalogProducts = [
     purchaseNotes: '全款预售，预计约60天后陆续发货。发货地：广州；未拆塑封7天无理由；纸制品避免弯折和受潮。',
     rating: 4.7,
     sales: 742,
-    imagePath: 'assets/images/products/p57.png',
+    imagePath: 'assets/images/products/p57.jpg',
   ),
   Product(
     id: 'p58',
@@ -958,7 +958,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；色纸避免弯折受潮，立牌灯座不要泡水。',
     rating: 4.8,
     sales: 291,
-    imagePath: 'assets/images/products/p58.png',
+    imagePath: 'assets/images/products/p58.jpg',
   ),
   Product(
     id: 'p59',
@@ -974,7 +974,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；立牌贴膜后再撕，挂件避免拉扯吊绳。',
     rating: 4.8,
     sales: 468,
-    imagePath: 'assets/images/products/p59.png',
+    imagePath: 'assets/images/products/p59.jpg',
   ),
   Product(
     id: 'p60',
@@ -992,7 +992,7 @@ const catalogProducts = [
     purchaseNotes: '全款预售，下单后30天内发出。发货地：广州；未拆封7天无理由；毛绒面避免机洗，污渍局部擦拭。',
     rating: 4.8,
     sales: 214,
-    imagePath: 'assets/images/products/p60.png',
+    imagePath: 'assets/images/products/p60.jpg',
   ),
   Product(
     id: 'p61',
@@ -1008,7 +1008,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；色纸与拍立得避免弯折，卷轴避免受潮。',
     rating: 4.8,
     sales: 356,
-    imagePath: 'assets/images/products/p61.png',
+    imagePath: 'assets/images/products/p61.jpg',
   ),
   Product(
     id: 'p62',
@@ -1026,7 +1026,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；吊牌完好7天无理由；不可高温机洗，建议局部擦拭，3岁以下需成人看护。',
     rating: 4.9,
     sales: 326,
-    imagePath: 'assets/images/products/p62.png',
+    imagePath: 'assets/images/products/p62.jpg',
   ),
   Product(
     id: 'p63',
@@ -1044,7 +1044,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；吊牌完好7天无理由；不可高温机洗，建议局部擦拭，3岁以下需成人看护。',
     rating: 4.8,
     sales: 289,
-    imagePath: 'assets/images/products/p63.png',
+    imagePath: 'assets/images/products/p63.jpg',
   ),
   Product(
     id: 'p64',
@@ -1060,7 +1060,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.8,
     sales: 512,
-    imagePath: 'assets/images/products/p64.png',
+    imagePath: 'assets/images/products/p64.jpg',
   ),
   Product(
     id: 'p65',
@@ -1078,7 +1078,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；娃衣建议手洗，娃娃避免水洗、用湿布擦拭。',
     rating: 4.7,
     sales: 148,
-    imagePath: 'assets/images/products/p65.png',
+    imagePath: 'assets/images/products/p65.jpg',
   ),
   Product(
     id: 'p66',
@@ -1094,7 +1094,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；PU材质避免暴晒和尖锐物，3岁以下勿入口。',
     rating: 4.7,
     sales: 864,
-    imagePath: 'assets/images/products/p66.png',
+    imagePath: 'assets/images/products/p66.jpg',
   ),
   Product(
     id: 'p67',
@@ -1110,7 +1110,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小零件较多，3岁以下需成人陪同。',
     rating: 4.8,
     sales: 231,
-    imagePath: 'assets/images/products/p67.png',
+    imagePath: 'assets/images/products/p67.jpg',
   ),
   Product(
     id: 'p68',
@@ -1126,7 +1126,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；避免长时间直视光源，充电时勿覆盖灯体。',
     rating: 4.8,
     sales: 197,
-    imagePath: 'assets/images/products/p68.png',
+    imagePath: 'assets/images/products/p68.jpg',
   ),
   Product(
     id: 'p69',
@@ -1142,7 +1142,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；首次使用先用温水清洗，避免装碳酸饮料后剧烈摇晃。',
     rating: 4.9,
     sales: 433,
-    imagePath: 'assets/images/products/p69.png',
+    imagePath: 'assets/images/products/p69.jpg',
   ),
   Product(
     id: 'p70',
@@ -1160,7 +1160,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；帆布避免长时间浸泡，污渍局部刷洗后阴干。',
     rating: 4.8,
     sales: 176,
-    imagePath: 'assets/images/products/p70.png',
+    imagePath: 'assets/images/products/p70.jpg',
   ),
   Product(
     id: 'p71',
@@ -1176,7 +1176,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；首次使用先单独清洗，深色织物避免与浅色混洗。',
     rating: 4.7,
     sales: 658,
-    imagePath: 'assets/images/products/p71.png',
+    imagePath: 'assets/images/products/p71.jpg',
   ),
   Product(
     id: 'p72',
@@ -1192,7 +1192,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；勿将手指伸入扇叶，儿童需成人看护使用。',
     rating: 4.8,
     sales: 342,
-    imagePath: 'assets/images/products/p72.png',
+    imagePath: 'assets/images/products/p72.jpg',
   ),
   Product(
     id: 'p73',
@@ -1210,7 +1210,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒和跌落，底座为固定式不可拆。',
     rating: 4.9,
     sales: 264,
-    imagePath: 'assets/images/products/p73.png',
+    imagePath: 'assets/images/products/p73.jpg',
   ),
   Product(
     id: 'p74',
@@ -1226,7 +1226,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒和跌落，尾巴部分较细、拿取时勿捏尾巴尖。',
     rating: 4.9,
     sales: 238,
-    imagePath: 'assets/images/products/p74.png',
+    imagePath: 'assets/images/products/p74.jpg',
   ),
   Product(
     id: 'p75',
@@ -1244,7 +1244,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；立牌使用前先撕保护膜，纸品避免弯折受潮。',
     rating: 4.8,
     sales: 391,
-    imagePath: 'assets/images/products/p75.png',
+    imagePath: 'assets/images/products/p75.jpg',
   ),
   Product(
     id: 'p76',
@@ -1262,7 +1262,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用前先撕掉表面保护膜，撕膜后才是透亮效果。',
     rating: 4.9,
     sales: 402,
-    imagePath: 'assets/images/products/p76.png',
+    imagePath: 'assets/images/products/p76.jpg',
   ),
   Product(
     id: 'p77',
@@ -1278,7 +1278,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；色纸避免弯折和受潮，建议配保护套存放。',
     rating: 4.8,
     sales: 356,
-    imagePath: 'assets/images/products/p77.png',
+    imagePath: 'assets/images/products/p77.jpg',
   ),
   Product(
     id: 'p78',
@@ -1294,7 +1294,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属别针避免沾水，表面覆膜轻微反光属正常。',
     rating: 4.8,
     sales: 723,
-    imagePath: 'assets/images/products/p78.png',
+    imagePath: 'assets/images/products/p78.jpg',
   ),
   Product(
     id: 'p79',
@@ -1312,7 +1312,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.8,
     sales: 489,
-    imagePath: 'assets/images/products/p79.png',
+    imagePath: 'assets/images/products/p79.jpg',
   ),
   Product(
     id: 'p80',
@@ -1328,7 +1328,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；相卡避免长时间暴晒褪色，背面书写请用普通中性笔。',
     rating: 4.7,
     sales: 377,
-    imagePath: 'assets/images/products/p80.png',
+    imagePath: 'assets/images/products/p80.jpg',
   ),
   Product(
     id: 'p81',
@@ -1344,7 +1344,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免弯折受潮，镭射面避免硬物刮擦。',
     rating: 4.8,
     sales: 264,
-    imagePath: 'assets/images/products/p81.png',
+    imagePath: 'assets/images/products/p81.jpg',
   ),
   Product(
     id: 'p82',
@@ -1360,7 +1360,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；贴纸避免贴在易掉漆表面，胶带存放避免高温。',
     rating: 4.7,
     sales: 591,
-    imagePath: 'assets/images/products/p82.png',
+    imagePath: 'assets/images/products/p82.jpg',
   ),
   Product(
     id: 'p83',
@@ -1376,7 +1376,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属活页夹开合时注意夹手，内页避免受潮。',
     rating: 4.8,
     sales: 318,
-    imagePath: 'assets/images/products/p83.png',
+    imagePath: 'assets/images/products/p83.jpg',
   ),
   Product(
     id: 'p84',
@@ -1392,7 +1392,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属书签边缘已打磨，避免弯折变形。',
     rating: 4.7,
     sales: 205,
-    imagePath: 'assets/images/products/p84.png',
+    imagePath: 'assets/images/products/p84.jpg',
   ),
   Product(
     id: 'p85',
@@ -1408,7 +1408,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；用完盖好笔帽防干，笔芯为通用0.5mm规格。',
     rating: 4.8,
     sales: 447,
-    imagePath: 'assets/images/products/p85.png',
+    imagePath: 'assets/images/products/p85.jpg',
   ),
   Product(
     id: 'p86',
@@ -1424,7 +1424,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；帆布避免长时间浸泡，污渍局部刷洗后阴干。',
     rating: 4.8,
     sales: 293,
-    imagePath: 'assets/images/products/p86.png',
+    imagePath: 'assets/images/products/p86.jpg',
   ),
   Product(
     id: 'p87',
@@ -1440,7 +1440,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；首次使用先用温水清洗，避免装碳酸饮料后剧烈摇晃。',
     rating: 4.9,
     sales: 361,
-    imagePath: 'assets/images/products/p87.png',
+    imagePath: 'assets/images/products/p87.jpg',
   ),
   Product(
     id: 'p88',
@@ -1458,7 +1458,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.9,
     sales: 538,
-    imagePath: 'assets/images/products/p88.png',
+    imagePath: 'assets/images/products/p88.jpg',
   ),
   Product(
     id: 'p89',
@@ -1476,7 +1476,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒、跌落和长时间高温，展示建议放展示柜。',
     rating: 4.9,
     sales: 186,
-    imagePath: 'assets/images/products/p89.png',
+    imagePath: 'assets/images/products/p89.jpg',
   ),
   Product(
     id: 'p90',
@@ -1494,7 +1494,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；秋千链条部分较细，拿取时请托底座、勿拎链条。',
     rating: 4.9,
     sales: 154,
-    imagePath: 'assets/images/products/p90.png',
+    imagePath: 'assets/images/products/p90.jpg',
   ),
   Product(
     id: 'p91',
@@ -1510,7 +1510,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；透明件避免硬物刮擦，涂装品避免暴晒跌落。',
     rating: 4.8,
     sales: 132,
-    imagePath: 'assets/images/products/p91.png',
+    imagePath: 'assets/images/products/p91.jpg',
   ),
   Product(
     id: 'p92',
@@ -1526,7 +1526,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒和跌落。',
     rating: 4.8,
     sales: 276,
-    imagePath: 'assets/images/products/p92.png',
+    imagePath: 'assets/images/products/p92.jpg',
   ),
   Product(
     id: 'p93',
@@ -1542,7 +1542,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；秋千部分较细，拿取时请托底座。',
     rating: 4.8,
     sales: 243,
-    imagePath: 'assets/images/products/p93.png',
+    imagePath: 'assets/images/products/p93.jpg',
   ),
   Product(
     id: 'p94',
@@ -1560,7 +1560,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；玻璃罩易碎、拿取轻放，避免长时间连续点亮。',
     rating: 4.9,
     sales: 208,
-    imagePath: 'assets/images/products/p94.png',
+    imagePath: 'assets/images/products/p94.jpg',
   ),
   Product(
     id: 'p95',
@@ -1578,7 +1578,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；盲盒拆封后非质量问题不退换；端盒指整端6盒购买。',
     rating: 4.8,
     sales: 627,
-    imagePath: 'assets/images/products/p95.png',
+    imagePath: 'assets/images/products/p95.jpg',
   ),
   Product(
     id: 'p96',
@@ -1594,7 +1594,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；吊牌完好7天无理由；不可高温机洗，建议局部擦拭。',
     rating: 4.8,
     sales: 194,
-    imagePath: 'assets/images/products/p96.png',
+    imagePath: 'assets/images/products/p96.jpg',
   ),
   Product(
     id: 'p97',
@@ -1610,7 +1610,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.7,
     sales: 418,
-    imagePath: 'assets/images/products/p97.png',
+    imagePath: 'assets/images/products/p97.jpg',
   ),
   Product(
     id: 'p98',
@@ -1626,7 +1626,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；搪胶避免暴晒和高温，表面灰尘用软布擦拭。',
     rating: 4.8,
     sales: 167,
-    imagePath: 'assets/images/products/p98.png',
+    imagePath: 'assets/images/products/p98.jpg',
   ),
   Product(
     id: 'p99',
@@ -1644,7 +1644,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；色纸避免弯折受潮，建议配保护套存放。',
     rating: 4.9,
     sales: 345,
-    imagePath: 'assets/images/products/p99.png',
+    imagePath: 'assets/images/products/p99.jpg',
   ),
   Product(
     id: 'p100',
@@ -1660,7 +1660,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属件避免沾水和汗液，佩戴后擦干存放。',
     rating: 4.8,
     sales: 289,
-    imagePath: 'assets/images/products/p100.png',
+    imagePath: 'assets/images/products/p100.jpg',
   ),
   Product(
     id: 'p101',
@@ -1676,7 +1676,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用前先撕掉表面保护膜，撕膜后才是透亮效果。',
     rating: 4.8,
     sales: 371,
-    imagePath: 'assets/images/products/p101.png',
+    imagePath: 'assets/images/products/p101.jpg',
   ),
   Product(
     id: 'p102',
@@ -1692,7 +1692,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.7,
     sales: 296,
-    imagePath: 'assets/images/products/p102.png',
+    imagePath: 'assets/images/products/p102.jpg',
   ),
   Product(
     id: 'p103',
@@ -1710,7 +1710,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；透明件避免刮擦，涂装品避免暴晒跌落。',
     rating: 4.9,
     sales: 158,
-    imagePath: 'assets/images/products/p103.png',
+    imagePath: 'assets/images/products/p103.jpg',
   ),
   Product(
     id: 'p104',
@@ -1726,7 +1726,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；透明件避免刮擦，涂装品避免暴晒跌落。',
     rating: 4.8,
     sales: 141,
-    imagePath: 'assets/images/products/p104.png',
+    imagePath: 'assets/images/products/p104.jpg',
   ),
   Product(
     id: 'p105',
@@ -1744,7 +1744,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；表情贴片为磁吸式、避免丢失，摆件避免跌落。',
     rating: 4.9,
     sales: 226,
-    imagePath: 'assets/images/products/p105.png',
+    imagePath: 'assets/images/products/p105.jpg',
   ),
   Product(
     id: 'p106',
@@ -1760,7 +1760,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小颗粒较多，6岁以下需成人陪同，拼装前先按图清点颗粒。',
     rating: 4.7,
     sales: 173,
-    imagePath: 'assets/images/products/p106.png',
+    imagePath: 'assets/images/products/p106.jpg',
   ),
   Product(
     id: 'p107',
@@ -1776,7 +1776,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属件避免沾水和汗液，佩戴后擦干存放。',
     rating: 4.8,
     sales: 264,
-    imagePath: 'assets/images/products/p107.png',
+    imagePath: 'assets/images/products/p107.jpg',
   ),
   Product(
     id: 'p108',
@@ -1794,7 +1794,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.8,
     sales: 312,
-    imagePath: 'assets/images/products/p108.png',
+    imagePath: 'assets/images/products/p108.jpg',
   ),
   Product(
     id: 'p109',
@@ -1810,7 +1810,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；相卡避免长时间暴晒褪色，背面书写请用普通中性笔。',
     rating: 4.7,
     sales: 228,
-    imagePath: 'assets/images/products/p109.png',
+    imagePath: 'assets/images/products/p109.jpg',
   ),
   Product(
     id: 'p110',
@@ -1826,7 +1826,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免弯折受潮，镭射面避免硬物刮擦。',
     rating: 4.8,
     sales: 197,
-    imagePath: 'assets/images/products/p110.png',
+    imagePath: 'assets/images/products/p110.jpg',
   ),
   Product(
     id: 'p111',
@@ -1842,7 +1842,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；用完盖好笔帽防干，笔芯为通用0.5mm规格。',
     rating: 4.7,
     sales: 386,
-    imagePath: 'assets/images/products/p111.png',
+    imagePath: 'assets/images/products/p111.jpg',
   ),
   Product(
     id: 'p112',
@@ -1860,7 +1860,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；避免高温和挤压，首次使用先充满电，勿边充边放电使用。',
     rating: 4.8,
     sales: 274,
-    imagePath: 'assets/images/products/p112.png',
+    imagePath: 'assets/images/products/p112.jpg',
   ),
   Product(
     id: 'p113',
@@ -1878,7 +1878,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；避免跌落和进水，长时间不用请关机存放。',
     rating: 4.9,
     sales: 189,
-    imagePath: 'assets/images/products/p113.png',
+    imagePath: 'assets/images/products/p113.jpg',
   ),
   Product(
     id: 'p114',
@@ -1894,7 +1894,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；避免进水，纽扣电池仓勿让儿童自行拆卸。',
     rating: 4.7,
     sales: 453,
-    imagePath: 'assets/images/products/p114.png',
+    imagePath: 'assets/images/products/p114.jpg',
   ),
   Product(
     id: 'p115',
@@ -1910,7 +1910,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.8,
     sales: 347,
-    imagePath: 'assets/images/products/p115.png',
+    imagePath: 'assets/images/products/p115.jpg',
   ),
   Product(
     id: 'p116',
@@ -1926,7 +1926,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；吊牌完好7天无理由；不可高温机洗，建议局部擦拭。',
     rating: 4.8,
     sales: 163,
-    imagePath: 'assets/images/products/p116.png',
+    imagePath: 'assets/images/products/p116.jpg',
   ),
   Product(
     id: 'p117',
@@ -1942,7 +1942,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.8,
     sales: 386,
-    imagePath: 'assets/images/products/p117.png',
+    imagePath: 'assets/images/products/p117.jpg',
   ),
   Product(
     id: 'p118',
@@ -1960,7 +1960,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；吊牌完好7天无理由；不可高温机洗，建议局部擦拭。',
     rating: 4.8,
     sales: 171,
-    imagePath: 'assets/images/products/p118.png',
+    imagePath: 'assets/images/products/p118.jpg',
   ),
   Product(
     id: 'p119',
@@ -1976,7 +1976,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；吊牌完好7天无理由；娃衣建议手洗晾干，娃体不可水洗。',
     rating: 4.9,
     sales: 143,
-    imagePath: 'assets/images/products/p119.png',
+    imagePath: 'assets/images/products/p119.jpg',
   ),
   Product(
     id: 'p120',
@@ -1994,7 +1994,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点卡牌数量；纸牌避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.7,
     sales: 208,
-    imagePath: 'assets/images/products/p120.png',
+    imagePath: 'assets/images/products/p120.jpg',
   ),
   Product(
     id: 'p121',
@@ -2010,7 +2010,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小颗粒较多，6岁以下需成人陪同，拼装前先按图清点颗粒。',
     rating: 4.7,
     sales: 156,
-    imagePath: 'assets/images/products/p121.png',
+    imagePath: 'assets/images/products/p121.jpg',
   ),
   Product(
     id: 'p122',
@@ -2026,7 +2026,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；避免尖锐物划破表面，勿让婴幼儿啃咬，远离高温。',
     rating: 4.7,
     sales: 429,
-    imagePath: 'assets/images/products/p122.png',
+    imagePath: 'assets/images/products/p122.jpg',
   ),
   Product(
     id: 'p123',
@@ -2042,7 +2042,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属别针避免沾水，徽章面避免硬物刮擦。',
     rating: 4.8,
     sales: 354,
-    imagePath: 'assets/images/products/p123.png',
+    imagePath: 'assets/images/products/p123.jpg',
   ),
   Product(
     id: 'p124',
@@ -2058,7 +2058,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用前先撕掉表面保护膜；亚克力避免摔落和硬物刮擦。',
     rating: 4.7,
     sales: 298,
-    imagePath: 'assets/images/products/p124.png',
+    imagePath: 'assets/images/products/p124.jpg',
   ),
   Product(
     id: 'p125',
@@ -2074,7 +2074,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.7,
     sales: 187,
-    imagePath: 'assets/images/products/p125.png',
+    imagePath: 'assets/images/products/p125.jpg',
   ),
   Product(
     id: 'p126',
@@ -2090,7 +2090,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；贴纸避免长时间暴晒，粘贴面保持干燥洁净。',
     rating: 4.7,
     sales: 264,
-    imagePath: 'assets/images/products/p126.png',
+    imagePath: 'assets/images/products/p126.jpg',
   ),
   Product(
     id: 'p127',
@@ -2108,7 +2108,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；陶瓷易碎、轻拿轻放；可微波加热，不可明火直烧，首次使用先清洗。',
     rating: 4.8,
     sales: 176,
-    imagePath: 'assets/images/products/p127.png',
+    imagePath: 'assets/images/products/p127.jpg',
   ),
   Product(
     id: 'p128',
@@ -2124,7 +2124,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；陶瓷易碎、轻拿轻放；可微波加热，首次使用先清洗。',
     rating: 4.8,
     sales: 243,
-    imagePath: 'assets/images/products/p128.png',
+    imagePath: 'assets/images/products/p128.jpg',
   ),
   Product(
     id: 'p129',
@@ -2140,7 +2140,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒和跌落。',
     rating: 4.8,
     sales: 231,
-    imagePath: 'assets/images/products/p129.png',
+    imagePath: 'assets/images/products/p129.jpg',
   ),
   Product(
     id: 'p130',
@@ -2158,7 +2158,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；树脂件避免跌落和重压，表面灰尘用软布轻擦。',
     rating: 4.9,
     sales: 119,
-    imagePath: 'assets/images/products/p130.png',
+    imagePath: 'assets/images/products/p130.jpg',
   ),
   Product(
     id: 'p131',
@@ -2174,7 +2174,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用前先撕掉表面保护膜，撕膜后才是透亮效果。',
     rating: 4.8,
     sales: 203,
-    imagePath: 'assets/images/products/p131.png',
+    imagePath: 'assets/images/products/p131.jpg',
   ),
   Product(
     id: 'p132',
@@ -2190,7 +2190,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属件避免沾水和汗液，佩戴后擦干存放。',
     rating: 4.8,
     sales: 167,
-    imagePath: 'assets/images/products/p132.png',
+    imagePath: 'assets/images/products/p132.jpg',
   ),
   Product(
     id: 'p133',
@@ -2208,7 +2208,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小配件较多请清点；丝带避免勾丝，装饰链勿用力拉扯。',
     rating: 4.7,
     sales: 158,
-    imagePath: 'assets/images/products/p133.png',
+    imagePath: 'assets/images/products/p133.jpg',
   ),
   Product(
     id: 'p134',
@@ -2224,7 +2224,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用前先撕掉表面保护膜；亚克力避免摔落和硬物刮擦。',
     rating: 4.7,
     sales: 226,
-    imagePath: 'assets/images/products/p134.png',
+    imagePath: 'assets/images/products/p134.jpg',
   ),
   Product(
     id: 'p135',
@@ -2240,7 +2240,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.7,
     sales: 174,
-    imagePath: 'assets/images/products/p135.png',
+    imagePath: 'assets/images/products/p135.jpg',
   ),
   Product(
     id: 'p136',
@@ -2256,7 +2256,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；相卡避免长时间暴晒褪色，背面书写请用普通中性笔。',
     rating: 4.8,
     sales: 198,
-    imagePath: 'assets/images/products/p136.png',
+    imagePath: 'assets/images/products/p136.jpg',
   ),
   Product(
     id: 'p137',
@@ -2274,7 +2274,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免受潮，胶带粘贴面保持洁净。',
     rating: 4.8,
     sales: 231,
-    imagePath: 'assets/images/products/p137.png',
+    imagePath: 'assets/images/products/p137.jpg',
   ),
   Product(
     id: 'p138',
@@ -2290,7 +2290,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免受潮和重压弯折。',
     rating: 4.7,
     sales: 189,
-    imagePath: 'assets/images/products/p138.png',
+    imagePath: 'assets/images/products/p138.jpg',
   ),
   Product(
     id: 'p139',
@@ -2306,7 +2306,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；吊牌完好7天无理由；不可高温机洗，建议局部擦拭。',
     rating: 4.8,
     sales: 147,
-    imagePath: 'assets/images/products/p139.png',
+    imagePath: 'assets/images/products/p139.jpg',
   ),
   Product(
     id: 'p140',
@@ -2322,7 +2322,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.8,
     sales: 214,
-    imagePath: 'assets/images/products/p140.png',
+    imagePath: 'assets/images/products/p140.jpg',
   ),
   Product(
     id: 'p141',
@@ -2340,7 +2340,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；避免长时间连续点亮，充电时勿覆盖灯体，远离水源。',
     rating: 4.9,
     sales: 257,
-    imagePath: 'assets/images/products/p141.png',
+    imagePath: 'assets/images/products/p141.jpg',
   ),
   Product(
     id: 'p142',
@@ -2356,7 +2356,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；树脂件避免跌落，透明支架较细、拿取时请托底座。',
     rating: 4.8,
     sales: 134,
-    imagePath: 'assets/images/products/p142.png',
+    imagePath: 'assets/images/products/p142.jpg',
   ),
   Product(
     id: 'p143',
@@ -2372,7 +2372,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小片较多请清点，拼装时避免受潮，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 167,
-    imagePath: 'assets/images/products/p143.png',
+    imagePath: 'assets/images/products/p143.jpg',
   ),
   Product(
     id: 'p144',
@@ -2390,7 +2390,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用后晾干再收，避免伞骨生锈，勿当登山杖使用。',
     rating: 4.7,
     sales: 143,
-    imagePath: 'assets/images/products/p144.png',
+    imagePath: 'assets/images/products/p144.jpg',
   ),
   Product(
     id: 'p145',
@@ -2406,7 +2406,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒和跌落，透明件避免刮擦。',
     rating: 4.8,
     sales: 259,
-    imagePath: 'assets/images/products/p145.png',
+    imagePath: 'assets/images/products/p145.jpg',
   ),
   Product(
     id: 'p146',
@@ -2424,7 +2424,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小颗粒较多，6岁以下需成人陪同，拼装前先按图清点颗粒。',
     rating: 4.7,
     sales: 138,
-    imagePath: 'assets/images/products/p146.png',
+    imagePath: 'assets/images/products/p146.jpg',
   ),
   Product(
     id: 'p147',
@@ -2440,7 +2440,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用前先撕掉表面保护膜；亚克力避免摔落和硬物刮擦。',
     rating: 4.7,
     sales: 241,
-    imagePath: 'assets/images/products/p147.png',
+    imagePath: 'assets/images/products/p147.jpg',
   ),
   Product(
     id: 'p148',
@@ -2456,7 +2456,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属别针避免沾水，徽章面避免硬物刮擦。',
     rating: 4.8,
     sales: 317,
-    imagePath: 'assets/images/products/p148.png',
+    imagePath: 'assets/images/products/p148.jpg',
   ),
   Product(
     id: 'p149',
@@ -2472,7 +2472,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属件避免沾水和汗液，佩戴后擦干存放。',
     rating: 4.8,
     sales: 196,
-    imagePath: 'assets/images/products/p149.png',
+    imagePath: 'assets/images/products/p149.jpg',
   ),
   Product(
     id: 'p150',
@@ -2488,7 +2488,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；搪胶避免暴晒和高温，表面灰尘用软布擦拭。',
     rating: 4.8,
     sales: 158,
-    imagePath: 'assets/images/products/p150.png',
+    imagePath: 'assets/images/products/p150.jpg',
   ),
   Product(
     id: 'p151',
@@ -2504,7 +2504,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；吊牌完好7天无理由；不可高温机洗，建议局部擦拭。',
     rating: 4.8,
     sales: 176,
-    imagePath: 'assets/images/products/p151.png',
+    imagePath: 'assets/images/products/p151.jpg',
   ),
   Product(
     id: 'p152',
@@ -2520,7 +2520,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.7,
     sales: 233,
-    imagePath: 'assets/images/products/p152.png',
+    imagePath: 'assets/images/products/p152.jpg',
   ),
   Product(
     id: 'p153',
@@ -2536,7 +2536,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；相卡避免长时间暴晒褪色，背面书写请用普通中性笔。',
     rating: 4.7,
     sales: 185,
-    imagePath: 'assets/images/products/p153.png',
+    imagePath: 'assets/images/products/p153.jpg',
   ),
   Product(
     id: 'p154',
@@ -2552,7 +2552,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免弯折受潮，镭射面避免硬物刮擦。',
     rating: 4.8,
     sales: 172,
-    imagePath: 'assets/images/products/p154.png',
+    imagePath: 'assets/images/products/p154.jpg',
   ),
   Product(
     id: 'p155',
@@ -2568,7 +2568,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；避免尖锐物划破表面，勿让婴幼儿啃咬，远离高温。',
     rating: 4.7,
     sales: 342,
-    imagePath: 'assets/images/products/p155.png',
+    imagePath: 'assets/images/products/p155.jpg',
   ),
   Product(
     id: 'p156',
@@ -2586,7 +2586,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；内页避免装过厚硬卡，卡册避免重压弯折。',
     rating: 4.8,
     sales: 209,
-    imagePath: 'assets/images/products/p156.png',
+    imagePath: 'assets/images/products/p156.jpg',
   ),
   Product(
     id: 'p157',
@@ -2604,7 +2604,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；发条勿过度拧紧，树脂件避免跌落，表面灰尘用软布轻擦。',
     rating: 4.9,
     sales: 127,
-    imagePath: 'assets/images/products/p157.png',
+    imagePath: 'assets/images/products/p157.jpg',
   ),
   Product(
     id: 'p158',
@@ -2620,7 +2620,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；首次使用先清洗，避免装过热液体后剧烈摇晃。',
     rating: 4.8,
     sales: 164,
-    imagePath: 'assets/images/products/p158.png',
+    imagePath: 'assets/images/products/p158.jpg',
   ),
   Product(
     id: 'p159',
@@ -2638,7 +2638,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒和跌落。',
     rating: 4.9,
     sales: 284,
-    imagePath: 'assets/images/products/p159.png',
+    imagePath: 'assets/images/products/p159.jpg',
   ),
   Product(
     id: 'p160',
@@ -2654,7 +2654,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用前先撕掉表面保护膜，撕膜后才是透亮效果。',
     rating: 4.8,
     sales: 296,
-    imagePath: 'assets/images/products/p160.png',
+    imagePath: 'assets/images/products/p160.jpg',
   ),
   Product(
     id: 'p161',
@@ -2670,7 +2670,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用前先撕掉表面保护膜；亚克力避免摔落和硬物刮擦。',
     rating: 4.7,
     sales: 218,
-    imagePath: 'assets/images/products/p161.png',
+    imagePath: 'assets/images/products/p161.jpg',
   ),
   Product(
     id: 'p162',
@@ -2686,7 +2686,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属别针避免沾水，徽章面避免硬物刮擦。',
     rating: 4.8,
     sales: 331,
-    imagePath: 'assets/images/products/p162.png',
+    imagePath: 'assets/images/products/p162.jpg',
   ),
   Product(
     id: 'p163',
@@ -2702,7 +2702,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.8,
     sales: 247,
-    imagePath: 'assets/images/products/p163.png',
+    imagePath: 'assets/images/products/p163.jpg',
   ),
   Product(
     id: 'p164',
@@ -2718,7 +2718,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免受潮和重压弯折。',
     rating: 4.7,
     sales: 176,
-    imagePath: 'assets/images/products/p164.png',
+    imagePath: 'assets/images/products/p164.jpg',
   ),
   Product(
     id: 'p165',
@@ -2734,7 +2734,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；胶带避免长时间暴晒，粘贴面保持洁净。',
     rating: 4.7,
     sales: 228,
-    imagePath: 'assets/images/products/p165.png',
+    imagePath: 'assets/images/products/p165.jpg',
   ),
   Product(
     id: 'p166',
@@ -2752,7 +2752,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；透明窗避免硬物刮擦和暴晒，包身用湿布擦拭、勿机洗。',
     rating: 4.8,
     sales: 192,
-    imagePath: 'assets/images/products/p166.png',
+    imagePath: 'assets/images/products/p166.jpg',
   ),
   Product(
     id: 'p167',
@@ -2768,7 +2768,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.7,
     sales: 205,
-    imagePath: 'assets/images/products/p167.png',
+    imagePath: 'assets/images/products/p167.jpg',
   ),
   Product(
     id: 'p168',
@@ -2784,7 +2784,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；搪胶避免暴晒和高温，表面灰尘用软布擦拭。',
     rating: 4.9,
     sales: 263,
-    imagePath: 'assets/images/products/p168.png',
+    imagePath: 'assets/images/products/p168.jpg',
   ),
   Product(
     id: 'p169',
@@ -2802,7 +2802,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点棋子数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.7,
     sales: 149,
-    imagePath: 'assets/images/products/p169.png',
+    imagePath: 'assets/images/products/p169.jpg',
   ),
   Product(
     id: 'p170',
@@ -2818,7 +2818,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小片较多请清点，拼装时避免受潮，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 183,
-    imagePath: 'assets/images/products/p170.png',
+    imagePath: 'assets/images/products/p170.jpg',
   ),
   Product(
     id: 'p171',
@@ -2836,7 +2836,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；树脂件避免跌落；发光底座用纽扣电池，避免长时间连续点亮。',
     rating: 4.9,
     sales: 141,
-    imagePath: 'assets/images/products/p171.png',
+    imagePath: 'assets/images/products/p171.jpg',
   ),
   Product(
     id: 'p172',
@@ -2852,7 +2852,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用前先撕掉表面保护膜；亚克力避免摔落和硬物刮擦。',
     rating: 4.7,
     sales: 176,
-    imagePath: 'assets/images/products/p172.png',
+    imagePath: 'assets/images/products/p172.jpg',
   ),
   Product(
     id: 'p173',
@@ -2868,7 +2868,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 167,
-    imagePath: 'assets/images/products/p173.png',
+    imagePath: 'assets/images/products/p173.jpg',
   ),
   Product(
     id: 'p174',
@@ -2884,7 +2884,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.7,
     sales: 213,
-    imagePath: 'assets/images/products/p174.png',
+    imagePath: 'assets/images/products/p174.jpg',
   ),
   Product(
     id: 'p175',
@@ -2900,7 +2900,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 121,
-    imagePath: 'assets/images/products/p175.png',
+    imagePath: 'assets/images/products/p175.jpg',
   ),
   Product(
     id: 'p176',
@@ -2916,7 +2916,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.9,
     sales: 158,
-    imagePath: 'assets/images/products/p176.png',
+    imagePath: 'assets/images/products/p176.jpg',
   ),
   Product(
     id: 'p177',
@@ -2932,7 +2932,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.7,
     sales: 196,
-    imagePath: 'assets/images/products/p177.png',
+    imagePath: 'assets/images/products/p177.jpg',
   ),
   Product(
     id: 'p178',
@@ -2948,7 +2948,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 132,
-    imagePath: 'assets/images/products/p178.png',
+    imagePath: 'assets/images/products/p178.jpg',
   ),
   Product(
     id: 'p179',
@@ -2964,7 +2964,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 149,
-    imagePath: 'assets/images/products/p179.png',
+    imagePath: 'assets/images/products/p179.jpg',
   ),
   Product(
     id: 'p180',
@@ -2980,7 +2980,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.7,
     sales: 287,
-    imagePath: 'assets/images/products/p180.png',
+    imagePath: 'assets/images/products/p180.jpg',
   ),
   Product(
     id: 'p181',
@@ -2996,7 +2996,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 118,
-    imagePath: 'assets/images/products/p181.png',
+    imagePath: 'assets/images/products/p181.jpg',
   ),
   Product(
     id: 'p182',
@@ -3012,7 +3012,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 174,
-    imagePath: 'assets/images/products/p182.png',
+    imagePath: 'assets/images/products/p182.jpg',
   ),
   Product(
     id: 'p183',
@@ -3028,7 +3028,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 201,
-    imagePath: 'assets/images/products/p183.png',
+    imagePath: 'assets/images/products/p183.jpg',
   ),
   Product(
     id: 'p184',
@@ -3044,7 +3044,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；开封后清点配件数量；纸品避免受潮弯折，6岁以下需成人陪同。',
     rating: 4.7,
     sales: 163,
-    imagePath: 'assets/images/products/p184.png',
+    imagePath: 'assets/images/products/p184.jpg',
   ),
   Product(
     id: 'p185',
@@ -3062,7 +3062,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒、跌落和长时间高温，展示建议放展示柜。',
     rating: 4.9,
     sales: 132,
-    imagePath: 'assets/images/products/p185.png',
+    imagePath: 'assets/images/products/p185.jpg',
   ),
   Product(
     id: 'p186',
@@ -3078,7 +3078,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒和跌落，尾巴部分较脆、拿取时请托底座。',
     rating: 4.9,
     sales: 118,
-    imagePath: 'assets/images/products/p186.png',
+    imagePath: 'assets/images/products/p186.jpg',
   ),
   Product(
     id: 'p187',
@@ -3094,7 +3094,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小颗粒较多，6岁以下需成人陪同，拼装前先按图清点颗粒。',
     rating: 4.7,
     sales: 143,
-    imagePath: 'assets/images/products/p187.png',
+    imagePath: 'assets/images/products/p187.jpg',
   ),
   Product(
     id: 'p188',
@@ -3112,7 +3112,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒、跌落和长时间高温，展示建议放展示柜。',
     rating: 4.9,
     sales: 109,
-    imagePath: 'assets/images/products/p188.png',
+    imagePath: 'assets/images/products/p188.jpg',
   ),
   Product(
     id: 'p189',
@@ -3128,7 +3128,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒和跌落。',
     rating: 4.8,
     sales: 187,
-    imagePath: 'assets/images/products/p189.png',
+    imagePath: 'assets/images/products/p189.jpg',
   ),
   Product(
     id: 'p190',
@@ -3144,7 +3144,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒和跌落。',
     rating: 4.8,
     sales: 176,
-    imagePath: 'assets/images/products/p190.png',
+    imagePath: 'assets/images/products/p190.jpg',
   ),
   Product(
     id: 'p191',
@@ -3162,7 +3162,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒、跌落和长时间高温，展示建议放展示柜。',
     rating: 4.9,
     sales: 97,
-    imagePath: 'assets/images/products/p191.png',
+    imagePath: 'assets/images/products/p191.jpg',
   ),
   Product(
     id: 'p192',
@@ -3178,7 +3178,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；树脂件避免跌落，发光底座避免长时间连续点亮。',
     rating: 4.8,
     sales: 136,
-    imagePath: 'assets/images/products/p192.png',
+    imagePath: 'assets/images/products/p192.jpg',
   ),
   Product(
     id: 'p193',
@@ -3196,7 +3196,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒和跌落，礼盒请保留好方便收纳。',
     rating: 4.9,
     sales: 154,
-    imagePath: 'assets/images/products/p193.png',
+    imagePath: 'assets/images/products/p193.jpg',
   ),
   Product(
     id: 'p194',
@@ -3212,7 +3212,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒和跌落。',
     rating: 4.8,
     sales: 169,
-    imagePath: 'assets/images/products/p194.png',
+    imagePath: 'assets/images/products/p194.jpg',
   ),
   Product(
     id: 'p195',
@@ -3230,7 +3230,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；避免长时间连续点亮，勿让灯体接触水，拿取时请托底座。',
     rating: 4.9,
     sales: 158,
-    imagePath: 'assets/images/products/p195.png',
+    imagePath: 'assets/images/products/p195.jpg',
   ),
   Product(
     id: 'p196',
@@ -3248,7 +3248,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒、跌落和长时间高温，展示建议放展示柜；透明件避免刮擦。',
     rating: 4.9,
     sales: 88,
-    imagePath: 'assets/images/products/p196.png',
+    imagePath: 'assets/images/products/p196.jpg',
   ),
   Product(
     id: 'p197',
@@ -3264,7 +3264,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；用完盖好笔帽防干，笔芯为通用0.5mm规格。',
     rating: 4.7,
     sales: 412,
-    imagePath: 'assets/images/products/p197.png',
+    imagePath: 'assets/images/products/p197.jpg',
   ),
   Product(
     id: 'p198',
@@ -3280,7 +3280,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免受潮，撕取时沿虚线轻撕。',
     rating: 4.7,
     sales: 238,
-    imagePath: 'assets/images/products/p198.png',
+    imagePath: 'assets/images/products/p198.jpg',
   ),
   Product(
     id: 'p199',
@@ -3296,7 +3296,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属书签避免弯折，文件夹避免装过厚文件。',
     rating: 4.8,
     sales: 176,
-    imagePath: 'assets/images/products/p199.png',
+    imagePath: 'assets/images/products/p199.jpg',
   ),
   Product(
     id: 'p200',
@@ -3314,7 +3314,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；印泥用后盖紧防干，印章面用后擦净存放。',
     rating: 4.9,
     sales: 264,
-    imagePath: 'assets/images/products/p200.png',
+    imagePath: 'assets/images/products/p200.jpg',
   ),
   Product(
     id: 'p201',
@@ -3330,7 +3330,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；笔袋可手洗晾干，勿漂白，拉链避免卡布。',
     rating: 4.8,
     sales: 203,
-    imagePath: 'assets/images/products/p201.png',
+    imagePath: 'assets/images/products/p201.jpg',
   ),
   Product(
     id: 'p202',
@@ -3346,7 +3346,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免受潮，书写请用普通中性笔。',
     rating: 4.8,
     sales: 187,
-    imagePath: 'assets/images/products/p202.png',
+    imagePath: 'assets/images/products/p202.jpg',
   ),
   Product(
     id: 'p203',
@@ -3362,7 +3362,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属件避免弯折和沾水，刻度面避免硬物刮擦。',
     rating: 4.7,
     sales: 219,
-    imagePath: 'assets/images/products/p203.png',
+    imagePath: 'assets/images/products/p203.jpg',
   ),
   Product(
     id: 'p204',
@@ -3378,7 +3378,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免受潮，撕取时沿齿孔轻撕。',
     rating: 4.7,
     sales: 194,
-    imagePath: 'assets/images/products/p204.png',
+    imagePath: 'assets/images/products/p204.jpg',
   ),
   Product(
     id: 'p205',
@@ -3394,7 +3394,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；用完盖好笔帽防干，笔芯为通用0.5mm规格，羽毛部分勿用力掰。',
     rating: 4.7,
     sales: 231,
-    imagePath: 'assets/images/products/p205.png',
+    imagePath: 'assets/images/products/p205.jpg',
   ),
   Product(
     id: 'p206',
@@ -3410,7 +3410,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免受潮，撕取时沿虚线轻撕。',
     rating: 4.7,
     sales: 256,
-    imagePath: 'assets/images/products/p206.png',
+    imagePath: 'assets/images/products/p206.jpg',
   ),
   Product(
     id: 'p207',
@@ -3428,7 +3428,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；笔袋用湿布擦拭、勿机洗，拉链避免卡布。',
     rating: 4.8,
     sales: 168,
-    imagePath: 'assets/images/products/p207.png',
+    imagePath: 'assets/images/products/p207.jpg',
   ),
   Product(
     id: 'p208',
@@ -3444,7 +3444,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属件避免弯折和沾水，流苏避免勾挂。',
     rating: 4.8,
     sales: 157,
-    imagePath: 'assets/images/products/p208.png',
+    imagePath: 'assets/images/products/p208.jpg',
   ),
   Product(
     id: 'p209',
@@ -3462,7 +3462,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.9,
     sales: 96,
-    imagePath: 'assets/images/products/p209.png',
+    imagePath: 'assets/images/products/p209.jpg',
   ),
   Product(
     id: 'p210',
@@ -3480,7 +3480,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.9,
     sales: 84,
-    imagePath: 'assets/images/products/p210.png',
+    imagePath: 'assets/images/products/p210.jpg',
   ),
   Product(
     id: 'p211',
@@ -3496,7 +3496,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.9,
     sales: 91,
-    imagePath: 'assets/images/products/p211.png',
+    imagePath: 'assets/images/products/p211.jpg',
   ),
   Product(
     id: 'p212',
@@ -3514,7 +3514,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.9,
     sales: 87,
-    imagePath: 'assets/images/products/p212.png',
+    imagePath: 'assets/images/products/p212.jpg',
   ),
   Product(
     id: 'p213',
@@ -3530,7 +3530,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.8,
     sales: 93,
-    imagePath: 'assets/images/products/p213.png',
+    imagePath: 'assets/images/products/p213.jpg',
   ),
   Product(
     id: 'p214',
@@ -3548,7 +3548,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.9,
     sales: 72,
-    imagePath: 'assets/images/products/p214.png',
+    imagePath: 'assets/images/products/p214.jpg',
   ),
   Product(
     id: 'p215',
@@ -3566,7 +3566,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.9,
     sales: 89,
-    imagePath: 'assets/images/products/p215.png',
+    imagePath: 'assets/images/products/p215.jpg',
   ),
   Product(
     id: 'p216',
@@ -3582,7 +3582,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.8,
     sales: 95,
-    imagePath: 'assets/images/products/p216.png',
+    imagePath: 'assets/images/products/p216.jpg',
   ),
   Product(
     id: 'p217',
@@ -3600,7 +3600,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.9,
     sales: 66,
-    imagePath: 'assets/images/products/p217.png',
+    imagePath: 'assets/images/products/p217.jpg',
   ),
   Product(
     id: 'p218',
@@ -3618,7 +3618,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.9,
     sales: 92,
-    imagePath: 'assets/images/products/p218.png',
+    imagePath: 'assets/images/products/p218.jpg',
   ),
   Product(
     id: 'p219',
@@ -3634,7 +3634,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.8,
     sales: 85,
-    imagePath: 'assets/images/products/p219.png',
+    imagePath: 'assets/images/products/p219.jpg',
   ),
   Product(
     id: 'p220',
@@ -3652,7 +3652,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装完成品，避免暴晒、跌落和长时间高温，展示建议放展示柜，拿取时请托底座。',
     rating: 4.9,
     sales: 58,
-    imagePath: 'assets/images/products/p220.png',
+    imagePath: 'assets/images/products/p220.jpg',
   ),
   Product(
     id: 'p221',
@@ -3670,7 +3670,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒、跌落和长时间高温，展示建议放展示柜。',
     rating: 4.9,
     sales: 83,
-    imagePath: 'assets/images/products/p221.png',
+    imagePath: 'assets/images/products/p221.jpg',
   ),
   Product(
     id: 'p222',
@@ -3686,7 +3686,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；吊牌完好7天无理由；不可高温机洗，建议局部擦拭。',
     rating: 4.9,
     sales: 176,
-    imagePath: 'assets/images/products/p222.png',
+    imagePath: 'assets/images/products/p222.jpg',
   ),
   Product(
     id: 'p223',
@@ -3702,7 +3702,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.7,
     sales: 158,
-    imagePath: 'assets/images/products/p223.png',
+    imagePath: 'assets/images/products/p223.jpg',
   ),
   Product(
     id: 'p224',
@@ -3718,7 +3718,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用前先撕掉表面保护膜，撕膜后才是透亮效果。',
     rating: 4.8,
     sales: 194,
-    imagePath: 'assets/images/products/p224.png',
+    imagePath: 'assets/images/products/p224.jpg',
   ),
   Product(
     id: 'p225',
@@ -3734,7 +3734,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.8,
     sales: 167,
-    imagePath: 'assets/images/products/p225.png',
+    imagePath: 'assets/images/products/p225.jpg',
   ),
   Product(
     id: 'p226',
@@ -3752,7 +3752,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；避免长时间连续点亮，充电时勿覆盖灯体，远离水源。',
     rating: 4.9,
     sales: 213,
-    imagePath: 'assets/images/products/p226.png',
+    imagePath: 'assets/images/products/p226.jpg',
   ),
   Product(
     id: 'p227',
@@ -3770,7 +3770,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒、跌落和长时间高温，展示建议放展示柜。',
     rating: 4.9,
     sales: 78,
-    imagePath: 'assets/images/products/p227.png',
+    imagePath: 'assets/images/products/p227.jpg',
   ),
   Product(
     id: 'p228',
@@ -3786,7 +3786,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属件避免沾水和汗液，佩戴后擦干存放。',
     rating: 4.8,
     sales: 143,
-    imagePath: 'assets/images/products/p228.png',
+    imagePath: 'assets/images/products/p228.jpg',
   ),
   Product(
     id: 'p229',
@@ -3802,7 +3802,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小颗粒较多，6岁以下需成人陪同，拼装前先按图清点颗粒。',
     rating: 4.7,
     sales: 127,
-    imagePath: 'assets/images/products/p229.png',
+    imagePath: 'assets/images/products/p229.jpg',
   ),
   Product(
     id: 'p230',
@@ -3818,7 +3818,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.7,
     sales: 139,
-    imagePath: 'assets/images/products/p230.png',
+    imagePath: 'assets/images/products/p230.jpg',
   ),
   Product(
     id: 'p231',
@@ -3834,7 +3834,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；贴纸避免长时间暴晒，粘贴面保持干燥洁净。',
     rating: 4.7,
     sales: 172,
-    imagePath: 'assets/images/products/p231.png',
+    imagePath: 'assets/images/products/p231.jpg',
   ),
   Product(
     id: 'p232',
@@ -3850,7 +3850,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属件避免弯折和沾水。',
     rating: 4.8,
     sales: 121,
-    imagePath: 'assets/images/products/p232.png',
+    imagePath: 'assets/images/products/p232.jpg',
   ),
   Product(
     id: 'p233',
@@ -3868,7 +3868,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒、跌落和长时间高温，展示建议放展示柜。',
     rating: 4.9,
     sales: 86,
-    imagePath: 'assets/images/products/p233.png',
+    imagePath: 'assets/images/products/p233.jpg',
   ),
   Product(
     id: 'p234',
@@ -3884,7 +3884,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；吊牌完好7天无理由；不可高温机洗，建议局部擦拭。',
     rating: 4.8,
     sales: 134,
-    imagePath: 'assets/images/products/p234.png',
+    imagePath: 'assets/images/products/p234.jpg',
   ),
   Product(
     id: 'p235',
@@ -3900,7 +3900,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属别针避免沾水，徽章面避免硬物刮擦。',
     rating: 4.8,
     sales: 228,
-    imagePath: 'assets/images/products/p235.png',
+    imagePath: 'assets/images/products/p235.jpg',
   ),
   Product(
     id: 'p236',
@@ -3916,7 +3916,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；用完盖好笔帽防干，笔芯为通用0.5mm规格。',
     rating: 4.7,
     sales: 264,
-    imagePath: 'assets/images/products/p236.png',
+    imagePath: 'assets/images/products/p236.jpg',
   ),
   Product(
     id: 'p237',
@@ -3932,7 +3932,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；相卡避免长时间暴晒褪色，背面书写请用普通中性笔。',
     rating: 4.7,
     sales: 189,
-    imagePath: 'assets/images/products/p237.png',
+    imagePath: 'assets/images/products/p237.jpg',
   ),
   Product(
     id: 'p238',
@@ -3948,7 +3948,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；帆布可手洗晾干，勿漂白，刺绣面避免勾挂。',
     rating: 4.8,
     sales: 176,
-    imagePath: 'assets/images/products/p238.png',
+    imagePath: 'assets/images/products/p238.jpg',
   ),
   Product(
     id: 'p239',
@@ -3966,7 +3966,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；涂装品避免暴晒、跌落和长时间高温，展示建议放展示柜；透明件避免刮擦。',
     rating: 4.9,
     sales: 81,
-    imagePath: 'assets/images/products/p239.png',
+    imagePath: 'assets/images/products/p239.jpg',
   ),
   Product(
     id: 'p240',
@@ -3982,7 +3982,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.7,
     sales: 147,
-    imagePath: 'assets/images/products/p240.png',
+    imagePath: 'assets/images/products/p240.jpg',
   ),
   Product(
     id: 'p241',
@@ -3998,7 +3998,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；吊牌完好7天无理由；不可高温机洗，建议局部擦拭。',
     rating: 4.9,
     sales: 168,
-    imagePath: 'assets/images/products/p241.png',
+    imagePath: 'assets/images/products/p241.jpg',
   ),
   Product(
     id: 'p242',
@@ -4014,7 +4014,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免弯折受潮，镭射面避免硬物刮擦。',
     rating: 4.9,
     sales: 203,
-    imagePath: 'assets/images/products/p242.png',
+    imagePath: 'assets/images/products/p242.jpg',
   ),
   Product(
     id: 'p243',
@@ -4030,7 +4030,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；首次使用先清洗，避免装过热液体后剧烈摇晃。',
     rating: 4.8,
     sales: 159,
-    imagePath: 'assets/images/products/p243.png',
+    imagePath: 'assets/images/products/p243.jpg',
   ),
   Product(
     id: 'p244',
@@ -4046,7 +4046,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用前先撕掉表面保护膜，撕膜后才是透亮效果。',
     rating: 4.8,
     sales: 186,
-    imagePath: 'assets/images/products/p244.png',
+    imagePath: 'assets/images/products/p244.jpg',
   ),
   Product(
     id: 'p245',
@@ -4062,7 +4062,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小片较多请清点，拼装时避免受潮，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 154,
-    imagePath: 'assets/images/products/p245.png',
+    imagePath: 'assets/images/products/p245.jpg',
   ),
   Product(
     id: 'p246',
@@ -4080,7 +4080,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放；透卡避免硬物刮擦。',
     rating: 4.9,
     sales: 286,
-    imagePath: 'assets/images/products/p246.png',
+    imagePath: 'assets/images/products/p246.jpg',
   ),
   Product(
     id: 'p247',
@@ -4096,7 +4096,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小片较多请清点，拼装时避免受潮，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 171,
-    imagePath: 'assets/images/products/p247.png',
+    imagePath: 'assets/images/products/p247.jpg',
   ),
   Product(
     id: 'p248',
@@ -4112,7 +4112,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免弯折受潮，镭射面避免硬物刮擦。',
     rating: 4.8,
     sales: 197,
-    imagePath: 'assets/images/products/p248.png',
+    imagePath: 'assets/images/products/p248.jpg',
   ),
   Product(
     id: 'p249',
@@ -4130,7 +4130,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免弯折受潮，镭射面避免硬物刮擦。',
     rating: 4.9,
     sales: 224,
-    imagePath: 'assets/images/products/p249.png',
+    imagePath: 'assets/images/products/p249.jpg',
   ),
   Product(
     id: 'p250',
@@ -4146,7 +4146,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.9,
     sales: 261,
-    imagePath: 'assets/images/products/p250.png',
+    imagePath: 'assets/images/products/p250.jpg',
   ),
   Product(
     id: 'p251',
@@ -4162,7 +4162,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免弯折受潮，镭射面避免硬物刮擦。',
     rating: 4.8,
     sales: 208,
-    imagePath: 'assets/images/products/p251.png',
+    imagePath: 'assets/images/products/p251.jpg',
   ),
   Product(
     id: 'p252',
@@ -4180,7 +4180,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放；透卡避免硬物刮擦。',
     rating: 4.9,
     sales: 274,
-    imagePath: 'assets/images/products/p252.png',
+    imagePath: 'assets/images/products/p252.jpg',
   ),
   Product(
     id: 'p253',
@@ -4196,7 +4196,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小片较多请清点，拼装时避免受潮，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 149,
-    imagePath: 'assets/images/products/p253.png',
+    imagePath: 'assets/images/products/p253.jpg',
   ),
   Product(
     id: 'p254',
@@ -4212,7 +4212,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.8,
     sales: 183,
-    imagePath: 'assets/images/products/p254.png',
+    imagePath: 'assets/images/products/p254.jpg',
   ),
   Product(
     id: 'p255',
@@ -4228,7 +4228,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小片较多请清点，拼装时避免受潮，6岁以下需成人陪同。',
     rating: 4.8,
     sales: 136,
-    imagePath: 'assets/images/products/p255.png',
+    imagePath: 'assets/images/products/p255.jpg',
   ),
   Product(
     id: 'p256',
@@ -4244,7 +4244,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.8,
     sales: 157,
-    imagePath: 'assets/images/products/p256.png',
+    imagePath: 'assets/images/products/p256.jpg',
   ),
   Product(
     id: 'p257',
@@ -4262,7 +4262,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免受潮，盖章后待印泥干透再合页。',
     rating: 4.9,
     sales: 231,
-    imagePath: 'assets/images/products/p257.png',
+    imagePath: 'assets/images/products/p257.jpg',
   ),
   Product(
     id: 'p258',
@@ -4278,7 +4278,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.8,
     sales: 176,
-    imagePath: 'assets/images/products/p258.png',
+    imagePath: 'assets/images/products/p258.jpg',
   ),
   Product(
     id: 'p259',
@@ -4294,7 +4294,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；可手洗晾干，勿漂白，避免长时间暴晒褪色。',
     rating: 4.8,
     sales: 164,
-    imagePath: 'assets/images/products/p259.png',
+    imagePath: 'assets/images/products/p259.jpg',
   ),
   Product(
     id: 'p260',
@@ -4310,7 +4310,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免弯折受潮，镭射面避免硬物刮擦。',
     rating: 4.9,
     sales: 191,
-    imagePath: 'assets/images/products/p260.png',
+    imagePath: 'assets/images/products/p260.jpg',
   ),
   Product(
     id: 'p261',
@@ -4326,7 +4326,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；吊牌完好7天无理由；不可高温机洗，建议局部擦拭。',
     rating: 4.8,
     sales: 158,
-    imagePath: 'assets/images/products/p261.png',
+    imagePath: 'assets/images/products/p261.jpg',
   ),
   Product(
     id: 'p262',
@@ -4342,7 +4342,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；吊牌完好7天无理由；不可高温机洗，建议局部擦拭。',
     rating: 4.8,
     sales: 121,
-    imagePath: 'assets/images/products/p262.png',
+    imagePath: 'assets/images/products/p262.jpg',
   ),
   Product(
     id: 'p263',
@@ -4360,7 +4360,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；吊牌完好7天无理由；不可高温机洗，建议局部擦拭。',
     rating: 4.9,
     sales: 143,
-    imagePath: 'assets/images/products/p263.png',
+    imagePath: 'assets/images/products/p263.jpg',
   ),
   Product(
     id: 'p264',
@@ -4376,7 +4376,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.8,
     sales: 196,
-    imagePath: 'assets/images/products/p264.png',
+    imagePath: 'assets/images/products/p264.jpg',
   ),
   Product(
     id: 'p265',
@@ -4392,7 +4392,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；挂绳避免用力拉扯，毛绒面局部擦拭。',
     rating: 4.8,
     sales: 134,
-    imagePath: 'assets/images/products/p265.png',
+    imagePath: 'assets/images/products/p265.jpg',
   ),
   Product(
     id: 'p266',
@@ -4408,7 +4408,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；搪胶避免暴晒和高温，表面灰尘用软布擦拭。',
     rating: 4.8,
     sales: 149,
-    imagePath: 'assets/images/products/p266.png',
+    imagePath: 'assets/images/products/p266.jpg',
   ),
   Product(
     id: 'p267',
@@ -4424,7 +4424,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；吊牌完好7天无理由；娃衣建议手洗晾干，娃体不可水洗。',
     rating: 4.9,
     sales: 117,
-    imagePath: 'assets/images/products/p267.png',
+    imagePath: 'assets/images/products/p267.jpg',
   ),
   Product(
     id: 'p268',
@@ -4440,7 +4440,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；搪胶避免暴晒和高温，表面灰尘用软布擦拭。',
     rating: 4.8,
     sales: 128,
-    imagePath: 'assets/images/products/p268.png',
+    imagePath: 'assets/images/products/p268.jpg',
   ),
   Product(
     id: 'p269',
@@ -4458,7 +4458,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放；透卡避免硬物刮擦。',
     rating: 4.8,
     sales: 219,
-    imagePath: 'assets/images/products/p269.png',
+    imagePath: 'assets/images/products/p269.jpg',
   ),
   Product(
     id: 'p270',
@@ -4474,7 +4474,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.8,
     sales: 186,
-    imagePath: 'assets/images/products/p270.png',
+    imagePath: 'assets/images/products/p270.jpg',
   ),
   Product(
     id: 'p271',
@@ -4490,7 +4490,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.8,
     sales: 173,
-    imagePath: 'assets/images/products/p271.png',
+    imagePath: 'assets/images/products/p271.jpg',
   ),
   Product(
     id: 'p272',
@@ -4508,7 +4508,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放；透卡避免硬物刮擦。',
     rating: 4.9,
     sales: 237,
-    imagePath: 'assets/images/products/p272.png',
+    imagePath: 'assets/images/products/p272.jpg',
   ),
   Product(
     id: 'p273',
@@ -4524,7 +4524,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；相卡避免长时间暴晒褪色，背面书写请用普通中性笔。',
     rating: 4.7,
     sales: 142,
-    imagePath: 'assets/images/products/p273.png',
+    imagePath: 'assets/images/products/p273.jpg',
   ),
   Product(
     id: 'p274',
@@ -4540,7 +4540,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；相卡避免长时间暴晒褪色，背面书写请用普通中性笔。',
     rating: 4.7,
     sales: 131,
-    imagePath: 'assets/images/products/p274.png',
+    imagePath: 'assets/images/products/p274.jpg',
   ),
   Product(
     id: 'p275',
@@ -4556,7 +4556,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.8,
     sales: 164,
-    imagePath: 'assets/images/products/p275.png',
+    imagePath: 'assets/images/products/p275.jpg',
   ),
   Product(
     id: 'p276',
@@ -4572,7 +4572,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；小卡避免弯折，建议配硬卡套存放。',
     rating: 4.8,
     sales: 158,
-    imagePath: 'assets/images/products/p276.png',
+    imagePath: 'assets/images/products/p276.jpg',
   ),
   Product(
     id: 'p277',
@@ -4588,7 +4588,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；纸品避免弯折受潮，书写请用普通中性笔。',
     rating: 4.8,
     sales: 203,
-    imagePath: 'assets/images/products/p277.png',
+    imagePath: 'assets/images/products/p277.jpg',
   ),
   Product(
     id: 'p278',
@@ -4604,7 +4604,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属件避免沾水，勿让儿童误吞小配件。',
     rating: 4.7,
     sales: 187,
-    imagePath: 'assets/images/products/p278.png',
+    imagePath: 'assets/images/products/p278.jpg',
   ),
   Product(
     id: 'p279',
@@ -4620,7 +4620,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；笔袋可手洗晾干，勿漂白，拉链避免卡布。',
     rating: 4.7,
     sales: 176,
-    imagePath: 'assets/images/products/p279.png',
+    imagePath: 'assets/images/products/p279.jpg',
   ),
   Product(
     id: 'p280',
@@ -4636,7 +4636,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；金属件避免弯折和沾水，细链避免用力拉扯。',
     rating: 4.8,
     sales: 169,
-    imagePath: 'assets/images/products/p280.png',
+    imagePath: 'assets/images/products/p280.jpg',
   ),
   Product(
     id: 'p281',
@@ -4652,7 +4652,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；磁吸件避免靠近银行卡等磁卡，勿让儿童误吞。',
     rating: 4.7,
     sales: 198,
-    imagePath: 'assets/images/products/p281.png',
+    imagePath: 'assets/images/products/p281.jpg',
   ),
   Product(
     id: 'p282',
@@ -4668,7 +4668,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；用完盖好笔帽防干，笔芯为通用0.5mm规格。',
     rating: 4.7,
     sales: 226,
-    imagePath: 'assets/images/products/p282.png',
+    imagePath: 'assets/images/products/p282.jpg',
   ),
   Product(
     id: 'p283',
@@ -4684,7 +4684,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；橡皮避免高温和油污，勿让儿童误吞小配件，铁盒避免沾水生锈。',
     rating: 4.8,
     sales: 158,
-    imagePath: 'assets/images/products/p283.png',
+    imagePath: 'assets/images/products/p283.jpg',
   ),
   Product(
     id: 'p284',
@@ -4700,7 +4700,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；用完盖好笔帽防干，笔芯为通用0.5mm规格。',
     rating: 4.7,
     sales: 183,
-    imagePath: 'assets/images/products/p284.png',
+    imagePath: 'assets/images/products/p284.jpg',
   ),
   Product(
     id: 'p285',
@@ -4716,7 +4716,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；文件夹避免装过厚文件，避免长时间暴晒褪色。',
     rating: 4.7,
     sales: 176,
-    imagePath: 'assets/images/products/p285.png',
+    imagePath: 'assets/images/products/p285.jpg',
   ),
   Product(
     id: 'p286',
@@ -4732,7 +4732,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；用完盖好笔帽防干，笔芯为通用0.5mm规格。',
     rating: 4.7,
     sales: 208,
-    imagePath: 'assets/images/products/p286.png',
+    imagePath: 'assets/images/products/p286.jpg',
   ),
   Product(
     id: 'p287',
@@ -4748,7 +4748,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；塑料尺避免弯折和高温，刻度面避免硬物刮擦。',
     rating: 4.7,
     sales: 161,
-    imagePath: 'assets/images/products/p287.png',
+    imagePath: 'assets/images/products/p287.jpg',
   ),
   Product(
     id: 'p288',
@@ -4764,7 +4764,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；抱枕可局部擦拭，枕芯不可水洗，避免暴晒。',
     rating: 4.8,
     sales: 147,
-    imagePath: 'assets/images/products/p288.png',
+    imagePath: 'assets/images/products/p288.jpg',
   ),
   Product(
     id: 'p289',
@@ -4780,7 +4780,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；可机洗，避免漂白，深色衣物分开洗涤。',
     rating: 4.8,
     sales: 132,
-    imagePath: 'assets/images/products/p289.png',
+    imagePath: 'assets/images/products/p289.jpg',
   ),
   Product(
     id: 'p290',
@@ -4796,7 +4796,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；缎面避免勾丝和硬物刮擦，局部擦拭清洁。',
     rating: 4.8,
     sales: 158,
-    imagePath: 'assets/images/products/p290.png',
+    imagePath: 'assets/images/products/p290.jpg',
   ),
   Product(
     id: 'p291',
@@ -4814,7 +4814,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；包身用湿布擦拭、勿机洗，磁吸扣避免重压。',
     rating: 4.8,
     sales: 109,
-    imagePath: 'assets/images/products/p291.png',
+    imagePath: 'assets/images/products/p291.jpg',
   ),
   Product(
     id: 'p292',
@@ -4832,7 +4832,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用后晾干再收，避免伞骨生锈，透明面避免硬物刮擦。',
     rating: 4.9,
     sales: 173,
-    imagePath: 'assets/images/products/p292.png',
+    imagePath: 'assets/images/products/p292.jpg',
   ),
   Product(
     id: 'p293',
@@ -4848,7 +4848,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用1节5号电池（不含），避免潮湿环境悬挂。',
     rating: 4.8,
     sales: 96,
-    imagePath: 'assets/images/products/p293.png',
+    imagePath: 'assets/images/products/p293.jpg',
   ),
   Product(
     id: 'p294',
@@ -4864,7 +4864,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；玻璃易碎、轻拿轻放；不可装开水，不可微波加热。',
     rating: 4.8,
     sales: 184,
-    imagePath: 'assets/images/products/p294.png',
+    imagePath: 'assets/images/products/p294.jpg',
   ),
   Product(
     id: 'p295',
@@ -4880,7 +4880,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；抱枕可局部擦拭，枕芯不可水洗，避免暴晒。',
     rating: 4.9,
     sales: 141,
-    imagePath: 'assets/images/products/p295.png',
+    imagePath: 'assets/images/products/p295.jpg',
   ),
   Product(
     id: 'p296',
@@ -4896,7 +4896,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；帆布可手洗晾干，勿漂白，皮扣避免长时间泡水。',
     rating: 4.8,
     sales: 124,
-    imagePath: 'assets/images/products/p296.png',
+    imagePath: 'assets/images/products/p296.jpg',
   ),
   Product(
     id: 'p297',
@@ -4912,7 +4912,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；陶瓷易碎、轻拿轻放；可微波加热，首次使用先清洗。',
     rating: 4.8,
     sales: 139,
-    imagePath: 'assets/images/products/p297.png',
+    imagePath: 'assets/images/products/p297.jpg',
   ),
   Product(
     id: 'p298',
@@ -4928,7 +4928,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；抱枕可局部擦拭，枕芯不可水洗，避免暴晒。',
     rating: 4.8,
     sales: 152,
-    imagePath: 'assets/images/products/p298.png',
+    imagePath: 'assets/images/products/p298.jpg',
   ),
   Product(
     id: 'p299',
@@ -4946,7 +4946,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；避免进水和跌落，充电时勿覆盖，长时间不用请关机。',
     rating: 4.9,
     sales: 167,
-    imagePath: 'assets/images/products/p299.png',
+    imagePath: 'assets/images/products/p299.jpg',
   ),
   Product(
     id: 'p300',
@@ -4962,7 +4962,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；抱枕可局部擦拭，枕芯不可水洗，避免暴晒。',
     rating: 4.9,
     sales: 155,
-    imagePath: 'assets/images/products/p300.png',
+    imagePath: 'assets/images/products/p300.jpg',
   ),
   Product(
     id: 'p301',
@@ -4978,7 +4978,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；避免长时间连续点亮，充电时勿覆盖灯体。',
     rating: 4.8,
     sales: 118,
-    imagePath: 'assets/images/products/p301.png',
+    imagePath: 'assets/images/products/p301.jpg',
   ),
   Product(
     id: 'p302',
@@ -4994,7 +4994,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；可机洗，避免漂白，晾干存放。',
     rating: 4.7,
     sales: 113,
-    imagePath: 'assets/images/products/p302.png',
+    imagePath: 'assets/images/products/p302.jpg',
   ),
   Product(
     id: 'p303',
@@ -5010,7 +5010,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；首次使用先清洗，避免装过热液体后剧烈摇晃。',
     rating: 4.7,
     sales: 146,
-    imagePath: 'assets/images/products/p303.png',
+    imagePath: 'assets/images/products/p303.jpg',
   ),
   Product(
     id: 'p304',
@@ -5028,7 +5028,7 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；使用纯净水，避免长时间无水干烧，定期清洁水箱。',
     rating: 4.8,
     sales: 161,
-    imagePath: 'assets/images/products/p304.png',
+    imagePath: 'assets/images/products/p304.jpg',
   ),
   Product(
     id: 'p305',
@@ -5044,6 +5044,6 @@ const catalogProducts = [
     purchaseNotes: '现货，下单后48小时发货。发货地：广州；未拆封7天无理由；陶瓷易碎、轻拿轻放；首次使用先清洗，不可明火直烧。',
     rating: 4.9,
     sales: 127,
-    imagePath: 'assets/images/products/p305.png',
+    imagePath: 'assets/images/products/p305.jpg',
   ),
 ];

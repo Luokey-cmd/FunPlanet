@@ -437,7 +437,13 @@ class _MessageListState extends State<_MessageList> {
     if (chat.messages.length != _lastMessageCount || contentLength != _lastContentLength) {
       _lastMessageCount = chat.messages.length;
       _lastContentLength = contentLength;
-      _scrollToBottom();
+      // 只在真对话进行时自动滚到底：首页区还在时（没有任何用户消息），
+      // 进门那条问候语也会让消息数变化，若照样滚底，用户一进门就被
+      // 甩到页面最下面、看不到顶部的标题与输入区（2026-11-26 hx 报）。
+      // 首页区在场时保持停在顶部，用户自己往下滑。
+      if (chat.messages.any((m) => m.role == ChatRole.user)) {
+        _scrollToBottom();
+      }
     }
     // 首页区显隐只看一条规则：对话里还没有任何用户消息就显示，发第一句后整体消失。
     // 历史会话打开时已有用户消息，天然不显示，不用另写分支。

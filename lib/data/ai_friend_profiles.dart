@@ -87,7 +87,7 @@ const aiFriendAvatarMap = <String, String>{
   'xiaoxing': 'assets/images/小星头像.jpg',
   'amu': 'assets/images/阿木头像.jpeg',
   'tangtang': 'assets/images/糖糖头像.jpg',
-  'tuanzi': 'assets/images/团子头像.png',
+  'tuanzi': 'assets/images/团子头像.jpg',
   'kele': 'assets/images/可乐头像.jpg',
   'youzi': 'assets/images/柚子头像.jpeg',
   'nihong': 'assets/images/霓虹头像.jpg',

@@ -10,12 +10,10 @@ import '../pages/profile_page.dart';
 import '../pages/xiaodou_chat_page.dart';
 import '../providers/app_tab_provider.dart';
 import '../providers/user_provider.dart';
-import '../services/xiaodou_guide_storage.dart';
 import '../theme/app_colors.dart';
 import '../utils/user_session_sync.dart';
 import '../widgets/app_tab_bar.dart';
 import '../widgets/floating_ai_assistant.dart';
-import '../widgets/xiaodou_guide_overlay.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -28,8 +26,6 @@ class _MainScreenState extends State<MainScreen>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   AppTab _activeTab = AppTab.home;
   AppTabProvider? _tabProvider;
-  bool _showXiaodouGuide = false;
-  final _guideStorage = XiaodouGuideStorage();
 
   // 底部导航直达滑动（2026-11-23 hx 二次要求）：上一版用 PageView，
   // 相邻切换很顺，但从第 1 页跳到第 4 页时动画要拖着中间两页一起
@@ -67,7 +63,6 @@ class _MainScreenState extends State<MainScreen>
       if (!mounted) return;
       _tabProvider = context.read<AppTabProvider>();
       _tabProvider!.attach(_onTabTap);
-      unawaited(_maybeShowGuide());
     });
   }
 
@@ -83,27 +78,6 @@ class _MainScreenState extends State<MainScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(refreshSessionData(context));
-    }
-  }
-
-  /// 进门引导：没看过小豆引导层时弹一次。
-  /// （今日星签已于 2026-11-23 删除，进门不再有第二层弹层。）
-  Future<void> _maybeShowGuide() async {
-    await Future<void>.delayed(const Duration(milliseconds: 420));
-    if (!mounted) return;
-    final userId = context.read<UserProvider>().userId;
-    final seen = await _guideStorage.hasSeen(userId);
-    if (!mounted || seen) return;
-    setState(() => _showXiaodouGuide = true);
-  }
-
-  Future<void> _finishXiaodouGuide({bool openChat = false}) async {
-    final userId = context.read<UserProvider>().userId;
-    await _guideStorage.markSeen(userId);
-    if (!mounted) return;
-    setState(() => _showXiaodouGuide = false);
-    if (openChat) {
-      await XiaodouChatPage.open(context);
     }
   }
 
@@ -186,14 +160,6 @@ class _MainScreenState extends State<MainScreen>
             onOpenChat: () => XiaodouChatPage.open(context),
           ),
         ),
-        if (_showXiaodouGuide)
-          Positioned.fill(
-            child: XiaodouGuideOverlay(
-              onFinished: () => unawaited(_finishXiaodouGuide()),
-              onOpenXiaodou: () =>
-                  unawaited(_finishXiaodouGuide(openChat: true)),
-            ),
-          ),
       ],
     );
   }
