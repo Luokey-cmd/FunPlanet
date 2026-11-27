@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
@@ -82,26 +82,26 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
   Future<void> _pickAvatar() async {
     try {
-      // 不带 withData：大照片不要走平台通道把整份字节搬进内存，
-      // 只拿文件路径，后面统一压成小图再用（见 _prepareAvatarImage）。
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
+      // 选图走 image_picker（系统相册选择器），不再用 file_picker。
+      // 真凶（2026-11-27 17:29 hx 提供的 Logcat 实锤）：file_picker
+      // 安卓端在选完图后会自己在原生层压图（FileUtils.compressImage），
+      // 临时文件建不出来时抛 IOException: Permission denied，而且是
+      // 在原生后台线程上未捕获地崩——整个进程被 SIG 9 杀掉，Dart
+      // 层的 try/catch 根本拦不住，前两版在解码内存上打的补丁自然
+      // 也治不到它。荣耀/华为的目录权限更容易触发这一崩。
+      // image_picker 是主流 App 的选图路：走系统选择器、用内容流
+      // 读取、缓存副本建在 App 自己的缓存目录，还能在原生层按
+      // maxWidth/maxHeight 先采样缩小，Dart 侧拿到的已经是小图；
+      // 拿到路径后仍走 _prepareAvatarImage 统一成 1024 以内的头像图。
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 90,
       );
-      if (result == null || result.files.isEmpty) return;
+      if (picked == null) return;
 
-      final file = result.files.first;
-      final path = file.path;
-      if (path == null || path.isEmpty) {
-        if (!mounted) return;
-        showTopSnackBar(
-          context,
-          content: Text('无法读取图片，请重试', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-        );
-        return;
-      }
-
-      final prepared = await _prepareAvatarImage(path);
+      final prepared = await _prepareAvatarImage(picked.path);
       if (!mounted) return;
       if (prepared == null) {
         showTopSnackBar(
@@ -124,20 +124,20 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     }
   }
 
-  // 把选中的原图压成最长边 512 的小图（PNG）写进临时目录，
-  // 返回小图的路径与字节，保存时上传的也是这份小图。
-  // 为什么必须压（2026-11-27 hx 实测闪退）：手机现拍/相册大照片
-  // 几千万像素，旧写法把原图整份读进内存、又按原尺寸解码显示，
-  // 内存瞬间涨一两百 MB，系统直接把 App 杀掉——选完图就闪退、
-  // 还没点保存。压到 512 后显示解码和待上传字节都小一个量级；
-  // 头像在 App 里最大也就显示到屏幕宽，512 够清晰。原图不动。
-  // 二版口径（同日晚 hx 反馈仍闪退后收紧）：不再按文件大小放行
-  // 小文件——文件小不等于像素少，一张不到 2MB 的高压缩大图照样
-  // 几千万像素，绕过压缩后在别处按原尺寸解码还是会爆；现在不论
-  // 大小一律走解码缩放（instantiateImageCodec 带目标尺寸是边解
-  // 码边缩小，不会先把原图全解开），头像统一成 512 的 PNG。
-  // 另外先看文件长度：大得离谱的（>25MB，多半是视频或异常文件）
-  // 直接放弃，别把几十 MB 字节白白搬进内存。
+  // 把选中的图处理成头像用的成品图，返回路径与字节，保存时上传
+  // 的也是这份。处理口径（2026-11-27 晚定版）：
+  // - 尺寸上限 1024：早先压到 512 是为了防大图原尺寸解码爆内存，
+  //   但 hx 实测点头像看大图时 512 被放大到全屏、糊得明显；1024
+  //   在 1080 宽的手机上看全屏预览基本够清。防爆内存靠的是选图
+  //   时 image_picker 已在原生层缩到 1024 以内、加上这里解码时
+  //   带目标尺寸边解码边缩小，不会把原图全像素解开。
+  // - 照片类（jpg/jpeg）直接沿用选图返回的原字节：它已经被
+  //   image_picker 压到 1024 以内、质量 90，再转成 PNG 只会把
+  //   文件撑大好几倍（照片 PNG 动辄 2MB），清晰度并不会更好。
+  //   这里只做一次带目标尺寸的解码校验，确认是张能解开的图。
+  // - 其余格式（png 插画等）走解码缩放输出 PNG，保住透明底。
+  // - 大得离谱的（>25MB，多半是视频或异常文件）直接放弃，别把
+  //   几十 MB 字节白白搬进内存。
   Future<({String path, Uint8List bytes, String mimeType})?> _prepareAvatarImage(
     String sourcePath,
   ) async {
@@ -148,11 +148,17 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       final sourceBytes = await source.readAsBytes();
       final codec = await ui.instantiateImageCodec(
         sourceBytes,
-        targetWidth: 512,
-        targetHeight: 512,
+        targetWidth: 1024,
+        targetHeight: 1024,
       );
       final frame = await codec.getNextFrame();
       final image = frame.image;
+      final lower = sourcePath.toLowerCase();
+      if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+        image.dispose();
+        codec.dispose();
+        return (path: sourcePath, bytes: sourceBytes, mimeType: 'image/jpeg');
+      }
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
       codec.dispose();

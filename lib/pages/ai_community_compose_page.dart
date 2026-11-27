@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../models/ai_artwork.dart';
@@ -109,18 +109,17 @@ class _AiCommunityComposePageState extends State<AiCommunityComposePage> {
       return;
     }
     final remain = _maxImages - _images.length;
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      allowMultiple: true,
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
+    // 选图一律走 image_picker（系统相册选择器）：file_picker 安卓端选图后
+    // 会在原生层压图建临时文件，华为/荣耀上 Permission denied 直接打死
+    // 进程（2026-11-27 Logcat 实锤、头像处已中招），别再换回去。
+    final picked = await ImagePicker().pickMultiImage();
+    if (picked.isEmpty) return;
 
     final pending = <_PickedUpload>[];
-    for (final file in result.files.take(remain)) {
-      final bytes = file.bytes;
-      if (bytes == null || bytes.isEmpty) continue;
-      final ext = (file.extension ?? '').toLowerCase();
+    for (final file in picked.take(remain)) {
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) continue;
+      final ext = file.name.contains('.') ? file.name.split('.').last.toLowerCase() : '';
       final mimeType = switch (ext) {
         'png' => 'image/png',
         'webp' => 'image/webp',

@@ -1,9 +1,8 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import '../utils/app_log.dart';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -114,26 +113,16 @@ void _sendHomeText(BuildContext context, String text) {
 /// 坑：不许再复制一份选图逻辑，两份（大小上限、格式判断）漂移后很难查。
 /// await 之后用 context 前必须先判 mounted，页面已关时直接收手。
 Future<({Uint8List bytes, String mimeType})?> _pickImageForChat(BuildContext context) async {
-  // 必须关掉 compression：file_picker 8.x 默认会 compressImage，
-  // 在华为/荣耀上往公共相册目录 createTempFile 会 Permission denied，
-  // 异常抛在插件后台线程，直接把整个进程打死（表现为选图确认后退出 App）。
-  final result = await FilePicker.platform.pickFiles(
-    type: FileType.image,
-    withData: true,
-    allowCompression: false,
-    compressionQuality: 0,
-  );
-  if (result == null || result.files.isEmpty) return null;
-  final file = result.files.first;
-  Uint8List? bytes = file.bytes;
-  if ((bytes == null || bytes.isEmpty) && file.path != null && file.path!.isNotEmpty) {
-    try {
-      bytes = await File(file.path!).readAsBytes();
-    } catch (_) {
-      bytes = null;
-    }
-  }
-  if (bytes == null || bytes.isEmpty) return null;
+  // 选图走 image_picker（系统相册选择器）。别再换回 file_picker：
+  // 它安卓端选图后会在原生层压图（FileUtils.compressImage），往公共
+  // 相册目录 createTempFile 在华为/荣耀上 Permission denied，异常抛在
+  // 插件后台线程、整个进程被打死（选图确认后直接退出 App）。
+  // 2026-11-27 hx 的 Logcat 实锤、换头像处已中招，全 App 选图已统一
+  // 迁到 image_picker；它用内容流读图、缓存建在 App 自己的目录里。
+  final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+  if (picked == null) return null;
+  final bytes = await picked.readAsBytes();
+  if (bytes.isEmpty) return null;
   if (!context.mounted) return null;
   if (bytes.lengthInBytes > 4 * 1024 * 1024) {
     showTopSnackBar(
@@ -142,13 +131,13 @@ Future<({Uint8List bytes, String mimeType})?> _pickImageForChat(BuildContext con
     );
     return null;
   }
-  final ext = (file.extension ?? '').toLowerCase();
+  final ext = picked.name.contains('.') ? picked.name.split('.').last.toLowerCase() : '';
   final mimeType = switch (ext) {
     'png' => 'image/png',
     'webp' => 'image/webp',
     _ => 'image/jpeg',
   };
-  return (bytes: Uint8List.fromList(bytes), mimeType: mimeType);
+  return (bytes: bytes, mimeType: mimeType);
 }
 
 class _XiaodouChatPageState extends State<XiaodouChatPage> {

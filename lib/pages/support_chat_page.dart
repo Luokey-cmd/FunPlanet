@@ -1,4 +1,4 @@
-import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -91,16 +91,15 @@ class _SupportChatPageState extends State<SupportChatPage> {
 
   Future<void> _pickImage(SupportChatProvider chat) async {
     if (chat.sending) return;
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      withData: true,
-    );
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) return;
+    // 选图一律走 image_picker（系统相册选择器）：file_picker 安卓端选图后
+    // 会在原生层压图建临时文件，华为/荣耀上 Permission denied 直接打死
+    // 进程（2026-11-27 Logcat 实锤、头像处已中招），别再换回去。
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (bytes.isEmpty) return;
 
-    final ext = (file.extension ?? '').toLowerCase();
+    final ext = picked.name.contains('.') ? picked.name.split('.').last.toLowerCase() : '';
     final mimeType = switch (ext) {
       'png' => 'image/png',
       'webp' => 'image/webp',
