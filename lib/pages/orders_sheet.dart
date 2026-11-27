@@ -19,6 +19,7 @@ import 'order_review_detail_page.dart';
 
 import '../widgets/click_effect/app_pressable.dart';
 import '../widgets/app_state_views.dart';
+import '../widgets/pay_panel.dart';
 
 class OrdersSheet {
   static void show(BuildContext context, {String? filterLabel}) {
@@ -656,28 +657,27 @@ class _AfterSaleSheetState extends State<_AfterSaleSheet> {
 }
 
 // 待付款订单的「去支付」按钮：样式与上面的评价小按钮保持一致。
-// 支付走 OrderProvider.payOrder（服务端接口），成功后订单状态会变待发货、
-// 列表自动刷新；失败只提示，不改本地状态，避免出现假已付订单。
+// 点开的是全 App 统一的支付面板（hx 2026-11-27 定：列表、详情、
+// 小豆卡片三处一个样），真支付走面板里的 OrderProvider.payOrder
+// （服务端接口），成功后订单状态变待发货、列表自动刷新；面板里
+// 付失败会留在面板内报错，不改本地状态，避免出现假已付订单。
 class _PayButton extends StatelessWidget {
   const _PayButton({required this.order});
 
   final Order order;
 
   Future<void> _onTap(BuildContext context) async {
-    try {
-      await context.read<OrderProvider>().payOrder(order.id);
-      if (!context.mounted) return;
-      showTopSnackBar(
-        context,
-        content: Text('支付成功，等待商家发货', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      showTopSnackBar(
-        context,
-        content: Text('支付失败，请稍后重试', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
-      );
-    }
+    await showPayPanel(
+      context,
+      order: order,
+      onPaid: (_) {
+        if (!context.mounted) return;
+        showTopSnackBar(
+          context,
+          content: Text('支付成功，等待商家发货', style: TextStyle(fontSize: AppScale.t(14), fontWeight: FontWeight.w600)),
+        );
+      },
+    );
   }
 
   @override

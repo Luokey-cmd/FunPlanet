@@ -131,25 +131,21 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   // 内存瞬间涨一两百 MB，系统直接把 App 杀掉——选完图就闪退、
   // 还没点保存。压到 512 后显示解码和待上传字节都小一个量级；
   // 头像在 App 里最大也就显示到屏幕宽，512 够清晰。原图不动。
-  // 小文件（≤2MB，如截图、小图）不值得压：直接用原图，但仍受
-  // UserAvatarImage 的解码尺寸上限保护，不会重演闪退。
+  // 二版口径（同日晚 hx 反馈仍闪退后收紧）：不再按文件大小放行
+  // 小文件——文件小不等于像素少，一张不到 2MB 的高压缩大图照样
+  // 几千万像素，绕过压缩后在别处按原尺寸解码还是会爆；现在不论
+  // 大小一律走解码缩放（instantiateImageCodec 带目标尺寸是边解
+  // 码边缩小，不会先把原图全解开），头像统一成 512 的 PNG。
+  // 另外先看文件长度：大得离谱的（>25MB，多半是视频或异常文件）
+  // 直接放弃，别把几十 MB 字节白白搬进内存。
   Future<({String path, Uint8List bytes, String mimeType})?> _prepareAvatarImage(
     String sourcePath,
   ) async {
     try {
       final source = File(sourcePath);
+      final length = await source.length();
+      if (length <= 0 || length > 25 * 1024 * 1024) return null;
       final sourceBytes = await source.readAsBytes();
-      final lower = sourcePath.toLowerCase();
-      final sourceMime = lower.endsWith('.png')
-          ? 'image/png'
-          : lower.endsWith('.webp')
-              ? 'image/webp'
-              : lower.endsWith('.gif')
-                  ? 'image/gif'
-                  : 'image/jpeg';
-      if (sourceBytes.length <= 2 * 1024 * 1024) {
-        return (path: sourcePath, bytes: sourceBytes, mimeType: sourceMime);
-      }
       final codec = await ui.instantiateImageCodec(
         sourceBytes,
         targetWidth: 512,

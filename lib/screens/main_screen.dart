@@ -136,6 +136,27 @@ class _MainScreenState extends State<MainScreen>
       fit: StackFit.expand,
       clipBehavior: Clip.none,
       children: [
+        Consumer<GuideController>(
+          builder: (context, guide, _) => PopScope(
+            // 引导极限防护（hx 2026-11-27 17:13 点名）：引导没走完时
+            // 系统手势返回/顶栏返回一律先拦下——不退出、不丢进度，
+            // 转去问「跳过引导？」；只有在确认层点「还是跳过」才真
+            // 退出。确认层开着时再按返回 = 收起确认层（等于「接着看」）。
+            // 恭喜页（done）除外：状态已落盘，放行返回。
+            // PopScope 放在页面子树里即可注册到本路由的返回守卫，
+            // 不必包住整页（它靠 ModalRoute 注册生效）。
+            canPop: !(guide.active && guide.step != GuideStep.done),
+            onPopInvokedWithResult: (didPop, _) {
+              if (didPop) return;
+              if (guide.confirmingSkip) {
+                guide.cancelSkip();
+              } else {
+                guide.askSkip();
+              }
+            },
+            child: const SizedBox.shrink(),
+          ),
+        ),
         Scaffold(
           backgroundColor: AppColors.background,
           body: Column(

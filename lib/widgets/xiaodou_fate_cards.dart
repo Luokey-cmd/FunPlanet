@@ -17,6 +17,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../utils/snackbar_utils.dart';
 import '../widgets/product_image.dart';
+import 'pay_panel.dart';
 
 /// 亮牌牌板（2026-11-26 改版 v4，hx 看真机录屏后定的形态）：
 /// 三张竖版小卡并排（极简，只有商品图 + 名字）这一步不变；点中一张后的变身
@@ -1196,9 +1197,15 @@ class _DetailCardButtonsState extends State<_DetailCardButtons> {
 
   @override
   Widget build(BuildContext context) {
+    // 已下单状态两处来源：本组件自己办成的单（_placedOrder），或
+    // 代买登记在小豆那边的同一件商品的单（全屏层里点的单、按钮随
+    // 关层销毁后靠登记回刷到聊天卡上，见 XiaodouChatProvider 的
+    // markOrderPlaced）。
+    final placed = _placedOrder ??
+        context.watch<XiaodouChatProvider>().placedOrderFor(widget.product.id);
     // 新手引导演示下单完成：按钮区换成演示成功片（没有真订单、不给去支付）。
     final guide = context.watch<GuideController>();
-    if (guide.demoOrderPlaced && _placedOrder == null) {
+    if (guide.demoOrderPlaced && placed == null) {
       return Container(
         padding: EdgeInsets.symmetric(vertical: AppScale.s(9)),
         decoration: BoxDecoration(
@@ -1222,8 +1229,40 @@ class _DetailCardButtonsState extends State<_DetailCardButtons> {
         ),
       );
     }
-    final placed = _placedOrder;
     if (placed != null) {
+      // 已付款之后（待发货/已发货/已完成）：只剩一枚状态片，不再给
+      // 「去支付」。文案按订单状态走，数据是支付后回刷的最新订单。
+      if (placed.status != OrderStatus.pending) {
+        final label = switch (placed.status) {
+          OrderStatus.paid => '已付款 · 待发货',
+          OrderStatus.shipping => '已付款 · 已发货',
+          OrderStatus.completed => '已付款 · 已完成',
+          OrderStatus.cancelled => '订单已取消',
+          OrderStatus.pending => '',
+        };
+        return Container(
+          padding: EdgeInsets.symmetric(vertical: AppScale.s(9)),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F7EE),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle, size: AppScale.s(15), color: const Color(0xFF1F9D55)),
+              SizedBox(width: AppScale.s(4)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: AppScale.t(12.5),
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1F9D55),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
       return Row(
         children: [
           Expanded(
@@ -1253,7 +1292,23 @@ class _DetailCardButtonsState extends State<_DetailCardButtons> {
           SizedBox(width: AppScale.s(9)),
           Expanded(
             child: GestureDetector(
-              onTap: () => openOrderDetail(context, placed),
+              // 「去支付」不再跳订单详情（hx 2026-11-27 改定）：原地
+              // 弹全 App 统一的支付面板；付成后把最新订单登记回小豆
+              // 那边、卡片翻成已付款片，并在对话里留一句收尾。
+              onTap: () {
+                final chat = context.read<XiaodouChatProvider>();
+                showPayPanel(
+                  context,
+                  order: placed,
+                  onPaid: (updated) {
+                    chat.markOrderPlaced(widget.product, updated);
+                    chat.appendAssistantNote(
+                      '付款成功：${widget.product.name}，实付 ${_priceText(updated.total)}。这一单已经转成待发货，商家打包好就会发出。',
+                    );
+                    if (mounted) setState(() => _placedOrder = updated);
+                  },
+                );
+              },
               child: Container(
                 padding: EdgeInsets.symmetric(vertical: AppScale.s(9)),
                 decoration: BoxDecoration(
@@ -1386,42 +1441,54 @@ class _DetailCardButtonsState extends State<_DetailCardButtons> {
   // 解析存好自动接着下单；用户改口或回了别的则停在这一步，不下单。
   Future<void> _agentBuy(BuildContext context) async {
     final product = widget.product;
+    // 先把要用的三份 Provider 都接下来，再等地址：等地址期间用户
+    // 要回对话里填小表，点单的这份按钮可能已经销毁（最典型：在
+    // 全屏翻牌层里点购买、关层回聊天填表，全屏那份按钮随关层就
+    // 没了）。后半程只认接下来的引用、不再查组件死活——旧写法在
+    // 地址回来后先看 context.mounted，组件没了就静默收手：订单
+    // 烂在半路、界面上什么都不发生（hx 2026-11-27 16:40 实测）。
+    final chat = context.read<XiaodouChatProvider>();
     final user = context.read<UserProvider>();
+    final orders = context.read<OrderProvider>();
     var address = user.defaultAddress;
     if (address == null) {
-      // 没地址不弹表单、更不跳填写页（hx 2026-11-27 改定，平时与
-      // 引导一致）：小豆在对话里开口要，用户把地址当一条消息发回来，
-      // 解析存成默认地址后接着下单；用户改口或回了别的就停手。
-      final parsed = await context.read<XiaodouChatProvider>().requestBuyAddress();
-      if (parsed == null || !context.mounted) return;
+      // 没地址不跳填写页（hx 2026-11-27 改定）：小豆在对话里发
+      // 地址小表，用户填好提交（或按旧习惯把地址一句话发回来），
+      // 存成默认地址后接着下单；用户取消或回了别的就停手。
+      final parsed = await chat.requestBuyAddress();
+      if (parsed == null) return;
       final error = await user.saveAddress(
         name: parsed.name,
         phone: parsed.phone,
         detail: parsed.detail,
         isDefault: true,
       );
-      if (!context.mounted) return;
       if (error != null) {
-        showTopSnackBar(
-          context,
-          content: Text(error, style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600)),
-        );
+        chat.appendAssistantNote('地址没存上：$error。检查一下，再点一次「立即购买」试试。');
         return;
       }
       // saveAddress 内部已刷新地址列表，直接取默认地址接着下单。
       address = user.defaultAddress;
-      if (address == null) return;
+      if (address == null) {
+        chat.appendAssistantNote('地址存好了，但没读到默认地址，这一单先没下成。再点一次「立即购买」试试。');
+        return;
+      }
     }
 
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
+    // 转圈挂在根导航的 context 上：按钮组件这会儿可能已经不在了，
+    // 根 context 一直都在，等待提示才有地方落。
+    final rootContext = GuideNav.navigatorKey.currentContext;
+    if (rootContext != null && rootContext.mounted) {
+      showDialog<void>(
+        context: rootContext,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+    }
     Order? order;
     Object? failure;
     try {
-      order = await context.read<OrderProvider>().checkoutDirect(
+      order = await orders.checkoutDirect(
             [CartItem(product: product, quantity: 1, spec: product.spec)],
             addressId: address.id,
             payNow: false,
@@ -1431,26 +1498,21 @@ class _DetailCardButtonsState extends State<_DetailCardButtons> {
     } catch (e) {
       failure = e;
     }
-    if (!context.mounted) return;
-    Navigator.of(context).pop();
+    if (rootContext != null && rootContext.mounted) {
+      Navigator.of(rootContext).pop();
+    }
     if (order == null) {
-      showTopSnackBar(
-        context,
-        content: Text(
-          '小豆下单没办成${failure == null ? '' : '：$failure'}',
-          style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600),
-        ),
+      chat.appendAssistantNote(
+        '地址存好了，不过这一单没下成${failure == null ? '' : '：$failure'}。再点一次「立即购买」就能接着下单。',
       );
       return;
     }
-    showTopSnackBar(
-      context,
-      content: Text(
-        '小豆已帮你下单，就差付款了',
-        style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600),
-      ),
+    // 订单在小豆这边登记一份：聊天里的卡片按钮靠它切成已下单
+    // 形态（点单的那份按钮若已随全屏层销毁，它自己的状态指望不上）。
+    chat.markOrderPlaced(product, order);
+    chat.appendAssistantNote(
+      '下单好了：${product.name}，实付 ${_priceText(order.total)}。点卡片上的「去支付」就能付款。',
     );
-    // 不跳页：把订单存进状态，按钮区原地切换成「已下单 + 去支付」。
     if (mounted) setState(() => _placedOrder = order);
   }
 

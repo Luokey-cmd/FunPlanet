@@ -191,9 +191,51 @@ class GuideController extends ChangeNotifier {
   /// 孔里能不能真点：detailIntro 只看不点（孔照挖、点拦住），其余有孔步可点。
   bool get holePassThrough => _step != GuideStep.detailIntro;
 
-  /// 罩子要不要画：翻牌演出与演示表单期间藏起来，别抢戏。
+  /// 跳过确认窗开着：确认窗画在引导罩内部（见 GuideOverlay），
+  /// 不走真弹窗——罩子挂在 MaterialApp 的 builder 层、比导航里的
+  /// 弹窗路由还高一层，真弹窗会被罩子的拦截层挡住点击（hx
+  /// 2026-11-27 实锤：确认窗两个按钮点不动、窗关不掉）。
+  bool confirmingSkip = false;
+
+  void askSkip() {
+    if (!active || _step == GuideStep.done) return;
+    confirmingSkip = true;
+    notifyListeners();
+  }
+
+  void cancelSkip() {
+    if (!confirmingSkip) return;
+    confirmingSkip = false;
+    notifyListeners();
+  }
+
+  /// 小豆聊天页还活着（页面 initState/dispose 时报）：引导的多数
+  /// 步长在聊天页里，用户中途离开聊天页（按返回、去别的页乱逛）
+  /// 时罩子整个让开——不画也不挡路，引导停在他离开的那一步；
+  /// 他回小豆页，罩子自己回来接着走（hx 2026-11-27 截图：气泡
+  /// 跑到「我的」页上面、罩子还罩着点什么都没反应）。
+  bool _chatSurfaceAlive = false;
+
+  void setChatSurfaceAlive(bool alive) {
+    if (_chatSurfaceAlive == alive) return;
+    _chatSurfaceAlive = alive;
+    notifyListeners();
+  }
+
+  /// 当前步是不是长在聊天页里的步（点小豆入口在主界面、恭喜页
+  /// 是罩子自己的卡，都不算——它们不依赖聊天页在不在）。
+  bool get _isChatStep => switch (_step) {
+        GuideStep.idle || GuideStep.welcome || GuideStep.tapEntry || GuideStep.done => false,
+        _ => true,
+      };
+
+  /// 罩子要不要画：翻牌演出与演示表单期间藏起来，别抢戏；聊天
+  /// 步还要聊天页在场，人走了就暂停、别追到别的页上去。
   bool get overlayVisible =>
-      active && _step != GuideStep.flipping && _step != GuideStep.demoSheet;
+      active &&
+      _step != GuideStep.flipping &&
+      _step != GuideStep.demoSheet &&
+      (!_isChatStep || _chatSurfaceAlive);
 
   /// 进度文案：第 X 步 · 共 7 步（欢迎与恭喜不计）。
   String? get progressLabel {
@@ -244,6 +286,7 @@ class GuideController extends ChangeNotifier {
   }
 
   void _begin(GuideStep from, {required bool replay}) {
+    confirmingSkip = false;
     replayMode = replay;
     demoOrderPlaced = false;
     waitTimedOut = false;
@@ -332,7 +375,10 @@ class GuideController extends ChangeNotifier {
   /// 等牌阶段提前收尾（空批次/等太久）：直接进恭喜页，奖励照发——
   /// 不能因为演示数据出问题扣用户奖励（设计稿兜底口径）。
   void completeEarly() {
-    if (_step != GuideStep.waitCards && _step != GuideStep.waitOptions && _step != GuideStep.pickAnswer) return;
+    // 哪些步能走这条出路：等牌/等问/答题（原有），加上目标丢失
+    // 兜底（选牌、预算档、购买等步目标不在屏上太久时，罩子气泡
+    // 给的出路也是它）。点小豆入口与恭喜页不走这条。
+    if (!active || _step == GuideStep.tapEntry || _step == GuideStep.done || _step == GuideStep.flipping) return;
     _waitTimer?.cancel();
     _step = GuideStep.done;
     if (!replayMode) unawaited(_saveStatus('done'));
@@ -342,6 +388,7 @@ class GuideController extends ChangeNotifier {
   /// 跳过：停在当前步不走了，状态记 skipped（首次）——之后不再自动弹，
   /// 「我的」页入口还在。重玩时跳过不改 done 状态。
   void skip() {
+    confirmingSkip = false;
     _waitTimer?.cancel();
     _step = GuideStep.idle;
     if (!replayMode && _status != 'done') unawaited(_saveStatus('skipped'));
@@ -350,6 +397,7 @@ class GuideController extends ChangeNotifier {
 
   /// 正常收尾（恭喜页按钮）：状态落 done，罩子撤下。
   void finish() {
+    confirmingSkip = false;
     _waitTimer?.cancel();
     _step = GuideStep.idle;
     if (!replayMode) unawaited(_saveStatus('done'));

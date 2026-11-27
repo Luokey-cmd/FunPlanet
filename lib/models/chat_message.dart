@@ -131,6 +131,7 @@ class ChatMessage {
     this.optionSet,
     this.couponChoices = const [],
     this.isGuideDemoCheckout = false,
+    this.isGuideDemoAddress = false,
     this.isBuyAddressForm = false,
   });
 
@@ -179,6 +180,11 @@ class ChatMessage {
   // 一步步办单（整理券、整理地址），最后亮这张卡等用户点「去下单」。
   // 只由引导本地生成、不走服务端；products 里放演示的那件商品。
   final bool isGuideDemoCheckout;
+
+  // 新手引导演示的地址清单：办单序列走到地址那步时亮这张只读清单
+  // （收货人/手机号/省市区/详细地址逐行列出，不许填），不用一段
+  // 话概括（hx 2026-11-27 17:10 点名）。
+  final bool isGuideDemoAddress;
 
   /// 这条消息挂着代买地址小表（三行：收货人/手机号/详细地址，
   /// 平时下单没默认地址时用；引导演示不走这条）。

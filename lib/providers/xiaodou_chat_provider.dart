@@ -513,14 +513,36 @@ class XiaodouChatProvider extends ChangeNotifier {
       _buyAddressCompleter != null && identical(_buyAddressFormMessage, message);
 
   /// 地址小表提交：收下三项回给等着的代买（它收到后存默认地址
-  /// 接着下单）；确认话术与「一句话发地址」那条路保持一致。
+  /// 接着下单）。这里不再另发一条「收到，接着下单」——小表提交后
+  /// 自己会收成一行「✓ 填好了…」，两处说同一件事是重复（hx
+  /// 2026-11-27 16:40 截图点名）；真正有信息量的收尾由代买在
+  /// 下单出结果后发（见 appendAssistantNote）。
   void submitBuyAddressForm({required String name, required String phone, required String detail}) {
     if (_buyAddressCompleter == null) return;
-    _messages.add(const ChatMessage(
-      role: ChatRole.assistant,
-      content: '收到，这就给你存成默认地址，接着下单。',
-    ));
     _completeBuyAddress(ParsedBuyAddress(name: name, phone: phone, detail: detail));
+    notifyListeners();
+    unawaited(_persistCurrentSession());
+  }
+
+  // 代买已下单登记（按商品编号）：下单成功的订单除了存一份在点单
+  // 按钮自己的状态里，也登记在这里——在全屏翻牌层里点「立即购买」
+  // 时，办单要等用户关层回聊天填地址，那份按钮随关层就销毁了，
+  // 订单结果没处落；靠这份登记，聊天里那张卡的按钮照样能切成
+  // 「已下单 · 去支付」。
+  final Map<String, Order> _placedOrders = {};
+
+  Order? placedOrderFor(String productId) => _placedOrders[productId];
+
+  void markOrderPlaced(Product product, Order order) {
+    _placedOrders[product.id] = order;
+    notifyListeners();
+  }
+
+  /// 往对话里追加一条小豆的本地消息（代买收尾确认等）：不走服务端，
+  /// 落盘进当前会话。代买的后半程不能只靠按钮组件的弹窗与提示——
+  /// 组件可能已经销毁，结果必须在对话里留一句才算把事办完。
+  void appendAssistantNote(String text) {
+    _messages.add(ChatMessage(role: ChatRole.assistant, content: text));
     notifyListeners();
     unawaited(_persistCurrentSession());
   }
@@ -593,7 +615,8 @@ class XiaodouChatProvider extends ChangeNotifier {
     await Future<void>.delayed(const Duration(milliseconds: 800));
     _messages.add(const ChatMessage(
       role: ChatRole.assistant,
-      content: '收货地址也整理好了：下单时会用你存好的默认地址。（这只是演示，不会真的下单；后面真正下单时，才需要填写真实地址。）',
+      content: '收货地址也整理好了，就是你存好的这一份：',
+      isGuideDemoAddress: true,
     ));
     notifyListeners();
     await Future<void>.delayed(const Duration(milliseconds: 600));

@@ -29,6 +29,11 @@ class _GuideOverlayState extends State<GuideOverlay> {
   /// 已经为哪一步滚过目标了：换步时先把目标滚到完整可见再指，
   /// 同一步不重复滚（用户手动滚动后不跟他抢）。
   GuideStep? _broughtStep;
+
+  /// 目标丢失计时（步 + 起点）：同一步的目标持续查不到超过 4 秒，
+  /// 气泡换成出路，免得用户对着全屏拦截层卡死。
+  GuideStep? _missingStep;
+  DateTime? _missingSince;
   int _tick = 0;
   bool _rewardClaimed = false;
 
@@ -95,6 +100,22 @@ class _GuideOverlayState extends State<GuideOverlay> {
       }
     }
 
+    // 目标丢失判定：当前步有目标、但登记处查无此控件（被列表滚
+    // 出销毁、页面内容换了等）。持续丢超过 4 秒算「丢久了」，
+    // _bubble 会换上出路气泡；目标一回来计时清掉、接着走。
+    final targetGone = targetId != null && GuideRects.of(targetId) == null;
+    if (targetGone) {
+      if (_missingStep != guide.step) {
+        _missingStep = guide.step;
+        _missingSince = DateTime.now();
+      }
+    } else {
+      _missingStep = null;
+      _missingSince = null;
+    }
+    final targetLost = _missingSince != null &&
+        DateTime.now().difference(_missingSince!) >= const Duration(seconds: 4);
+
     // 整个罩子必须包一层透明 Material：罩子挂在页面层之上（MaterialApp
     // builder），里面的 Text 没有 Material 祖先时，Flutter 会按「缺
     // Material」的默认样式给文字加双黄下划线（hx 14:38 截图点名：
@@ -137,7 +158,7 @@ class _GuideOverlayState extends State<GuideOverlay> {
                 const Spacer(),
                 if (guide.step != GuideStep.done)
                   GestureDetector(
-                    onTap: () => _confirmSkip(context, guide),
+                    onTap: () => guide.askSkip(),
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: AppScale.s(12), vertical: AppScale.s(6)),
                       decoration: BoxDecoration(
@@ -157,88 +178,98 @@ class _GuideOverlayState extends State<GuideOverlay> {
           ),
         ),
         // 气泡 / 恭喜卡
-        _bubble(context, guide, size, hole),
+        _bubble(context, guide, size, hole, targetLost: targetLost),
+        // 跳过确认层（最顶）：罩子自己画的模态卡，见 _skipConfirmLayer。
+        if (guide.confirmingSkip) _skipConfirmLayer(guide),
         ],
       ),
     );
   }
 
-  /// 点「跳过引导」先弹确认窗（hx 2026-11-27 点名补的）：说清跳过
-  /// 后在哪重看、奖励就没了，给一次反悔机会。「接着看」关窗、引导
-  /// 停在当前步不动；「还是跳过」才真跳过（记 skipped、不发奖，
-  /// 重走走完照常能领，与既定奖励口径一致）。
-  /// 弹窗走 GuideNav 的导航钥匙开在顶层路由上，盖住引导罩；开着时
-  /// 罩子在底下收不到点（路由自带遮罩），手和气泡自然不响应。
-  /// 点窗外不关（barrierDismissible: false），必须二选一。
-  Future<void> _confirmSkip(BuildContext context, GuideController guide) async {
-    final navContext = GuideNav.navigatorKey.currentContext;
-    if (navContext == null) return;
-    final skip = await showDialog<bool>(
-      context: navContext,
-      barrierDismissible: false,
-      builder: (dialogContext) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppScale.s(16))),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(AppScale.s(20), AppScale.s(18), AppScale.s(20), AppScale.s(16)),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '跳过新手引导？',
-                style: TextStyle(fontSize: AppScale.t(16), fontWeight: FontWeight.w700, color: AppColors.foreground),
+  /// 跳过确认层：罩子自己画的模态卡（hx 2026-11-27 点名要的确认
+  /// 窗，文案沿用已定稿的那版）。为什么不用 showDialog：罩子挂在
+  /// MaterialApp 的 builder 层、位于导航之上，真弹窗开在导航里，
+  /// 会被罩子的全屏拦截层挡住点击——两个按钮点不动、窗还关不掉
+  /// （hx 实锤）。画在罩子内部、垫在所有层最上方，点击才通。
+  /// 「接着看」关层、引导停在当前步不动；「还是跳过」才真跳过
+  /// （记 skipped、不发奖，之后走完照常能领）。点层外不关，必须二选一。
+  Widget _skipConfirmLayer(GuideController guide) {
+    return Positioned.fill(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {},
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.45),
+          alignment: Alignment.center,
+          padding: EdgeInsets.symmetric(horizontal: AppScale.s(28)),
+          child: GestureDetector(
+            onTap: () {},
+            child: Container(
+              padding: EdgeInsets.fromLTRB(AppScale.s(20), AppScale.s(18), AppScale.s(20), AppScale.s(16)),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(AppScale.s(16)),
               ),
-              SizedBox(height: AppScale.s(9)),
-              Text(
-                '这一步步的教学就先到这儿啦。想再看，去『我的』页点『新手引导』就能重新开始。走完全程有 20 趣玩币奖励，跳过的话这次就没有了；不过以后把引导走完，奖励照样能领。',
-                style: TextStyle(fontSize: AppScale.t(13), height: 1.55, color: AppColors.foreground),
-              ),
-              SizedBox(height: AppScale.s(16)),
-              Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(dialogContext).pop(false),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(vertical: AppScale.s(10)),
-                        decoration: BoxDecoration(
-                          color: AppColors.muted,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '接着看',
-                          style: TextStyle(fontSize: AppScale.t(13.5), fontWeight: FontWeight.w600, color: AppColors.foreground),
-                        ),
-                      ),
-                    ),
+                  Text(
+                    '跳过新手引导？',
+                    style: TextStyle(fontSize: AppScale.t(16), fontWeight: FontWeight.w700, color: AppColors.foreground),
                   ),
-                  SizedBox(width: AppScale.s(10)),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => Navigator.of(dialogContext).pop(true),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(vertical: AppScale.s(10)),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '还是跳过',
-                          style: TextStyle(fontSize: AppScale.t(13.5), fontWeight: FontWeight.w700, color: Colors.white),
+                  SizedBox(height: AppScale.s(9)),
+                  Text(
+                    '这一步步的教学就先到这儿啦。想再看，去『我的』页点『新手引导』就能重新开始。走完全程有 20 趣玩币奖励，跳过的话这次就没有了；不过以后把引导走完，奖励照样能领。',
+                    style: TextStyle(fontSize: AppScale.t(13), height: 1.55, color: AppColors.foreground),
+                  ),
+                  SizedBox(height: AppScale.s(16)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: guide.cancelSkip,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(vertical: AppScale.s(10)),
+                            decoration: BoxDecoration(
+                              color: AppColors.muted,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              '接着看',
+                              style: TextStyle(fontSize: AppScale.t(13.5), fontWeight: FontWeight.w600, color: AppColors.foreground),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      SizedBox(width: AppScale.s(10)),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: guide.skip,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(vertical: AppScale.s(10)),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              '还是跳过',
+                              style: TextStyle(fontSize: AppScale.t(13.5), fontWeight: FontWeight.w700, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
-    if (skip == true) guide.skip();
   }
 
   List<Widget> _blockers(Size size, Rect? hole, bool passThrough) {
@@ -289,8 +320,23 @@ class _GuideOverlayState extends State<GuideOverlay> {
     );
   }
 
-  Widget _bubble(BuildContext context, GuideController guide, Size size, Rect? hole) {
+  Widget _bubble(BuildContext context, GuideController guide, Size size, Rect? hole, {bool targetLost = false}) {
     if (guide.step == GuideStep.done) return _doneCard(context, guide, size);
+    // 目标丢久了：不管本步原本说什么，都换成出路——把页面翻回
+    // 刚才那儿就能接着走，或者结束引导（奖励照拿，不让用户
+    // 因为演示数据/滚动位置卡死在这一屏）。
+    if (targetLost) {
+      return Positioned(
+        left: AppScale.s(16),
+        right: AppScale.s(16),
+        bottom: AppScale.s(110),
+        child: _bubbleCard(guide, (
+          title: null,
+          body: '要指的东西不在这屏上了。把页面翻回刚才那儿，我就接着带你走；不想走了也可以结束，奖励照拿。',
+          buttons: [('结束引导，奖励照拿', guide.completeEarly)],
+        )),
+      );
+    }
     final data = _bubbleData(guide);
     // 纯指引步（有目标、无按钮）：学录屏里的小气泡——一句话、白底、
     // 带小尾巴贴在目标旁边，不用整张大卡（欢迎/恭喜/带按钮的步才用卡）。
@@ -299,6 +345,11 @@ class _GuideOverlayState extends State<GuideOverlay> {
       // 文字标签时不再念一遍，气泡只留给真带信息的步。
       if (data.body.isEmpty) return const SizedBox.shrink();
       return _miniBubble(guide, data.body, size, hole);
+    }
+    // 无目标、无文案、无按钮的步（如等提问）：整张气泡都不出，
+    // 别留一张只剩头像的空卡在屏上。
+    if (hole == null && data.title == null && data.body.isEmpty && data.buttons.isEmpty) {
+      return const SizedBox.shrink();
     }
     final card = _bubbleCard(guide, data);
     if (hole == null) {
@@ -332,9 +383,14 @@ class _GuideOverlayState extends State<GuideOverlay> {
       case GuideStep.startPick:
         return (title: null, body: '', buttons: const []);
       case GuideStep.waitOptions:
+        // 等提问这段不给任何引导解说（hx 2026-11-27 16:49 定）：
+        // 就按平时正常对话的样子走——聊天里自有「思考中…」，小豆
+        // 把问题正常发出来，引导只在答题时多做指引动作，不预告、
+        // 不解说。只有等太久（waitTimedOut）才出声给条出路，那是
+        // 故障兜底、不是解说。
         return (
           title: null,
-          body: guide.waitTimedOut ? '小豆还没问出来，可能网络在忙。' : '小豆要先问你个问题，马上就好。',
+          body: guide.waitTimedOut ? '小豆还没问出来，可能网络在忙。' : '',
           buttons: guide.waitTimedOut ? [('太久了？结束引导，奖励照拿', guide.completeEarly)] : const [],
         );
       case GuideStep.pickAnswer:

@@ -156,6 +156,7 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
   // 控制器据此推步。引用在 initState 里存好，dispose 时摘监听，
   // 别在回调里现读 provider（页面关了 context 就不能用了）。
   XiaodouChatProvider? _chatForGuide;
+  GuideController? _guideForSurface;
 
   void _guideSync() {
     if (!mounted) return;
@@ -254,17 +255,16 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
   void initState() {
     super.initState();
     _chatForGuide = context.read<XiaodouChatProvider>()..addListener(_guideSync);
+    // 引导防护：告诉控制器小豆页在场——引导的聊天步只在这个页面
+    // 在场时才画罩子；用户中途离开（返回/乱逛），罩子让开、引导
+    // 暂停，回来接着走（dispose 里报离场，见下）。
+    _guideForSurface = context.read<GuideController>()..setChatSurfaceAlive(true);
     // 新手引导：小豆页打开了，说明用户点了悬浮入口（tapEntry 步完成）。
     // 不在这里推步，引导会一直停在「点我」那步等不到下文。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final guide = context.read<GuideController>();
       if (guide.step == GuideStep.tapEntry) guide.advance();
-    });
-    // 进门盘点：每次打开小豆页都重新盘一遍没办完的事（待付款/将过期券）。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      context.read<XiaodouChatProvider>().refreshBriefing();
     });
     // 普通进入：什么都不自动做——不再弹星愿档案问卷，首页区就是入口。
     // 只有为抽牌而来（autoDraw）时才保留原来的自动抽三翻。
@@ -290,6 +290,7 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
   @override
   void dispose() {
     _chatForGuide?.removeListener(_guideSync);
+    _guideForSurface?.setChatSurfaceAlive(false);
     _inputFocusNode.dispose();
     super.dispose();
   }
@@ -301,10 +302,40 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
       body: SparkleBackground(
         child: Column(
           children: [
+            Consumer<GuideController>(
+              builder: (context, guide, _) => PopScope(
+                // 引导极限防护（hx 2026-11-27 17:13 点名）：引导没走完时
+                // 系统手势返回/顶栏返回一律先拦下——不退出、不丢进度，
+                // 转去问「跳过引导？」；只有在确认层点「还是跳过」才真
+                // 退出。确认层开着时再按返回 = 收起确认层（等于「接着看」）。
+                // 恭喜页（done）除外：状态已落盘，放行返回。
+                // PopScope 放在页面子树里即可注册到本路由的返回守卫，
+                // 不必包住整页（它靠 ModalRoute 注册生效）。
+                canPop: !(guide.active && guide.step != GuideStep.done),
+                onPopInvokedWithResult: (didPop, _) {
+                  if (didPop) return;
+                  if (guide.confirmingSkip) {
+                    guide.cancelSkip();
+                  } else {
+                    guide.askSkip();
+                  }
+                },
+                child: const SizedBox.shrink(),
+              ),
+            ),
             SafeArea(
               bottom: false,
               child: _Header(
-                onClose: () => Navigator.pop(context),
+                onClose: () {
+                  // 引导中点顶栏返回：与手势返回同口径，先拦下转
+                  // 跳过确认，不直接离页（见上方 PopScope 守卫）。
+                  final guide = context.read<GuideController>();
+                  if (guide.active && guide.step != GuideStep.done) {
+                    guide.askSkip();
+                  } else {
+                    Navigator.pop(context);
+                  }
+                },
                 // 顶栏菜单四项：录音中点按先结束录音、再照常执行；
                 // 返回不拦——按下即离开页面，输入栏 dispose 会停掉
                 // 录音，结果与先停再走一致。
@@ -584,34 +615,6 @@ class _MessageListState extends State<_MessageList> with WidgetsBindingObserver 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 进门盘点（长记性）：有没办完的事才出声，没事不占地方。
-                  if (chat.briefingMatters.isNotEmpty && !chat.briefingDismissed)
-                    _BriefingBanner(
-                      matters: chat.briefingMatters,
-                      onDismiss: chat.dismissBriefing,
-                      onOpenOrder: () => openAgentActionTarget(
-                        context,
-                        const AgentAction(
-                          id: 'briefing-order',
-                          type: 'briefing',
-                          title: '',
-                          detail: '',
-                          status: 'done',
-                          target: {'page': 'order'},
-                        ),
-                      ),
-                      onOpenCoupons: () => openAgentActionTarget(
-                        context,
-                        const AgentAction(
-                          id: 'briefing-coupons',
-                          type: 'briefing',
-                          title: '',
-                          detail: '',
-                          status: 'done',
-                          target: {'page': 'coupons'},
-                        ),
-                      ),
-                    ),
                   XiaodouHome(
                 onDrawFate: widget.onDrawFate,
                 onSendText: widget.onSendText,
@@ -814,7 +817,12 @@ class _MessageBubble extends StatelessWidget {
                             onTarget: (action) => openAgentActionTarget(context, action),
                             onPay: (action) => _payAgentOrder(context, msgIndex, action),
                           ),
-                        if (message.hasProducts) ...[
+                        // 演示收尾消息（isGuideDemoCheckout）只亮它
+                        // 自己的收尾卡：商品卡（加入购物车/立即购买）
+                        // 与「换一批/看同类」一律不挂——单都办完了
+                        // 还留一排购物按钮在那儿，用户看着莫名其妙
+                        // （hx 2026-11-27 17:10 截图点名）。
+                        if (message.hasProducts && !message.isGuideDemoCheckout) ...[
                           if (message.isFate)
                             XiaodouFateSection(
                               message: message,
@@ -874,6 +882,10 @@ class _MessageBubble extends StatelessWidget {
                         // 消息下面，三行填好就接着下单（平时流程）。
                         if (message.isBuyAddressForm)
                           _BuyAddressFormCard(message: message),
+                        // 新手引导演示的地址清单：像小表一样逐行
+                        // 列出，只看不填（见 _GuideDemoAddressCard）。
+                        if (message.isGuideDemoAddress)
+                          const _GuideDemoAddressCard(),
                         // 提问选项：小豆问了问题、服务端随信给了短回答
                         // 选项时，气泡下挂一排按钮，点一下就替用户把
                         // 这句发出去（hx 2026-11-23 定，省得打字）。
@@ -905,96 +917,6 @@ class _MessageBubble extends StatelessWidget {
                       ],
                     ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 进门盘点卡（长记性）：小豆进门先替用户盘一遍没办完的事——
-/// 待付款订单、快过期的券，每条带一个能直接去办的按钮；点叉关掉
-/// 就不再打扰。没事时这张卡根本不出现，不许拿它刷存在感。
-class _BriefingBanner extends StatelessWidget {
-  const _BriefingBanner({
-    required this.matters,
-    required this.onDismiss,
-    required this.onOpenOrder,
-    required this.onOpenCoupons,
-  });
-
-  final List<BriefingMatter> matters;
-  final VoidCallback onDismiss;
-  final VoidCallback onOpenOrder;
-  final VoidCallback onOpenCoupons;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: EdgeInsets.only(bottom: _xs(12)),
-      padding: EdgeInsets.fromLTRB(_xs(14), _xs(10), _xs(8), _xs(12)),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFBF2),
-        borderRadius: BorderRadius.circular(_xs(14)),
-        border: Border.all(color: const Color(0xFFE8CF9A)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '先帮你盘了盘，有几件事还没办完',
-                  style: TextStyle(
-                    fontSize: _xs(13) + AppScale.fontBump,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.foreground,
-                  ),
-                ),
-              ),
-              AppIconButton(
-                onPressed: onDismiss,
-                iconSize: _xs(16),
-                icon: Icon(Icons.close, color: AppColors.mutedForeground),
-              ),
-            ],
-          ),
-          for (final matter in matters) _row(matter),
-        ],
-      ),
-    );
-  }
-
-  Widget _row(BriefingMatter matter) {
-    final isOrder = matter.isPendingOrder;
-    final expire = matter.expireAt?.toLocal();
-    final text = isOrder
-        ? '订单还没付款：${matter.summary} · 应付 ${formatYuan(matter.total)}'
-        : '「${matter.title}」${matter.condition}，'
-            '${expire == null ? '快到期了' : '${expire.month}月${expire.day}日到期'}，别浪费';
-    return Padding(
-      padding: EdgeInsets.only(top: _xs(6)),
-      child: Row(
-        children: [
-          Icon(
-            isOrder ? Icons.receipt_long_outlined : Icons.local_offer_outlined,
-            size: _xs(16),
-            color: const Color(0xFFB98A2F),
-          ),
-          SizedBox(width: _xs(8)),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: _xs(12) + AppScale.fontBump,
-                color: AppColors.foreground,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: isOrder ? onOpenOrder : onOpenCoupons,
-            child: Text(isOrder ? '去付款' : '去看看'),
           ),
         ],
       ),
@@ -1129,6 +1051,77 @@ class _VisionChoice extends StatelessWidget {
 /// 「去下单」按钮。按钮套 GuideTarget('guide:demoOrder') 让引导罩
 /// 挖孔指它；只在引导的 demoCheckout 步可点（点完进恭喜页），
 /// 引导结束后这张卡留在聊天记录里、按钮失效，不会重复触发。
+/// 新手引导演示的地址清单卡：把收货地址像地址小表一样逐行列出
+/// ——收货人、手机号、省市区、详细地址——给用户看清楚小豆整理好
+/// 的是哪一份；只列不填（hx 2026-11-27 17:10 点名：不要一段话
+/// 概括、需要填的地方不让他填、括号注明只是演示）。
+/// 数据取用户存好的默认地址（拆出省市区与街道段展示）；没有默认
+/// 地址时，收货人/手机号按账号资料列、省市区与详细地址留空位。
+class _GuideDemoAddressCard extends StatelessWidget {
+  const _GuideDemoAddressCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final address = context.watch<UserProvider>().defaultAddress;
+    final account = context.watch<AuthProvider>().currentUser;
+    final name = address?.name ?? account?.nickname ?? '——';
+    final phone = address?.phone ?? account?.phone ?? '——';
+    var region = '——';
+    var street = '——';
+    final detail = address?.detail ?? '';
+    if (detail.isNotEmpty) {
+      final parts = splitRegionFromDetail(detail);
+      if (parts.region != null) {
+        region = regionLabel(parts.region!);
+        street = parts.rest.isEmpty ? '——' : parts.rest;
+      } else {
+        street = detail;
+      }
+    }
+    Widget row(String label, String value) => Padding(
+          padding: EdgeInsets.symmetric(vertical: _xs(7)),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: _xs(64),
+                child: Text(label, style: TextStyle(fontSize: _xs(12.5) + AppScale.fontBump, color: AppColors.mutedForeground)),
+              ),
+              Expanded(
+                child: Text(value, style: TextStyle(fontSize: _xs(12.5) + AppScale.fontBump, color: AppColors.foreground)),
+              ),
+            ],
+          ),
+        );
+    return Container(
+      margin: EdgeInsets.only(top: _xs(10)),
+      padding: EdgeInsets.fromLTRB(_xs(12), _xs(5), _xs(12), _xs(10)),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(_xs(14)),
+        border: Border.all(color: AppColors.primaryLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          row('收货人', name),
+          const Divider(height: 1, color: AppColors.border),
+          row('手机号', phone),
+          const Divider(height: 1, color: AppColors.border),
+          row('省市区', region),
+          const Divider(height: 1, color: AppColors.border),
+          row('详细地址', street),
+          SizedBox(height: _xs(4)),
+          Text(
+            '（只是演示，暂时不需要填）',
+            style: TextStyle(fontSize: _xs(12) + AppScale.fontBump, color: AppColors.mutedForeground),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _GuideDemoCheckoutCard extends StatelessWidget {
   const _GuideDemoCheckoutCard({required this.product});
 
