@@ -25,6 +25,10 @@ class GuideOverlay extends StatefulWidget {
 
 class _GuideOverlayState extends State<GuideOverlay> {
   Timer? _ticker;
+
+  /// 已经为哪一步滚过目标了：换步时先把目标滚到完整可见再指，
+  /// 同一步不重复滚（用户手动滚动后不跟他抢）。
+  GuideStep? _broughtStep;
   int _tick = 0;
   bool _rewardClaimed = false;
 
@@ -67,15 +71,29 @@ class _GuideOverlayState extends State<GuideOverlay> {
 
     final size = MediaQuery.sizeOf(context);
     final targetId = guide.targetId;
+    // 换步先把目标滚到完整可见：目标只露一截时，孔按整卡矩形画、
+    // 手落在整卡中心，就会指到看不见的那半截上（2026-11-27 hx
+    // 截图实锤：翻牌卡只露个头，手压在下面一排路线 chips 上）。
+    // 录屏里的规矩是目标先完整出现、手才指过去，这里照做。
+    if (targetId != null && _broughtStep != guide.step) {
+      _broughtStep = guide.step;
+      WidgetsBinding.instance.addPostFrameCallback((_) => GuideRects.bringToView(targetId));
+    }
     final rawRect = targetId == null ? null : GuideRects.of(targetId);
-    final hole = rawRect == null
-        ? null
-        : Rect.fromLTRB(
-            (rawRect.left - 6).clamp(0, size.width),
-            (rawRect.top - 6).clamp(0, size.height),
-            (rawRect.right + 6).clamp(0, size.width),
-            (rawRect.bottom + 6).clamp(0, size.height),
-          );
+    // 孔只按屏幕上真正看得见的部分算：被滚动区切掉的部分不算数；
+    // 可见不足六成时先不画孔与手（阻挡层照常全屏挡），等滚到位。
+    Rect? hole;
+    if (rawRect != null && rawRect.width > 0 && rawRect.height > 0) {
+      final visible = rawRect.intersect(Rect.fromLTWH(0, 0, size.width, size.height));
+      if (visible.width >= rawRect.width * 0.6 && visible.height >= rawRect.height * 0.6) {
+        hole = Rect.fromLTRB(
+          (visible.left - 6).clamp(0, size.width),
+          (visible.top - 6).clamp(0, size.height),
+          (visible.right + 6).clamp(0, size.width),
+          (visible.bottom + 6).clamp(0, size.height),
+        );
+      }
+    }
 
     return Stack(
       fit: StackFit.expand,
@@ -88,7 +106,7 @@ class _GuideOverlayState extends State<GuideOverlay> {
             painter: _HoleMaskPainter(
               hole,
               _tick,
-              dimmed: guide.step == GuideStep.welcome || guide.step == GuideStep.done,
+              dimmed: guide.step == GuideStep.done,
             ),
           ),
         ),
@@ -96,9 +114,15 @@ class _GuideOverlayState extends State<GuideOverlay> {
         ..._blockers(size, hole, guide.holePassThrough),
         // 目标边上的脉冲圈 + 小手
         if (hole != null) _pointer(hole),
-        // 顶部：进度（左）与跳过（右）
-        SafeArea(
-          child: Padding(
+        // 顶部：只留「跳过引导」。必须用 Positioned 钉在顶部——它原来是
+        // Stack 的非定位子级，被 expand 撑成全屏高，Row 又默认垂直居中，
+        // 按钮实际渲染在屏幕正中（hx 截图实锤：压在小豆头上）。
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            child: Padding(
             padding: EdgeInsets.symmetric(horizontal: AppScale.s(14), vertical: AppScale.s(8)),
             child: Row(
               children: [
@@ -122,6 +146,7 @@ class _GuideOverlayState extends State<GuideOverlay> {
                     ),
                   ),
               ],
+            ),
             ),
           ),
         ),
@@ -150,17 +175,20 @@ class _GuideOverlayState extends State<GuideOverlay> {
   }
 
   Widget _pointer(Rect hole) {
-    // 指引手是 AI 生成的白手套图（assets/images/guide_hand.png，透明底），
-    // 不用代码画形（hx 2026-11-27 点名）。指尖在图宽 0.656 处、贴近图顶
-    // （抠图时按 alpha 实测），摆位时让指尖正落目标中心；戳动 = 整只手
-    // 上下小幅沉降 + 微缩，像真手指在按。手是 IgnorePointer，绝不挡点击。
+    // 指引手是 AI 生成图（assets/images/guide_hand.png，透明底），照
+    // hx 的录屏参考重生：浅肤色卡通手、食指朝左上伸、腕上古铜护腕，
+    // 跟录屏里那只几乎一样（不用代码画形，hx 点名）。指尖在图的左上
+    // 角（图宽 0.071 处、贴图顶，抠图时按 alpha 实测并画点验过），
+    // 摆位让指尖正落目标中心、手身顺指头方向垂在目标右下方，和录屏
+    // 里手压在按钮右下角的姿势一致；戳动 = 整只手沿指头方向（左上）
+    // 小幅探压 + 微缩。手是 IgnorePointer，绝不挡点击。
     final phase = (_tick % 8) / 8; // 0→1 循环（ticker 120ms 一跳）
     final bob = phase < 0.5 ? phase * 2 : (1 - phase) * 2; // 0→1→0
-    final w = AppScale.s(62);
-    final h = w * 758 / 480; // 与资产图同宽高比，别拉变形
-    final press = AppScale.s(6) * bob;
+    final w = AppScale.s(64);
+    final h = w * 536 / 440; // 与资产图同宽高比，别拉变形
+    final press = AppScale.s(5) * bob;
     return Positioned(
-      left: hole.center.dx - w * 0.656,
+      left: hole.center.dx - w * 0.071 + press,
       top: hole.center.dy - h * 0.01 + press,
       child: IgnorePointer(
         child: Transform.scale(
@@ -182,6 +210,9 @@ class _GuideOverlayState extends State<GuideOverlay> {
     // 纯指引步（有目标、无按钮）：学录屏里的小气泡——一句话、白底、
     // 带小尾巴贴在目标旁边，不用整张大卡（欢迎/恭喜/带按钮的步才用卡）。
     if (hole != null && data.buttons.isEmpty) {
+      // body 留空 = 纯手步（录屏里多数步只有手没有字）：目标自带
+      // 文字标签时不再念一遍，气泡只留给真带信息的步。
+      if (data.body.isEmpty) return const SizedBox.shrink();
       return _miniBubble(guide, data.body, size, hole);
     }
     final card = _bubbleCard(guide, data);
@@ -212,15 +243,15 @@ class _GuideOverlayState extends State<GuideOverlay> {
           buttons: [('开始体验', guide.advance), ('先逛逛', guide.skip)],
         );
       case GuideStep.tapEntry:
-        return (title: null, body: '想要什么，跟我说就行。点我，咱们开始。', buttons: const []);
+        return (title: null, body: '我是小豆，你的 AI 导购。点我，花 1 分钟带你买一遍东西——完成有 20 趣玩币奖励。', buttons: const []);
       case GuideStep.startPick:
-        return (title: null, body: '点「翻牌推荐」，我来帮你挑。', buttons: const []);
+        return (title: null, body: '', buttons: const []);
       case GuideStep.waitOptions:
         return (title: null, body: '我先问你三个小问题，马上就好。', buttons: const []);
       case GuideStep.pickType:
-        return (title: null, body: '先选想要的类型——点「手办」。', buttons: const []);
+        return (title: null, body: '', buttons: const []);
       case GuideStep.pickSeries:
-        return (title: null, body: '再选系列——点「月光马戏团」。', buttons: const []);
+        return (title: null, body: '', buttons: const []);
       case GuideStep.pickBudget:
         return (title: null, body: '最后定预算——点「50到100元」。你点过的偏好我会记住，下次不用再说一遍。', buttons: const []);
       case GuideStep.submitOptions:
@@ -457,23 +488,21 @@ class _HoleMaskPainter extends CustomPainter {
       }
     }
     if (hole == null) return;
-    // 目标强调（学小游戏录屏）：孔外一圈呼吸光晕 + 孔边一圈品牌色实线，
-    // 让用户一眼知道点哪、且看得出它在「活着」。
+    // 目标强调（学小游戏录屏）：录屏里目标几乎不套框，最多一层若有
+    // 若无的柔光，存在感全靠手。这里只留两层低透明呼吸光晕，硬实
+    // 线圈删掉——太「设计稿」了，不像游戏里的引导。
     final phase = (tick % 8) / 8;
     final breath = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
-    final glow = Paint()
-      ..color = AppColors.primary.withValues(alpha: 0.18 + 0.22 * breath)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 7 + 3 * breath;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(hole!.inflate(4), Radius.circular(AppScale.s(18))),
-      glow,
-    );
-    final border = Paint()
-      ..color = AppColors.primary
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    canvas.drawRRect(RRect.fromRectAndRadius(hole!, Radius.circular(AppScale.s(14))), border);
+    for (final (inflate, width, alpha) in [(3.0, 4.0, 0.30), (8.0, 8.0, 0.16)]) {
+      final layer = Paint()
+        ..color = AppColors.primary.withValues(alpha: alpha * (0.75 + 0.25 * breath))
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(hole!.inflate(inflate), Radius.circular(AppScale.s(16))),
+        layer,
+      );
+    }
   }
 
   @override

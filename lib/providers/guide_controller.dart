@@ -12,7 +12,7 @@ class GuideNav {
 
 /// 引导步骤（顺序即流程）：
 /// welcome 欢迎（首页，开始/跳过）→ tapEntry 点小豆悬浮入口 →
-/// startPick 点小豆首页「翻牌推荐」→ waitOptions 等服务端分组问题出现 →
+/// startPick 点聊天页「挑手办」词条→ waitOptions 等服务端分组问题出现 →
 /// pickType/pickSeries/pickBudget 三问点选 → submitOptions 点提交 →
 /// waitCards 等功课与亮牌 → pickCard 点目标牌 → flipping 翻牌演出中（罩隐藏）→
 /// detailIntro 看办事清单 → buyDemo 点立即购买 → demoSheet 演示表单（罩隐藏）→
@@ -60,6 +60,16 @@ class GuideRects {
       state.measure();
     }
   }
+
+  /// 把某个目标滚动到完整可见（它若在可滚动区里且被切掉一截）。
+  /// 录屏里的规矩：目标先完整出现在屏幕上，手才指过去；只露一截就
+  /// 指过去，手会落在看不见的那半截上（2026-11-27 hx 截图实锤：
+  /// 翻牌卡只露个头，手却落在卡中心位置的路线 chips 上）。
+  static void bringToView(String id) {
+    for (final state in _states.toList()) {
+      if (state.widget.id == id) state.bringToView();
+    }
+  }
 }
 
 /// 引导目标包装：套在任何要被挖孔高亮的控件外面，把它的全局矩形
@@ -94,6 +104,18 @@ class _GuideTargetState extends State<GuideTarget> {
     final box = _key.currentContext?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) return;
     GuideRects._report(widget.id, box.localToGlobal(Offset.zero) & box.size);
+  }
+
+  /// 把自己滚到可见区偏上位置（alignment 0.3：上方留出气泡的空间）。
+  /// 不在滚动区里的目标调用无副作用。
+  void bringToView() {
+    if (!mounted) return;
+    Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+      alignment: 0.3,
+    );
   }
 
   @override
@@ -141,7 +163,7 @@ class GuideController extends ChangeNotifier {
   /// 当前步要挖孔的目标 id；null = 不挖孔（欢迎/等待/恭喜）。
   String? get targetId => switch (_step) {
         GuideStep.tapEntry => 'guide:xiaodouEntry',
-        GuideStep.startPick => 'guide:fateEntry',
+        GuideStep.startPick => 'guide:pickFigure',
         GuideStep.pickType || GuideStep.pickSeries || GuideStep.pickBudget => 'guide:chip',
         GuideStep.submitOptions => 'guide:submit',
         GuideStep.pickCard => 'guide:card',
@@ -200,7 +222,7 @@ class GuideController extends ChangeNotifier {
     await _load();
     if (active) return;
     if (_status == 'new') {
-      _begin(GuideStep.welcome, replay: false);
+      _begin(GuideStep.tapEntry, replay: false);
     } else if (_status == 'started') {
       _begin(GuideStep.tapEntry, replay: false);
     }
@@ -209,7 +231,7 @@ class GuideController extends ChangeNotifier {
   /// 「我的」页入口手动进：永远从欢迎步重走；已完成的是重玩（不发奖）。
   void startManual() {
     if (active) return;
-    _begin(GuideStep.welcome, replay: _status == 'done');
+    _begin(GuideStep.tapEntry, replay: _status == 'done');
   }
 
   void _begin(GuideStep from, {required bool replay}) {
@@ -226,6 +248,8 @@ class GuideController extends ChangeNotifier {
   /// 事件点都调它，各组件不用知道下一步是什么。
   void advance() {
     final next = switch (_step) {
+      // welcome 步已废弃（2026-11-27 hx 点名删欢迎卡：开局直达 tapEntry，
+      // 学录屏——没有欢迎弹窗，手直接落在第一个目标上）。枚举值留着防旧存档。
       GuideStep.welcome => GuideStep.tapEntry,
       GuideStep.tapEntry => GuideStep.startPick,
       // startPick 直接进引导自己的三问面板：翻牌推荐卡在引导模式下

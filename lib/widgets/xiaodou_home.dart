@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../providers/guide_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import 'click_effect/app_pressable.dart';
@@ -363,11 +362,9 @@ class XiaodouHome extends StatelessWidget {
         child: AppPressable(
           child: GestureDetector(
             onTap: card.onTap,
-            // 新手引导第 2 步挖孔的是「翻牌推荐」卡：卡面套个测量套，
-            // 只量位置、不拦点击；其余三张卡不注册。
-            child: card.title == '翻牌推荐'
-                ? GuideTarget(id: 'guide:fateEntry', child: cardFace)
-                : cardFace,
+            // 新手引导第 2 步已改指聊天页的「挑手办」词条（hx
+            // 2026-11-27 点名），这张卡不再是引导目标，不套测量套。
+            child: cardFace,
           ),
         ),
       );

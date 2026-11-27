@@ -1582,6 +1582,33 @@ class _GuideChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chat = context.watch<XiaodouChatProvider>();
+
+    // 词条卡面（图标+词名）：单写一份是因为「挑手办」那枚在新手
+    // 引导里要套测量套，其余词条直接用。
+    Widget chipFace(int i) => Container(
+          padding: EdgeInsets.symmetric(horizontal: _xs(12), vertical: _xs(7)),
+          decoration: BoxDecoration(
+            color: AppColors.muted,
+            borderRadius: BorderRadius.circular(_xs(999)),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_chips[i].$1, size: _xs(14), color: AppColors.primary),
+              SizedBox(width: _xs(4)),
+              Text(
+                _chips[i].$2,
+                style: TextStyle(
+                  fontSize: _xs(12) + AppScale.fontBump,
+                  color: AppColors.foreground,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        );
+
     return Container(
       width: double.infinity,
       color: AppColors.card,
@@ -1598,32 +1625,22 @@ class _GuideChips extends StatelessWidget {
                   onTap: chat.sending
                       ? null
                       : () {
+                          // 新手引导第 2 步点的就是这枚「挑手办」（hx
+                          // 2026-11-27 点名改的，原先指首页翻牌推荐卡）：
+                          // 引导中不真发话，只推进引导，随后亮引导自己
+                          // 的三问面板；不在引导时照常发「帮我挑手办」。
+                          final guide = context.read<GuideController>();
+                          if (_chips[i].$2 == '挑手办' && guide.step == GuideStep.startPick) {
+                            guide.advance();
+                            return;
+                          }
                           onActionTap();
                           chat.send(_chips[i].$3, starwish: _archiveOf(context));
                         },
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: _xs(12), vertical: _xs(7)),
-                    decoration: BoxDecoration(
-                      color: AppColors.muted,
-                      borderRadius: BorderRadius.circular(_xs(999)),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(_chips[i].$1, size: _xs(14), color: AppColors.primary),
-                        SizedBox(width: _xs(4)),
-                        Text(
-                          _chips[i].$2,
-                          style: TextStyle(
-                            fontSize: _xs(12) + AppScale.fontBump,
-                            color: AppColors.foreground,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // 「挑手办」套测量套给引导报位置，只量不拦点击。
+                  child: _chips[i].$2 == '挑手办'
+                      ? GuideTarget(id: 'guide:pickFigure', child: chipFace(i))
+                      : chipFace(i),
                 ),
               ),
             ],
