@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'package:provider/provider.dart';
+
 import '../models/chat_message.dart';
+import '../providers/guide_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import 'xiaodou_fate_cards.dart';
@@ -49,6 +52,7 @@ class XiaodouFateSection extends StatelessWidget {
       children: [
         SizedBox(height: AppScale.s(8)),
         _chipRow(
+          context: context,
           label: '预算',
           options: const [
             (null, '不限'),
@@ -58,9 +62,14 @@ class XiaodouFateSection extends StatelessWidget {
           ],
           selected: budget,
           onPick: (value) => onRefilter(maxPrice: value ?? 0),
+          // 新手引导：hx 定的「点 100 元内」就是这排预算档里的
+          // 「¥100内」——给它挂引导目标，点中时报控制器进选牌步。
+          guideTargetIds: const {100: 'guide:budget100'},
+          onGuidePicked: () => context.read<GuideController>().notifyBudgetPicked(),
         ),
         SizedBox(height: AppScale.s(6)),
         _chipRow(
+          context: context,
           label: '路线',
           options: const [
             ('sales', '综合'),
@@ -119,10 +128,13 @@ class XiaodouFateSection extends StatelessWidget {
   }
 
   Widget _chipRow<T>({
+    required BuildContext context,
     required String label,
     required List<(T, String)> options,
     required T selected,
     required ValueChanged<T> onPick,
+    Map<T, String>? guideTargetIds,
+    VoidCallback? onGuidePicked,
   }) {
     return Row(
       children: [
@@ -136,8 +148,16 @@ class XiaodouFateSection extends StatelessWidget {
             spacing: AppScale.s(6),
             children: [
               for (final option in options)
-                GestureDetector(
-                  onTap: loadingBatch || option.$1 == selected ? null : () => onPick(option.$1),
+                () {
+                  final chip = GestureDetector(
+                  onTap: loadingBatch || option.$1 == selected
+                      ? null
+                      : () {
+                          onPick(option.$1);
+                          if (guideTargetIds != null && guideTargetIds.containsKey(option.$1)) {
+                            onGuidePicked?.call();
+                          }
+                        },
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: AppScale.s(10), vertical: AppScale.s(4)),
                     decoration: BoxDecoration(
@@ -156,7 +176,10 @@ class XiaodouFateSection extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
+                  );
+                  final targetId = guideTargetIds?[option.$1];
+                  return targetId == null ? chip : GuideTarget(id: targetId, child: chip);
+                }(),
             ],
           ),
         ),

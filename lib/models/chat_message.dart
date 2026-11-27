@@ -130,6 +130,8 @@ class ChatMessage {
     this.optionsUsed = false,
     this.optionSet,
     this.couponChoices = const [],
+    this.isGuideDemoCheckout = false,
+    this.isBuyAddressForm = false,
   });
 
   final ChatRole role;
@@ -172,6 +174,15 @@ class ChatMessage {
 
   // 可领券清单（找优惠时下发）：气泡下方渲染成带领取按钮的卡片。
   final List<CouponChoice> couponChoices;
+
+  // 新手引导演示下单收尾卡：引导里点「立即购买」后，小豆在对话里
+  // 一步步办单（整理券、整理地址），最后亮这张卡等用户点「去下单」。
+  // 只由引导本地生成、不走服务端；products 里放演示的那件商品。
+  final bool isGuideDemoCheckout;
+
+  /// 这条消息挂着代买地址小表（三行：收货人/手机号/详细地址，
+  /// 平时下单没默认地址时用；引导演示不走这条）。
+  final bool isBuyAddressForm;
 
   bool get hasAgentCard => actions.isNotEmpty || homework.isNotEmpty;
 

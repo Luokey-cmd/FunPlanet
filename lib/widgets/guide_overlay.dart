@@ -95,9 +95,15 @@ class _GuideOverlayState extends State<GuideOverlay> {
       }
     }
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
+    // 整个罩子必须包一层透明 Material：罩子挂在页面层之上（MaterialApp
+    // builder），里面的 Text 没有 Material 祖先时，Flutter 会按「缺
+    // Material」的默认样式给文字加双黄下划线（hx 14:38 截图点名：
+    // 「跳过引导」和气泡文字下面那两条黄线）。包上后全部消失。
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
         // 黑罩（带孔）：必须 IgnorePointer 包住——CustomPainter 的
         // hitTest 默认整屏 true，不包的话画笔层会把孔里的点击也吸掉，
         // 用户点小豆永远点不动（2026-11-27 hx 真机实锤的卡点）。
@@ -131,7 +137,7 @@ class _GuideOverlayState extends State<GuideOverlay> {
                 const Spacer(),
                 if (guide.step != GuideStep.done)
                   GestureDetector(
-                    onTap: guide.skip,
+                    onTap: () => _confirmSkip(context, guide),
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: AppScale.s(12), vertical: AppScale.s(6)),
                       decoration: BoxDecoration(
@@ -152,8 +158,87 @@ class _GuideOverlayState extends State<GuideOverlay> {
         ),
         // 气泡 / 恭喜卡
         _bubble(context, guide, size, hole),
-      ],
+        ],
+      ),
     );
+  }
+
+  /// 点「跳过引导」先弹确认窗（hx 2026-11-27 点名补的）：说清跳过
+  /// 后在哪重看、奖励就没了，给一次反悔机会。「接着看」关窗、引导
+  /// 停在当前步不动；「还是跳过」才真跳过（记 skipped、不发奖，
+  /// 重走走完照常能领，与既定奖励口径一致）。
+  /// 弹窗走 GuideNav 的导航钥匙开在顶层路由上，盖住引导罩；开着时
+  /// 罩子在底下收不到点（路由自带遮罩），手和气泡自然不响应。
+  /// 点窗外不关（barrierDismissible: false），必须二选一。
+  Future<void> _confirmSkip(BuildContext context, GuideController guide) async {
+    final navContext = GuideNav.navigatorKey.currentContext;
+    if (navContext == null) return;
+    final skip = await showDialog<bool>(
+      context: navContext,
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppScale.s(16))),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(AppScale.s(20), AppScale.s(18), AppScale.s(20), AppScale.s(16)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '跳过新手引导？',
+                style: TextStyle(fontSize: AppScale.t(16), fontWeight: FontWeight.w700, color: AppColors.foreground),
+              ),
+              SizedBox(height: AppScale.s(9)),
+              Text(
+                '这一步步的教学就先到这儿啦。想再看，去『我的』页点『新手引导』就能重新开始。走完全程有 20 趣玩币奖励，跳过的话这次就没有了；不过以后把引导走完，奖励照样能领。',
+                style: TextStyle(fontSize: AppScale.t(13), height: 1.55, color: AppColors.foreground),
+              ),
+              SizedBox(height: AppScale.s(16)),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(dialogContext).pop(false),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: AppScale.s(10)),
+                        decoration: BoxDecoration(
+                          color: AppColors.muted,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '接着看',
+                          style: TextStyle(fontSize: AppScale.t(13.5), fontWeight: FontWeight.w600, color: AppColors.foreground),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: AppScale.s(10)),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(dialogContext).pop(true),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(vertical: AppScale.s(10)),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '还是跳过',
+                          style: TextStyle(fontSize: AppScale.t(13.5), fontWeight: FontWeight.w700, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (skip == true) guide.skip();
   }
 
   List<Widget> _blockers(Size size, Rect? hole, bool passThrough) {
@@ -247,15 +332,22 @@ class _GuideOverlayState extends State<GuideOverlay> {
       case GuideStep.startPick:
         return (title: null, body: '', buttons: const []);
       case GuideStep.waitOptions:
-        return (title: null, body: '我先问你三个小问题，马上就好。', buttons: const []);
-      case GuideStep.pickType:
+        return (
+          title: null,
+          body: guide.waitTimedOut ? '小豆还没问出来，可能网络在忙。' : '小豆要先问你个问题，马上就好。',
+          buttons: guide.waitTimedOut ? [('太久了？结束引导，奖励照拿', guide.completeEarly)] : const [],
+        );
+      case GuideStep.pickAnswer:
+        // 指提交按钮时给一句话；指选项时只用手（body 空）；屏幕上
+        // 找不到引导想教的那枚（小豆问了没预设答案的问题）时，
+        // 给一句兜底，别让用户对着空气猜。
+        if (guide.answerTarget == 'guide:submit' && GuideRects.of('guide:submit') != null) {
+          return (title: null, body: '选好了，点那个紫色按钮。', buttons: const []);
+        }
+        if (GuideRects.of('guide:chip') == null) {
+          return (title: null, body: '这题没有标准答案，点一个你想要的就行。', buttons: const []);
+        }
         return (title: null, body: '', buttons: const []);
-      case GuideStep.pickSeries:
-        return (title: null, body: '', buttons: const []);
-      case GuideStep.pickBudget:
-        return (title: null, body: '最后定预算——点「50到100元」。你点过的偏好我会记住，下次不用再说一遍。', buttons: const []);
-      case GuideStep.submitOptions:
-        return (title: null, body: '都选好了，点下面那个紫色按钮，我这就去挑。', buttons: const []);
       case GuideStep.waitCards:
         if (guide.waitFailed) {
           return (
@@ -269,6 +361,8 @@ class _GuideOverlayState extends State<GuideOverlay> {
           body: '这一步不用点。我在替你翻数据：销量、口碑、价格，一件件比给你看。',
           buttons: guide.waitTimedOut ? [('太久了？结束引导，奖励照拿', guide.completeEarly)] : const [],
         );
+      case GuideStep.pickBudgetChip:
+        return (title: null, body: '再点一下牌面上方的「¥100内」，把预算卡住。', buttons: const []);
       case GuideStep.pickCard:
         return (
           title: null,
@@ -277,12 +371,8 @@ class _GuideOverlayState extends State<GuideOverlay> {
               : '三张都是按你的条件挑的。点一张你顺眼的，翻个牌看看。',
           buttons: const [],
         );
-      case GuideStep.detailIntro:
-        return (
-          title: null,
-          body: '这是办事清单：加购、领券、下单都列在这儿，你能改、能删，不动就按我办的来。',
-          buttons: [('知道了', guide.advance)],
-        );
+      case GuideStep.demoCheckout:
+        return (title: null, body: '都替你办好了，点卡片上的「去下单」。', buttons: const []);
       case GuideStep.buyDemo:
         return (title: null, body: '最后一步，点「立即购买」——放心，这是演示，不会真下单。', buttons: const []);
       default:

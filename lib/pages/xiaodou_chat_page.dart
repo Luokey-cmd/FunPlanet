@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../models/agent_records.dart';
 import '../models/chat_message.dart';
 import '../providers/cart_provider.dart';
+import '../providers/auth_provider.dart';
 import '../providers/guide_controller.dart';
 import '../providers/order_provider.dart';
 import '../providers/starwish_profile_provider.dart';
@@ -24,10 +25,13 @@ import '../services/voice_input_service.dart';
 import '../services/xiaodou_chat_service.dart';
 import '../utils/snackbar_utils.dart';
 import '../widgets/floating_ai_assistant.dart';
+import '../data/product_data.dart';
+import '../data/region_data.dart';
 import '../widgets/product_image.dart';
 import '../widgets/sparkle_background.dart';
 import '../widgets/starwish_dossier_sheet.dart';
 import '../widgets/xiaodou_agent_card.dart';
+import '../widgets/region_picker.dart';
 import '../widgets/xiaodou_coupon_card.dart';
 import '../widgets/xiaodou_fate_section.dart';
 import '../widgets/xiaodou_home.dart';
@@ -158,15 +162,29 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
     final guide = context.read<GuideController>();
     final chat = _chatForGuide;
     if (!guide.active || chat == null) return;
-    if (guide.step == GuideStep.waitOptions) {
-      final ready = chat.messages.any((m) => m.optionSet != null && !m.optionsUsed);
-      if (ready) guide.notifyOptionsReady();
+    if (guide.step == GuideStep.waitOptions || guide.step == GuideStep.pickAnswer) {
+      // 牌可能先于问题到（档案齐全时小豆跳过提问直接抽牌）：先查牌。
+      final last = chat.messages.isEmpty ? null : chat.messages.last;
+      if (last != null && last.isFate) {
+        guide.notifyCardsReadyFromWait(
+          hasProducts: last.hasProducts || last.fateBatches.any((b) => b.isNotEmpty),
+          maxPrice: (last.drawArgs['maxPrice'] as num?)?.toInt(),
+        );
+      }
+      // 问题到了没：分组卡（optionSet）与平铺按钮（options）都算——
+      // 挑手办时小豆只问一轮平铺系列，旧版只认分组卡、干等到超时
+      // （hx 2026-11-27 截图实锤），两种都认才跟得上真实问法。
+      if (guide.step == GuideStep.waitOptions) {
+        final ready = chat.messages.any((m) => !m.optionsUsed && (m.optionSet != null || m.options.isNotEmpty));
+        if (ready) guide.notifyOptionsReady();
+      }
     } else if (guide.step == GuideStep.waitCards) {
       // 只认最后一条消息：历史里翻过的旧牌不算，得是这一轮新亮的牌。
       final m = chat.messages.isEmpty ? null : chat.messages.last;
       if (m != null && m.isFate) {
         guide.notifyCardsReady(
           hasProducts: m.hasProducts || m.fateBatches.any((b) => b.isNotEmpty),
+          maxPrice: (m.drawArgs['maxPrice'] as num?)?.toInt(),
         );
       }
     }
@@ -332,46 +350,6 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
                 ],
               ),
             ),
-            // 新手引导三问面板：三问步期间贴在输入栏上方，提交后自动撤。
-            Builder(
-              builder: (context) {
-                final guide = context.watch<GuideController>();
-                final inPick = guide.step == GuideStep.pickType ||
-                    guide.step == GuideStep.pickSeries ||
-                    guide.step == GuideStep.pickBudget ||
-                    guide.step == GuideStep.submitOptions;
-                if (!inPick) return const SizedBox.shrink();
-                return Container(
-                  margin: EdgeInsets.fromLTRB(_xs(12), _xs(4), _xs(12), _xs(8)),
-                  padding: EdgeInsets.fromLTRB(_xs(12), _xs(10), _xs(12), _xs(12)),
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
-                    borderRadius: BorderRadius.circular(_xs(14)),
-                    border: Border.all(color: AppColors.primaryLight),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '小豆想先问你三个小问题',
-                        style: TextStyle(
-                          fontSize: _xs(12) + AppScale.fontBump,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      _GroupedQuestionOptions(
-                        optionSet: _guideOptionSet(),
-                        onPick: (text) => _guideSubmitOptions(context, text),
-                        onMemory: (byLabel) =>
-                            context.read<StarwishProfileProvider>().rememberFromOptions(byLabel),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
             _CartConfirmBar(onActionTap: _endListeningForAction),
             _GuideChips(onActionTap: _endListeningForAction),
             _InputBar(
@@ -385,56 +363,6 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
       ),
     );
   }
-}
-
-/// 新手引导的三问选项集（2026-11-27，主聊复核后改口径）：
-/// 现行服务端分组问答是两轮（第一轮送给谁＋预算，第二轮类型＋系列），
-/// 引导要的「手办→月光马戏团→50到100元」三枚不在同一轮里、第一轮
-/// 也没有手办/月光马戏团——等服务端提问走不通，引导自己亮这套面板。
-/// 标签必须与服务端一致（类型/系列/预算），「小豆记得你」的沉淀
-/// （rememberFromOptions）与预算换算都按这三个标签认。
-/// 预算档沿用服务端真选项（50元以内/50到100元/100到200元/200元以上）。
-XiaodouOptionSet _guideOptionSet() => const XiaodouOptionSet(
-      mode: 'each',
-      groups: [
-        XiaodouOptionGroup(
-          label: '类型',
-          options: ['玩具', '公仔', '手办', '谷子', '小卡', '文具', '实用类周边'],
-        ),
-        XiaodouOptionGroup(
-          label: '系列',
-          options: ['星屿邮局', '山海小食堂', '月光马戏团', '霓虹夜行', '深海观测站', '时光钟表店', '樱庭花艺社', '极光观测队'],
-        ),
-        XiaodouOptionGroup(
-          label: '预算',
-          options: ['50元以内', '50到100元', '100到200元', '200元以上'],
-        ),
-      ],
-    );
-
-/// 引导三问提交：按用户点的三个条件直接抽第一批牌（不经模型）。
-/// 输入是 _GroupedQuestionOptions 拼好的「类型，系列，预算」；
-/// 预算换算与 rememberFromOptions 同口径（50到100元→100）。
-Future<void> _guideSubmitOptions(BuildContext context, String joined) async {
-  final parts = joined.split('，');
-  final type = parts.isNotEmpty && parts[0].isNotEmpty ? parts[0] : '手办';
-  final series = parts.length > 1 && parts[1].isNotEmpty ? parts[1] : '月光马戏团';
-  final budget = parts.length > 2 ? parts[2] : '50到100元';
-  final maxPrice = switch (budget) {
-    '50元以内' => 50,
-    '50到100元' => 100,
-    '100到200元' => 200,
-    _ => null, // 200元以上不限
-  };
-  final guide = context.read<GuideController>();
-  guide.notifyOptionsSubmitted();
-  if (!context.mounted) return;
-  await context.read<XiaodouChatProvider>().drawGuideCards(
-        summary: joined,
-        majorCategory: type,
-        query: series,
-        maxPrice: maxPrice,
-      );
 }
 
 Future<void> _startNewChat(BuildContext context) async {
@@ -938,6 +866,14 @@ class _MessageBubble extends StatelessWidget {
                             },
                             onMember: () => MemberBenefitPage.open(context, MemberBenefitKind.monthlyCoupon),
                           ),
+                        // 新手引导演示下单收尾卡：小豆办完券与地址后
+                        // 亮出来，等用户点「去下单」收尾（演示，不真下单）。
+                        if (message.isGuideDemoCheckout && message.products.isNotEmpty)
+                          _GuideDemoCheckoutCard(product: message.products.first),
+                        // 代买地址小表：没默认地址时挂在要地址那条
+                        // 消息下面，三行填好就接着下单（平时流程）。
+                        if (message.isBuyAddressForm)
+                          _BuyAddressFormCard(message: message),
                         // 提问选项：小豆问了问题、服务端随信给了短回答
                         // 选项时，气泡下挂一排按钮，点一下就替用户把
                         // 这句发出去（hx 2026-11-23 定，省得打字）。
@@ -947,8 +883,8 @@ class _MessageBubble extends StatelessWidget {
                             optionSet: message.optionSet!,
                             onPick: (text) {
                               context.read<XiaodouChatProvider>().chooseOption(msgIndex, text);
-                              // 新手引导：三问提交了，报控制器推到等牌步。
-                              context.read<GuideController>().notifyOptionsSubmitted();
+                              // 新手引导：这一轮答完了，报控制器回等待步。
+                              context.read<GuideController>().notifyAnswered();
                             },
                             onMemory: (byLabel) =>
                                 context.read<StarwishProfileProvider>().rememberFromOptions(byLabel),
@@ -956,8 +892,11 @@ class _MessageBubble extends StatelessWidget {
                         else if (message.options.isNotEmpty && !message.optionsUsed && isLastMessage && !sending)
                           _QuestionOptions(
                             options: message.options,
-                            onPick: (text) =>
-                                context.read<XiaodouChatProvider>().chooseOption(msgIndex, text),
+                            onPick: (text) {
+                              context.read<XiaodouChatProvider>().chooseOption(msgIndex, text);
+                              // 新手引导：平铺问题答了同样算一轮答完。
+                              context.read<GuideController>().notifyAnswered();
+                            },
                           ),
                         // 说了一半停住（在想下一段、查工具、联网搜）时
                         // 最容易被误以为已经说完——尾巴挂上会动的省略号，
@@ -1186,6 +1125,337 @@ class _VisionChoice extends StatelessWidget {
 
 /// 提问选项按钮排：照 _VisionChoice 的胶囊样式，文字换成服务端随
 /// 问题下发的短回答；点哪个就把哪个当用户回复发出去，整组随即撤掉。
+/// 新手引导演示下单收尾卡：商品一行 + 券/地址两行「已办好」+ 紫色
+/// 「去下单」按钮。按钮套 GuideTarget('guide:demoOrder') 让引导罩
+/// 挖孔指它；只在引导的 demoCheckout 步可点（点完进恭喜页），
+/// 引导结束后这张卡留在聊天记录里、按钮失效，不会重复触发。
+class _GuideDemoCheckoutCard extends StatelessWidget {
+  const _GuideDemoCheckoutCard({required this.product});
+
+  final Product product;
+
+  String _priceText(double price) =>
+      '¥${price.toStringAsFixed(price.truncateToDouble() == price ? 0 : 2)}';
+
+  @override
+  Widget build(BuildContext context) {
+    final guide = context.watch<GuideController>();
+    final canTap = guide.step == GuideStep.demoCheckout;
+    Widget doneRow(String text) => Padding(
+          padding: EdgeInsets.only(top: _xs(7)),
+          child: Row(
+            children: [
+              Icon(Icons.check_circle, size: _xs(15), color: AppColors.primary),
+              SizedBox(width: _xs(6)),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(fontSize: _xs(12) + AppScale.fontBump, color: AppColors.foreground),
+                ),
+              ),
+            ],
+          ),
+        );
+    return Container(
+      margin: EdgeInsets.only(top: _xs(10)),
+      padding: EdgeInsets.fromLTRB(_xs(12), _xs(11), _xs(12), _xs(12)),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(_xs(14)),
+        border: Border.all(color: AppColors.primaryLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  product.name,
+                  style: TextStyle(fontSize: _xs(13) + AppScale.fontBump, fontWeight: FontWeight.w700, color: AppColors.foreground),
+                ),
+              ),
+              Text(
+                _priceText(product.price),
+                style: TextStyle(fontSize: _xs(13) + AppScale.fontBump, fontWeight: FontWeight.w700, color: AppColors.primary),
+              ),
+            ],
+          ),
+          doneRow('优惠券 · 已整理，选了最省的一张'),
+          doneRow('收货地址 · 已整理（演示，真下单时才填真实地址）'),
+          SizedBox(height: _xs(11)),
+          GuideTarget(
+            id: 'guide:demoOrder',
+            child: GestureDetector(
+              onTap: canTap
+                  ? () {
+                      context.read<XiaodouChatProvider>().appendGuideDemoDoneMessage();
+                      context.read<GuideController>().finishBuyDemo();
+                    }
+                  : null,
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: _xs(9)),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF8A5FD6), AppColors.primary]),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '去下单',
+                  style: TextStyle(fontSize: _xs(12.5) + AppScale.fontBump, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 代买地址小表（hx 2026-11-27 晚改定）：三行——收货人、手机号、
+/// 详细地址。收货人/手机号按账号资料预填（登录手机号与昵称，
+/// 昵称兜底走 UserProvider），用户多半只需补详细地址；三项都可改。
+/// 提交 → provider.submitBuyAddressForm（代买存默认地址接着下单）；
+/// 「先不买了」→ cancelBuyAddressForm。只有 provider 还在等这张
+/// 表时能填；处理过后收成一行状态字。引导演示不走这张表。
+class _BuyAddressFormCard extends StatefulWidget {
+  const _BuyAddressFormCard({required this.message});
+
+  final ChatMessage message;
+
+  @override
+  State<_BuyAddressFormCard> createState() => _BuyAddressFormCardState();
+}
+
+class _BuyAddressFormCardState extends State<_BuyAddressFormCard> {
+  late final TextEditingController _name;
+  late final TextEditingController _phone;
+  late final TextEditingController _detail;
+  RegionSelection? _region;
+  String? _error;
+  bool _submitted = false;
+  bool _cancelled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final auth = context.read<AuthProvider>().currentUser;
+    _name = TextEditingController(text: auth?.nickname ?? context.read<UserProvider>().nickname);
+    _phone = TextEditingController(text: auth?.phone ?? '');
+    _detail = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    _detail.dispose();
+    super.dispose();
+  }
+
+  void _submit(XiaodouChatProvider chat) {
+    final name = _name.text.trim();
+    final phone = _phone.text.trim();
+    final detail = _detail.text.trim();
+    if (name.isEmpty || phone.isEmpty || detail.isEmpty) {
+      setState(() => _error = '三项都要填好：收货人、手机号、详细地址。');
+      return;
+    }
+    if (_region == null) {
+      setState(() => _error = '省市区还没选，点那一行选一下。');
+      return;
+    }
+    if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(phone)) {
+      setState(() => _error = '手机号看着不对，检查一下这 11 位。');
+      return;
+    }
+    setState(() {
+      _error = null;
+      _submitted = true;
+    });
+    chat.submitBuyAddressForm(name: name, phone: phone, detail: composeDetail(_region!, detail));
+  }
+
+  /// 省市区一行：点开与地址页同款的三级选择弹层。
+  Widget _regionRow() {
+    return Padding(
+      padding: EdgeInsets.only(top: _xs(8)),
+      child: Row(
+        children: [
+          SizedBox(
+            width: _xs(56),
+            child: Text(
+              '省市区',
+              style: TextStyle(fontSize: _xs(12) + AppScale.fontBump, color: AppColors.mutedForeground),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () async {
+                final picked = await showRegionPicker(context, initial: _region);
+                if (picked != null && mounted) setState(() => _region = picked);
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: _xs(10), vertical: _xs(8)),
+                decoration: BoxDecoration(
+                  color: AppColors.muted,
+                  borderRadius: BorderRadius.circular(_xs(9)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _region == null ? '点这里选省市区' : regionLabel(_region!),
+                        style: TextStyle(
+                          fontSize: _xs(13) + AppScale.fontBump,
+                          color: _region == null ? AppColors.mutedForeground : AppColors.foreground,
+                        ),
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, size: _xs(16), color: AppColors.mutedForeground),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(String label, TextEditingController controller, {TextInputType? keyboardType}) {
+    return Padding(
+      padding: EdgeInsets.only(top: _xs(8)),
+      child: Row(
+        children: [
+          SizedBox(
+            width: _xs(56),
+            child: Text(
+              label,
+              style: TextStyle(fontSize: _xs(12) + AppScale.fontBump, color: AppColors.mutedForeground),
+            ),
+          ),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: keyboardType,
+              style: TextStyle(fontSize: _xs(13) + AppScale.fontBump, color: AppColors.foreground),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(horizontal: _xs(10), vertical: _xs(8)),
+                filled: true,
+                fillColor: AppColors.muted,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(_xs(9)),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusRow(String text) => Padding(
+        padding: EdgeInsets.only(top: _xs(10)),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle, size: _xs(15), color: AppColors.primary),
+            SizedBox(width: _xs(6)),
+            Expanded(
+              child: Text(
+                text,
+                style: TextStyle(fontSize: _xs(12) + AppScale.fontBump, color: AppColors.foreground),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final chat = context.watch<XiaodouChatProvider>();
+    final pending = chat.isBuyAddressFormPending(widget.message);
+    return Container(
+      margin: EdgeInsets.only(top: _xs(10)),
+      padding: EdgeInsets.fromLTRB(_xs(12), _xs(11), _xs(12), _xs(12)),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(_xs(14)),
+        border: Border.all(color: AppColors.primaryLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '收货地址',
+            style: TextStyle(fontSize: _xs(13) + AppScale.fontBump, fontWeight: FontWeight.w700, color: AppColors.foreground),
+          ),
+          if (_submitted)
+            _statusRow('填好了，小豆这就存成默认地址、接着下单。')
+          else if (_cancelled)
+            _statusRow('已取消这次下单。')
+          else if (!pending)
+            _statusRow('这张表已经处理过了。')
+          else ...[
+            _field('收货人', _name),
+            _field('手机号', _phone, keyboardType: TextInputType.phone),
+            _regionRow(),
+            _field('详细地址', _detail),
+            if (_error != null)
+              Padding(
+                padding: EdgeInsets.only(top: _xs(8)),
+                child: Text(
+                  _error!,
+                  style: TextStyle(fontSize: _xs(12) + AppScale.fontBump, color: AppColors.priceRed),
+                ),
+              ),
+            SizedBox(height: _xs(11)),
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    setState(() => _cancelled = true);
+                    chat.cancelBuyAddressForm();
+                  },
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: _xs(8), vertical: _xs(9)),
+                    child: Text(
+                      '先不买了',
+                      style: TextStyle(fontSize: _xs(12.5) + AppScale.fontBump, fontWeight: FontWeight.w600, color: AppColors.mutedForeground),
+                    ),
+                  ),
+                ),
+                SizedBox(width: _xs(8)),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _submit(chat),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: _xs(9)),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF8A5FD6), AppColors.primary]),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '保存并下单',
+                        style: TextStyle(fontSize: _xs(12.5) + AppScale.fontBump, fontWeight: FontWeight.w700, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _QuestionOptions extends StatelessWidget {
   const _QuestionOptions({required this.options, required this.onPick});
 
@@ -1194,6 +1464,29 @@ class _QuestionOptions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 新手引导（答题步）：平铺问题也要能指——按关键字优先级在选项里
+    // 找引导想教的那枚（系列问法找「月光马戏团」、预算问法找
+    // 「50到100元」），套上测量套并把目标报给控制器。挑手办时小豆
+    // 只问这种平铺问题，旧版没这套钩子、引导干等到超时（hx
+    // 2026-11-27 截图实锤）。
+    final guide = context.watch<GuideController>();
+    String? target;
+    if (guide.step == GuideStep.pickAnswer) {
+      for (final kw in const ['月光马戏团', '50到100元', '手办', '自己用']) {
+        for (final o in options) {
+          if (o.contains(kw)) {
+            target = o;
+            break;
+          }
+        }
+        if (target != null) break;
+      }
+      if (target != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          guide.setAnswerTarget('guide:chip');
+        });
+      }
+    }
     return Padding(
       padding: EdgeInsets.only(top: _xs(10)),
       child: Wrap(
@@ -1201,25 +1494,49 @@ class _QuestionOptions extends StatelessWidget {
         runSpacing: _xs(8),
         children: [
           for (final option in options)
-            GestureDetector(
-              onTap: () => onPick(option),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: _xs(12), vertical: _xs(7)),
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(_xs(999)),
-                  border: Border.all(color: AppColors.primaryLight),
+            if (option == target)
+              GuideTarget(
+                id: 'guide:chip',
+                child: GestureDetector(
+                  onTap: () => onPick(option),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: _xs(12), vertical: _xs(7)),
+                    decoration: BoxDecoration(
+                      color: AppColors.card,
+                      borderRadius: BorderRadius.circular(_xs(999)),
+                      border: Border.all(color: AppColors.primaryLight),
+                    ),
+                    child: Text(
+                      option,
+                      style: TextStyle(
+                        fontSize: _xs(12) + AppScale.fontBump,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
                 ),
-                child: Text(
-                  option,
-                  style: TextStyle(
-                    fontSize: _xs(12) + AppScale.fontBump,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
+              )
+            else
+              GestureDetector(
+                onTap: () => onPick(option),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: _xs(12), vertical: _xs(7)),
+                  decoration: BoxDecoration(
+                    color: AppColors.card,
+                    borderRadius: BorderRadius.circular(_xs(999)),
+                    border: Border.all(color: AppColors.primaryLight),
+                  ),
+                  child: Text(
+                    option,
+                    style: TextStyle(
+                      fontSize: _xs(12) + AppScale.fontBump,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
               ),
-            ),
         ],
       ),
     );
@@ -1267,24 +1584,11 @@ class _GroupedQuestionOptionsState extends State<_GroupedQuestionOptions> {
         // multi 总数上限 2：已选满两组时，点未选组的选项不响应
         // （同组内换选不受限，因为总数不变）。
         if (!_isEach && !_picked.containsKey(groupIndex) && _picked.length >= 2) {
-          // 新手引导要连点三枚（类型/系列/预算），multi 上限 2 会把第三枚挡死：
-          // 引导期间点的正是教学目标时，挤掉最早选的那组，让流程走得通。
-          final guideInToggle = context.read<GuideController>();
-          if (guideInToggle.chipNeed != null && option.contains(guideInToggle.chipNeed!)) {
-            _picked.remove(_picked.keys.first);
-          } else {
-            return;
-          }
+          return;
         }
         _picked[groupIndex] = option;
       }
     });
-    // 新手引导：正在教的那枚 chip 被选中了，就推一步（取消选中不算）。
-    final guide = context.read<GuideController>();
-    final need = guide.chipNeed;
-    if (need != null && _picked[groupIndex] == option && option.contains(need)) {
-      guide.advance();
-    }
   }
 
   void _submit() {
@@ -1330,27 +1634,41 @@ class _GroupedQuestionOptionsState extends State<_GroupedQuestionOptions> {
   @override
   Widget build(BuildContext context) {
     final set = widget.optionSet;
-    // 新手引导：算出这一步要指的 chip（按控制器给的关键字全组搜）。
-    // 搜不到说明问题数据变了——别把用户卡死，自动跳过这一小步。
+    // 新手引导（答题步）：按组标签算这一步要指哪枚——送给谁指
+    // 「自己用」、预算指「50到100元」、类型指「手办」、系列指
+    // 「月光马戏团」；哪组还没选上首选就先指哪组，全选齐了指提交
+    // 按钮；认不出的组（小豆临时问的别的）指它第一个选项，答了
+    // 就能往下走。目标 id 报给控制器，罩子照它挖孔（帧后报，
+    // build 里不能直接 notify）。
     final guide = context.watch<GuideController>();
-    final need = guide.chipNeed;
     var targetGroup = -1;
     String? targetOption;
-    if (need != null) {
+    var targetSubmit = false;
+    if (guide.step == GuideStep.pickAnswer) {
+      const preferred = {'送给谁': '自己用', '预算': '50到100元', '类型': '手办', '系列': '月光马戏团'};
       for (var g = 0; g < set.groups.length && targetGroup < 0; g++) {
-        for (final o in set.groups[g].options) {
-          if (o.contains(need)) {
-            targetGroup = g;
-            targetOption = o;
-            break;
-          }
+        final want = preferred[set.groups[g].label];
+        if (want != null && _picked[g] != want && set.groups[g].options.contains(want)) {
+          targetGroup = g;
+          targetOption = want;
         }
       }
       if (targetGroup < 0) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) guide.advance();
-        });
+        if (_canSubmit) {
+          targetSubmit = true;
+        } else {
+          for (var g = 0; g < set.groups.length && targetGroup < 0; g++) {
+            if (_picked[g] == null && set.groups[g].options.isNotEmpty) {
+              targetGroup = g;
+              targetOption = set.groups[g].options.first;
+            }
+          }
+        }
       }
+      final reportId = targetSubmit ? 'guide:submit' : 'guide:chip';
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) guide.setAnswerTarget(reportId);
+      });
     }
     return Padding(
       padding: EdgeInsets.only(top: _xs(10)),
@@ -1626,13 +1944,13 @@ class _GuideChips extends StatelessWidget {
                       ? null
                       : () {
                           // 新手引导第 2 步点的就是这枚「挑手办」（hx
-                          // 2026-11-27 点名改的，原先指首页翻牌推荐卡）：
-                          // 引导中不真发话，只推进引导，随后亮引导自己
-                          // 的三问面板；不在引导时照常发「帮我挑手办」。
+                          // 2026-11-27 点名）：引导走小豆平时的真实问法
+                          // （hx 同日拍板），所以这句「帮我挑手办」照常
+                          // 真发出去，只顺手推进引导到等提问步；小豆接
+                          // 下来怎么问，引导就跟着怎么指。
                           final guide = context.read<GuideController>();
                           if (_chips[i].$2 == '挑手办' && guide.step == GuideStep.startPick) {
                             guide.advance();
-                            return;
                           }
                           onActionTap();
                           chat.send(_chips[i].$3, starwish: _archiveOf(context));

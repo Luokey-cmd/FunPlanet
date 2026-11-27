@@ -11,27 +11,40 @@ class GuideNav {
 }
 
 /// 引导步骤（顺序即流程）：
-/// welcome 欢迎（首页，开始/跳过）→ tapEntry 点小豆悬浮入口 →
-/// startPick 点聊天页「挑手办」词条→ waitOptions 等服务端分组问题出现 →
-/// pickType/pickSeries/pickBudget 三问点选 → submitOptions 点提交 →
-/// waitCards 等功课与亮牌 → pickCard 点目标牌 → flipping 翻牌演出中（罩隐藏）→
-/// detailIntro 看办事清单 → buyDemo 点立即购买 → demoSheet 演示表单（罩隐藏）→
-/// done 恭喜页。idle = 引导没在跑。
+/// welcome 欢迎（已废弃，枚举保留）→ tapEntry 点小豆悬浮入口 →
+/// startPick 点聊天页「挑手办」词条（真发出去）→ waitOptions 等小豆
+/// 提问出现 → pickAnswer 答题步（小豆问什么指什么：分组卡按组标签
+/// 指首选答案、选齐指提交按钮；平铺按钮按关键字指那枚；答完回
+/// waitOptions 循环，直到牌亮出来）→ waitCards 等亮牌 →
+/// pickBudgetChip 点牌面上方预算档「¥100内」（hx 2026-11-27 指明：
+/// 100 元内就是牌面调档那排，点完按预算重抽再选牌；抽牌时预算
+/// 已经是 100 的跳过此步）→ pickCard 点目标牌 → flipping 翻牌演出中（罩隐藏）→ detailIntro 看办事
+/// 清单 → buyDemo 点立即购买（不弹面板：小豆在对话里说清地址与
+/// 下单）→ done 恭喜页。idle = 引导没在跑。
+/// pickRecipient/pickBudget/submitOptions/waitOptions2/pickType/
+/// pickSeries/submitOptions2 是写死两轮时期的旧步，已退役，枚举
+/// 保留防旧存档，advance 一律并入 pickAnswer。
 enum GuideStep {
   idle,
   welcome,
   tapEntry,
   startPick,
   waitOptions,
-  pickType,
-  pickSeries,
+  pickAnswer,
+  pickRecipient,
   pickBudget,
   submitOptions,
+  waitOptions2,
+  pickType,
+  pickSeries,
+  submitOptions2,
   waitCards,
+  pickBudgetChip,
   pickCard,
   flipping,
   detailIntro,
   buyDemo,
+  demoCheckout,
   demoSheet,
   done,
 }
@@ -164,11 +177,14 @@ class GuideController extends ChangeNotifier {
   String? get targetId => switch (_step) {
         GuideStep.tapEntry => 'guide:xiaodouEntry',
         GuideStep.startPick => 'guide:pickFigure',
-        GuideStep.pickType || GuideStep.pickSeries || GuideStep.pickBudget => 'guide:chip',
-        GuideStep.submitOptions => 'guide:submit',
+        GuideStep.pickAnswer => answerTarget,
+        GuideStep.pickRecipient || GuideStep.pickType || GuideStep.pickSeries || GuideStep.pickBudget => 'guide:chip',
+        GuideStep.submitOptions || GuideStep.submitOptions2 => 'guide:submit',
+        GuideStep.pickBudgetChip => 'guide:budget100',
         GuideStep.pickCard => 'guide:card',
         GuideStep.detailIntro => 'guide:detail',
         GuideStep.buyDemo => 'guide:buy',
+        GuideStep.demoCheckout => 'guide:demoOrder',
         _ => null,
       };
 
@@ -179,14 +195,6 @@ class GuideController extends ChangeNotifier {
   bool get overlayVisible =>
       active && _step != GuideStep.flipping && _step != GuideStep.demoSheet;
 
-  /// 三问步要找的选项关键字：分组选项组件按它定位要挖孔的那枚 chip。
-  String? get chipNeed => switch (_step) {
-        GuideStep.pickType => '手办',
-        GuideStep.pickSeries => '月光马戏团',
-        GuideStep.pickBudget => '50到100元',
-        _ => null,
-      };
-
   /// 进度文案：第 X 步 · 共 7 步（欢迎与恭喜不计）。
   String? get progressLabel {
     final n = switch (_step) {
@@ -194,7 +202,8 @@ class GuideController extends ChangeNotifier {
       GuideStep.startPick => 2,
       GuideStep.pickType || GuideStep.pickSeries || GuideStep.pickBudget || GuideStep.submitOptions => 3,
       GuideStep.waitCards => 4,
-      GuideStep.pickCard => 5,
+      GuideStep.pickBudgetChip => 5,
+      GuideStep.pickCard => 6,
       GuideStep.detailIntro => 6,
       GuideStep.buyDemo => 7,
       _ => null,
@@ -254,17 +263,19 @@ class GuideController extends ChangeNotifier {
       GuideStep.tapEntry => GuideStep.startPick,
       // startPick 直接进引导自己的三问面板：翻牌推荐卡在引导模式下
       // 不发「帮我翻三张命运牌」（那句话直接抽牌、不问问题，等不到 optionSet）。
-      GuideStep.startPick => GuideStep.pickType,
-      GuideStep.waitOptions => GuideStep.pickType,
-      GuideStep.pickType => GuideStep.pickSeries,
-      GuideStep.pickSeries => GuideStep.pickBudget,
-      GuideStep.pickBudget => GuideStep.submitOptions,
-      GuideStep.submitOptions => GuideStep.waitCards,
-      GuideStep.waitCards => GuideStep.pickCard,
+      GuideStep.startPick => GuideStep.waitOptions,
+      GuideStep.waitOptions => GuideStep.pickAnswer,
+      // 以下旧步（自造面板与写死两轮时期）已退役，枚举留着防旧存档，
+      // 万一有残留状态一律并入 pickAnswer，不再单独走。
+      GuideStep.pickRecipient || GuideStep.pickBudget || GuideStep.submitOptions || GuideStep.waitOptions2 || GuideStep.pickType || GuideStep.pickSeries || GuideStep.submitOptions2 => GuideStep.pickAnswer,
+      GuideStep.waitCards => GuideStep.pickBudgetChip,
+      GuideStep.pickBudgetChip => GuideStep.pickCard,
       GuideStep.pickCard => GuideStep.flipping,
-      GuideStep.flipping => GuideStep.detailIntro,
+      // detailIntro（看办事清单步）已删（hx 2026-11-27 点名：落回
+      // 聊天后单独指着卡片讲清单没必要）：翻牌落定直达购买步。
+      GuideStep.flipping => GuideStep.buyDemo,
       GuideStep.detailIntro => GuideStep.buyDemo,
-      GuideStep.buyDemo => GuideStep.demoSheet,
+      GuideStep.buyDemo => GuideStep.done,
       GuideStep.demoSheet => GuideStep.done,
       _ => _step,
     };
@@ -274,15 +285,13 @@ class GuideController extends ChangeNotifier {
       waitTimedOut = false;
       waitFailed = false;
       _waitTimer?.cancel();
-      // 等谁都一样只等 20 秒：waitCards 等牌、waitOptions 等问题，
-      // 到时没等到就给气泡出路，不让用户干等（2026-11-27 主聊复核补的兜底）。
+      // 等谁都一样只等 20 秒：等牌、等两轮问题都是它。到时没等到
+      // 就置位 waitTimedOut，气泡给出路（结束引导、奖励照拿），
+      // 不让用户干等。旧版 waitOptions 超时会强推到自造三问面板，
+      // 改走真实问法后那条兜底已删（2026-11-27 hx 拍板走真实问法）。
       _waitTimer = Timer(const Duration(seconds: 20), () {
-        if (_step == GuideStep.waitCards) {
+        if (_step == next) {
           waitTimedOut = true;
-          notifyListeners();
-        } else if (_step == GuideStep.waitOptions) {
-          // 兜底：服务端问题没来，直接亮引导自己的三问面板。
-          _step = GuideStep.pickType;
           notifyListeners();
         }
       });
@@ -295,10 +304,35 @@ class GuideController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 购买步收尾（点「立即购买」时调）：不弹面板、不真下单——小豆
+  /// 已经在对话里把地址与下单说清（chat provider 的收尾话），这里
+  /// 只把引导跳到恭喜页。detailIntro 也算：全屏详细卡上就有购买
+  /// 按钮，用户在那儿点了不能让他走真下单（旧版只认 buyDemo，
+  /// 在全屏卡上点会弹出真地址表单，hx 2026-11-27 截图实锤）。
+  void finishBuyDemo() {
+    if (_step != GuideStep.buyDemo && _step != GuideStep.detailIntro && _step != GuideStep.demoCheckout) return;
+    demoOrderPlaced = true;
+    _step = GuideStep.done;
+    if (!replayMode) unawaited(_saveStatus('done'));
+    notifyListeners();
+  }
+
+  /// 进演示下单步（点「立即购买」时调）：小豆在对话里一步步办单
+  /// （整理券 → 整理地址 → 收尾卡），用户点卡上「去下单」才收尾。
+  void beginDemoCheckout() {
+    // flipping 也算：全屏卡落定后、飞回之前，引导步还停在 flipping
+    // （notifyDetailLanded 要等全屏层关掉才报），这时点的购买必须
+    // 在这里接住，不然会漏去走真代买（hx 截图里地址消息重复两条
+    // 就是这么来的）。
+    if (_step != GuideStep.buyDemo && _step != GuideStep.detailIntro && _step != GuideStep.flipping) return;
+    _step = GuideStep.demoCheckout;
+    notifyListeners();
+  }
+
   /// 等牌阶段提前收尾（空批次/等太久）：直接进恭喜页，奖励照发——
   /// 不能因为演示数据出问题扣用户奖励（设计稿兜底口径）。
   void completeEarly() {
-    if (_step != GuideStep.waitCards) return;
+    if (_step != GuideStep.waitCards && _step != GuideStep.waitOptions && _step != GuideStep.pickAnswer) return;
     _waitTimer?.cancel();
     _step = GuideStep.done;
     if (!replayMode) unawaited(_saveStatus('done'));
@@ -324,41 +358,79 @@ class GuideController extends ChangeNotifier {
 
   // ---------- 各接线点的事件回报（组件只报事实，推步在这里判） ----------
 
-  /// 分组问题已出现在对话里（小豆页监听到带 optionSet 的消息）。
+  /// 问题已出现在对话里（小豆页监听到带选项的消息，分组卡与平铺
+  /// 按钮都算）：从等待步进到答题步。
   void notifyOptionsReady() {
     if (_step == GuideStep.waitOptions) advance();
   }
 
-  /// 三问提交了（onPick 触发）：三问任一步都算——用户可能在某步改选后
-  /// 直接点提交，步数未必正好停在 submitOptions。进等牌步并起 20 秒定时。
-  void notifyOptionsSubmitted() {
-    if (_step == GuideStep.pickType ||
-        _step == GuideStep.pickSeries ||
-        _step == GuideStep.pickBudget ||
-        _step == GuideStep.submitOptions) {
-      _step = GuideStep.waitCards;
-      waitTimedOut = false;
-      waitFailed = false;
-      _waitTimer?.cancel();
-      _waitTimer = Timer(const Duration(seconds: 20), () {
-        if (_step == GuideStep.waitCards) {
-          waitTimedOut = true;
-          notifyListeners();
-        }
-      });
-      notifyListeners();
-    }
+  /// 答题步当前要指的目标 id（'guide:chip' 指选项、'guide:submit'
+  /// 指提交按钮）：渲染选项的组件算出来报到这里，罩子按它挖孔。
+  /// 为什么不写死：小豆问什么、问几轮由它自己定（挑手办只问一轮
+  /// 平铺系列、挑礼物才是两轮分组），引导只能看屏幕上真有什么。
+  String answerTarget = 'guide:chip';
+
+  void setAnswerTarget(String id) {
+    if (answerTarget == id) return;
+    answerTarget = id;
+    notifyListeners();
+  }
+
+  /// 一轮答案交出去了（选项 onPick 触发，分组提交与平铺点选都算）：
+  /// 回等待步，看小豆下一个问题还是直接亮牌。
+  void notifyAnswered() {
+    if (_step == GuideStep.pickAnswer) _enterWait(GuideStep.waitOptions);
+  }
+
+  /// 进某个等待步并起 20 秒兜底定时（notifyAnswered 用；
+  /// advance() 里进等待步走它自己的那段，两边口径一致）。
+  void _enterWait(GuideStep step) {
+    _step = step;
+    waitTimedOut = false;
+    waitFailed = false;
+    _waitTimer?.cancel();
+    _waitTimer = Timer(const Duration(seconds: 20), () {
+      if (_step == step) {
+        waitTimedOut = true;
+        notifyListeners();
+      }
+    });
+    notifyListeners();
+  }
+
+  /// 等问题期间牌直接亮出来了（用户档案齐全、小豆跳过提问直接抽牌，
+  /// 或轮次和预期错位）：从两个等待步直接进选牌步，不让引导干等。
+  void notifyCardsReadyFromWait({required bool hasProducts, int? maxPrice}) {
+    if (_step != GuideStep.waitOptions && _step != GuideStep.pickAnswer) return;
+    if (!hasProducts) return;
+    _waitTimer?.cancel();
+    // 预算已经是 100（小豆记着偏好、抽牌时就带上了）：「¥100内」
+    // 那枚档已经是选中态、点不动，跳过预算步直接选牌。
+    _step = maxPrice == 100 ? GuideStep.pickCard : GuideStep.pickBudgetChip;
+    notifyListeners();
   }
 
   /// 亮牌结果到了：有牌进 pickCard；空批次记 waitFailed，气泡给出路。
-  void notifyCardsReady({required bool hasProducts}) {
+  void notifyCardsReady({required bool hasProducts, int? maxPrice}) {
     if (_step != GuideStep.waitCards) return;
     if (hasProducts) {
-      advance();
+      if (maxPrice == 100) {
+        _step = GuideStep.pickCard;
+        notifyListeners();
+      } else {
+        advance();
+      }
     } else {
       waitFailed = true;
       notifyListeners();
     }
+  }
+
+  /// 预算档「¥100内」被点了（牌面调档组件报的）：进选牌步。
+  /// 重抽是异步的，牌板换上新一批后会自己重新登记口碑目标，
+  /// 手跟着过去，不用等重抽完。
+  void notifyBudgetPicked() {
+    if (_step == GuideStep.pickBudgetChip) advance();
   }
 
   /// 目标牌被点、翻牌演出开始。
@@ -371,18 +443,5 @@ class GuideController extends ChangeNotifier {
     if (_step == GuideStep.flipping) advance();
   }
 
-  /// 演示表单被关掉但没完成（取消/划掉）：从 demoSheet 退回 buyDemo。
-  void notifyDemoSheetClosed() {
-    if (_step == GuideStep.demoSheet) {
-      _step = GuideStep.buyDemo;
-      notifyListeners();
-    }
-  }
 
-  /// 演示表单点了「完成演示」。
-  void notifyDemoPlaced() {
-    demoOrderPlaced = true;
-    if (_step == GuideStep.demoSheet) advance();
-    notifyListeners();
-  }
 }

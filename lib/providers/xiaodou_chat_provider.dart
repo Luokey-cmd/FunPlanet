@@ -100,6 +100,33 @@ class XiaodouChatProvider extends ChangeNotifier {
       content = '帮我看看店里有没有同款或同类';
     }
     if (content.isEmpty || _sending) return;
+    // 代买正在等地址（见 requestBuyAddress）：这条消息先按地址处理。
+    // 像地址（带手机号）就解析掉、不发给服务端；明确说取消就收尾；
+    // 都不是 → 这次等地址作废，消息照常往下发给小豆。
+    if (awaitingBuyAddress && imageBytes == null) {
+      final parsed = parseBuyAddress(content);
+      const cancels = {'取消', '不用了', '算了', '不买了', '先不买'};
+      if (parsed != null || cancels.contains(content)) {
+        _messages.add(ChatMessage(role: ChatRole.user, content: content));
+        if (parsed != null) {
+          _messages.add(const ChatMessage(
+            role: ChatRole.assistant,
+            content: '收到，这就给你存成默认地址，接着下单。',
+          ));
+          _completeBuyAddress(parsed);
+        } else {
+          _messages.add(const ChatMessage(
+            role: ChatRole.assistant,
+            content: '好，那就先不下单了。想买的时候再点「立即购买」就行。',
+          ));
+          _completeBuyAddress(null);
+        }
+        notifyListeners();
+        await _persistCurrentSession();
+        return;
+      }
+      _completeBuyAddress(null);
+    }
     if (starwish != null) _starwish = starwish;
 
     _messages.add(ChatMessage(role: ChatRole.user, content: content, imageBytes: imageBytes));
@@ -466,6 +493,131 @@ class XiaodouChatProvider extends ChangeNotifier {
     }
   }
 
+  Completer<ParsedBuyAddress?>? _buyAddressCompleter;
+
+  /// 代买是否正在等用户在对话里发地址。
+  bool get awaitingBuyAddress => _buyAddressCompleter != null;
+
+  void _completeBuyAddress(ParsedBuyAddress? value) {
+    final completer = _buyAddressCompleter;
+    _buyAddressCompleter = null;
+    _buyAddressFormMessage = null;
+    completer?.complete(value);
+  }
+
+  /// 正在等填写的那张地址表消息（渲染端靠它认哪张表还能填）。
+  ChatMessage? _buyAddressFormMessage;
+
+  /// 这张地址表是不是当前正等着的那张（提交/取消/改口都会让它失效）。
+  bool isBuyAddressFormPending(ChatMessage message) =>
+      _buyAddressCompleter != null && identical(_buyAddressFormMessage, message);
+
+  /// 地址小表提交：收下三项回给等着的代买（它收到后存默认地址
+  /// 接着下单）；确认话术与「一句话发地址」那条路保持一致。
+  void submitBuyAddressForm({required String name, required String phone, required String detail}) {
+    if (_buyAddressCompleter == null) return;
+    _messages.add(const ChatMessage(
+      role: ChatRole.assistant,
+      content: '收到，这就给你存成默认地址，接着下单。',
+    ));
+    _completeBuyAddress(ParsedBuyAddress(name: name, phone: phone, detail: detail));
+    notifyListeners();
+    unawaited(_persistCurrentSession());
+  }
+
+  /// 地址小表上点「先不买了」：这次代买停手。
+  void cancelBuyAddressForm() {
+    if (_buyAddressCompleter == null) return;
+    _messages.add(const ChatMessage(
+      role: ChatRole.assistant,
+      content: '好，那就先不下单了。想买的时候再点「立即购买」就行。',
+    ));
+    _completeBuyAddress(null);
+    notifyListeners();
+    unawaited(_persistCurrentSession());
+  }
+
+  /// 代买没地址时在对话里收地址（hx 2026-11-27 晚改定，推翻同日
+  /// 下午的「一句话发地址」：改成对话里一张三行小表——收货人、
+  /// 手机号、详细地址，前两项按账号资料预填，用户多半只补详细
+  /// 地址；不跳地址页、不弹面板，就在对话流里填）：返回的 Future
+  /// 在用户提交小表（submitBuyAddressForm）、或仍按旧习惯把地址
+  /// 当一句话发回来被 send() 解析、或取消时完成。
+  /// 同一时刻只挂一个请求，新请求会把旧的作废。
+  Future<ParsedBuyAddress?> requestBuyAddress() {
+    // 已经在等地址时再点「立即购买」：不重复发第二张表（hx
+    // 2026-11-27 截图里出现两条一模一样的要地址消息，就是连点
+    // 两下各追加了一条），直接返回正在等的那次。
+    final waiting = _buyAddressCompleter;
+    if (waiting != null && !waiting.isCompleted) return waiting.future;
+    _completeBuyAddress(null);
+    final completer = Completer<ParsedBuyAddress?>();
+    _buyAddressCompleter = completer;
+    final formMessage = ChatMessage(
+      role: ChatRole.assistant,
+      content: '下单前还差一个收货地址。下面这张小表填好就行：收货人和手机号我先按你账号里的填上了，核对一下，再选好省市区、把详细地址补上，点「保存并下单」，我就存成你的默认地址，接着帮你下单。',
+      isBuyAddressForm: true,
+    );
+    _buyAddressFormMessage = formMessage;
+    _messages.add(formMessage);
+    notifyListeners();
+    return completer.future;
+  }
+
+  /// 新手引导购买步的收尾话：点「立即购买」后不弹任何面板、不真
+  /// 下单，由小豆在对话里把地址与下单一并说清（hx 2026-11-27 点名：
+  /// 地址的事要在小豆的回答里说，不要弹出个面板）。纯本地消息，
+  /// 不走服务端、不落盘到会话记录之外的地方。
+  bool _guideDemoRunning = false;
+
+  /// 新手引导演示下单（hx 2026-11-27 定稿）：点「立即购买」后，小豆
+  /// 在对话里一步步把这一单办出来——整理优惠券 → 整理地址 → 亮
+  /// 收尾卡等用户点「去下单」，这样才是完整走完导购功能。全是本地
+  /// 消息、不走服务端、不真下单；地址只在话里说清并括号注明演示，
+  /// 绝不让用户在引导里填地址（hx 点名：引导里填地址太麻烦、删掉）。
+  /// 输入是演示商品（翻到的那张牌）；输出无，消息逐条追加进对话。
+  Future<void> appendGuideBuyDemoSequence(Product product) async {
+    if (_guideDemoRunning) return;
+    _guideDemoRunning = true;
+    _messages.add(const ChatMessage(
+      role: ChatRole.assistant,
+      content: '好，这一单我来替你办——先把优惠券整理一下。',
+    ));
+    notifyListeners();
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    _messages.add(const ChatMessage(
+      role: ChatRole.assistant,
+      content: '优惠券整理好了：这一单能用的券我都比过，挑了最省的一张给你留着。接着给你整理收货地址。',
+    ));
+    notifyListeners();
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    _messages.add(const ChatMessage(
+      role: ChatRole.assistant,
+      content: '收货地址也整理好了：下单时会用你存好的默认地址。（这只是演示，不会真的下单；后面真正下单时，才需要填写真实地址。）',
+    ));
+    notifyListeners();
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    _messages.add(ChatMessage(
+      role: ChatRole.assistant,
+      content: '都办好了，你确认一下这一单：',
+      products: [product],
+      isGuideDemoCheckout: true,
+    ));
+    notifyListeners();
+    // 序列走完就放行：中途跳过引导，剩下的消息照常落完、标记照常
+    // 清掉，重玩引导时还能再走一遍，不会被这次卡住。
+    _guideDemoRunning = false;
+  }
+
+  /// 演示下单的收尾话（用户点了收尾卡上的「去下单」时调）。
+  void appendGuideDemoDoneMessage() {
+    _messages.add(const ChatMessage(
+      role: ChatRole.assistant,
+      content: '办好啦——挑款、比价、整理券和地址、最后下单，整个导购流程就走完了。（演示到这里结束，不会真的下单、不扣款。）',
+    ));
+    notifyListeners();
+  }
+
   /// 亮牌「下一批」：拿服务端回带的抽牌条件 + 已展示的全部商品 id
   /// 接着抽，抽到的新一批原样存下并切过去；池子空了就把 hasMore 关掉。
   Future<void> nextFateBatch(int index) async {
@@ -828,4 +980,25 @@ extension _FirstOrNull<E> on Iterable<E> {
     if (iterator.moveNext()) return iterator.current;
     return null;
   }
+}
+
+/// 用户在对话里发来的收货地址（代买等地址时由 parseBuyAddress 解析）。
+class ParsedBuyAddress {
+  const ParsedBuyAddress({required this.name, required this.phone, required this.detail});
+
+  final String name;
+  final String phone;
+  final String detail;
+}
+
+/// 把一句话解析成收货地址：以 11 位手机号为锚，号前是收货人、
+/// 号后是详细地址；缺手机号、或人/址任一为空都算解析失败（返回
+/// null，这条消息就当普通消息处理）。分隔符只认常见的逗号与空白。
+ParsedBuyAddress? parseBuyAddress(String text) {
+  final match = RegExp(r'1[3-9]\d{9}').firstMatch(text);
+  if (match == null) return null;
+  final name = text.substring(0, match.start).replaceAll(RegExp(r'[,，、\s]+$'), '').trim();
+  final detail = text.substring(match.end).replaceAll(RegExp(r'^[,，、\s]+'), '').trim();
+  if (name.isEmpty || detail.isEmpty) return null;
+  return ParsedBuyAddress(name: name, phone: match.group(0)!, detail: detail);
 }

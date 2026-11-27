@@ -75,6 +75,7 @@ flutter:
     - assets/images/vr-avatars/
     - assets/icon/
     - assets/videos/
+    - assets/data/
 
   fonts:
     - family: NotoSerifSC
