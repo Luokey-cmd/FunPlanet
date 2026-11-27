@@ -403,6 +403,69 @@ class XiaodouChatProvider extends ChangeNotifier {
 
   bool isBatchLoading(int index) => _batchLoading.contains(index);
 
+  /// 新手引导的直接抽牌（2026-11-27，主聊复核后改口径）：
+  /// 引导三问是 App 自己亮的专用选项，不经模型提问——提交后按用户点的
+  /// 条件直接调 draw-batch 接口抽第一批，再写成和流式亮牌同一形态的
+  /// 命运消息（命运三翻的牌板/翻页/调档全靠这些字段）。输入是用户在
+  /// 引导面板里点的三个条件；输出无（结果进消息列表）。
+  /// 坑：_sending 期间不能走这里，引导提交时必须确认没有别的发送在跑；
+  /// 抽空（0 件）也如实写消息，引导据此给兜底；功课段只写一句真实的
+  /// 筛选条件，不编数据。
+  Future<void> drawGuideCards({
+    required String summary,
+    required String majorCategory,
+    required String query,
+    required int? maxPrice,
+  }) async {
+    if (_sending) return;
+    _messages.add(ChatMessage(role: ChatRole.user, content: summary));
+    _messages.add(const ChatMessage(role: ChatRole.assistant, content: '按你的条件挑牌中…', isLoading: true));
+    _sending = true;
+    notifyListeners();
+    final assistantIndex = _messages.length - 1;
+    try {
+      final args = <String, dynamic>{
+        'majorCategory': majorCategory,
+        'query': query,
+        if (maxPrice != null) 'maxPrice': maxPrice,
+      };
+      final result = await _service.drawBatch(args: args, excludeIds: const []);
+      final products = result.products;
+      _messages[assistantIndex] = ChatMessage(
+        role: ChatRole.assistant,
+        content: products.length >= 3
+            ? '三张牌已经亮出来了，本命、遇见、余韵都在，点任意一张就能看详情。'
+            : products.isEmpty
+                ? '按这三个条件暂时没找到合适的牌，换个条件再试试。'
+                : '牌已经亮出来了，点任意一张就能看详情。',
+        homework: [
+          HomeworkEntry(
+            text: '按你的条件筛选：类型 $majorCategory · 系列 $query · 预算${maxPrice == null ? '不限' : '$maxPrice元内'}',
+          ),
+        ],
+        products: products,
+        starRoles: result.roles,
+        fateBatches: products.isEmpty ? const [] : [products],
+        fateRolesBatches: products.isEmpty ? const [] : [result.roles],
+        fateIndex: 0,
+        fateTotal: result.meta.totalCount,
+        fateHasMore: result.meta.hasMore,
+        drawArgs: result.meta.drawArgs,
+        traits: result.meta.traits,
+      );
+      await _persistCurrentSession();
+    } catch (_) {
+      // 抽牌失败：留一条如实说明，不让对话停在「挑牌中…」。
+      _messages[assistantIndex] = _messages[assistantIndex].copyWith(
+        content: '抽牌这一下没成功，点「下一批」或换个条件再试试。',
+        isLoading: false,
+      );
+    } finally {
+      _sending = false;
+      notifyListeners();
+    }
+  }
+
   /// 亮牌「下一批」：拿服务端回带的抽牌条件 + 已展示的全部商品 id
   /// 接着抽，抽到的新一批原样存下并切过去；池子空了就把 hasMore 关掉。
   Future<void> nextFateBatch(int index) async {

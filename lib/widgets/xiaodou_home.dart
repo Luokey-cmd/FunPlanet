@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../providers/guide_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import 'click_effect/app_pressable.dart';
@@ -321,11 +322,7 @@ class XiaodouHome extends StatelessWidget {
     ];
 
     Widget cardCell(_InspirationCard card) {
-      return Expanded(
-        child: AppPressable(
-          child: GestureDetector(
-            onTap: card.onTap,
-            child: Container(
+      final cardFace = Container(
               padding: EdgeInsets.all(_hs(14)),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -361,7 +358,16 @@ class XiaodouHome extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
+            );
+      return Expanded(
+        child: AppPressable(
+          child: GestureDetector(
+            onTap: card.onTap,
+            // 新手引导第 2 步挖孔的是「翻牌推荐」卡：卡面套个测量套，
+            // 只量位置、不拦点击；其余三张卡不注册。
+            child: card.title == '翻牌推荐'
+                ? GuideTarget(id: 'guide:fateEntry', child: cardFace)
+                : cardFace,
           ),
         ),
       );

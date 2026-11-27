@@ -50,6 +50,8 @@ model User {
 model UserProfile {
   userId                     String    @id @map("user_id")
   newcomerClaimed            Boolean   @default(false) @map("newcomer_claimed")
+  // 新手引导奖励是否已领：一辈子一次，领奖接口判重就看它
+  guideRewardClaimed         Boolean   @default(false) @map("guide_reward_claimed")
   memberMonthlyCouponClaimed Boolean   @default(false) @map("member_monthly_coupon_claimed")
   points                     Int       @default(0)
   funCoins                   Int       @default(0) @map("fun_coins")

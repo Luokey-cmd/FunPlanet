@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../models/agent_records.dart';
 import '../models/chat_message.dart';
 import '../providers/cart_provider.dart';
+import '../providers/guide_controller.dart';
 import '../providers/order_provider.dart';
 import '../providers/starwish_profile_provider.dart';
 import '../providers/user_provider.dart';
@@ -76,6 +77,14 @@ class XiaodouChatPage extends StatefulWidget {
 
 /// 自动抽三翻的定式话术：走现有对话流程，命中抽牌工具的概率最高。
 void _drawFateCards(BuildContext context) {
+  final guide = context.read<GuideController>();
+  // 新手引导：翻牌推荐卡在引导模式下不发「帮我翻三张命运牌」——
+  // 那句话是直接抽牌（不经模型提问），等不到分组问题，waitOptions
+  // 会卡死。引导改为直接亮自己的三问面板，提交后走直接抽牌接口。
+  if (guide.step == GuideStep.startPick) {
+    guide.advance();
+    return;
+  }
   final chat = context.read<XiaodouChatProvider>();
   if (chat.sending) return;
   chat.send('小豆，帮我翻三张命运牌', starwish: _archiveOf(context));
@@ -139,6 +148,30 @@ Future<({Uint8List bytes, String mimeType})?> _pickImageForChat(BuildContext con
 }
 
 class _XiaodouChatPageState extends State<XiaodouChatPage> {
+  // 新手引导同步：盯着对话进展给控制器报信——分组问题出现了、牌亮出来了，
+  // 控制器据此推步。引用在 initState 里存好，dispose 时摘监听，
+  // 别在回调里现读 provider（页面关了 context 就不能用了）。
+  XiaodouChatProvider? _chatForGuide;
+
+  void _guideSync() {
+    if (!mounted) return;
+    final guide = context.read<GuideController>();
+    final chat = _chatForGuide;
+    if (!guide.active || chat == null) return;
+    if (guide.step == GuideStep.waitOptions) {
+      final ready = chat.messages.any((m) => m.optionSet != null && !m.optionsUsed);
+      if (ready) guide.notifyOptionsReady();
+    } else if (guide.step == GuideStep.waitCards) {
+      // 只认最后一条消息：历史里翻过的旧牌不算，得是这一轮新亮的牌。
+      final m = chat.messages.isEmpty ? null : chat.messages.last;
+      if (m != null && m.isFate) {
+        guide.notifyCardsReady(
+          hasProducts: m.hasProducts || m.fateBatches.any((b) => b.isNotEmpty),
+        );
+      }
+    }
+  }
+
   // 底部真输入框的焦点节点，由页面持有：首页区的大输入框只是视觉入口，
   // 点它要把焦点交给这个节点，用户实际打字仍在底部输入栏里完成。
   // 坑：节点必须在 dispose 里释放，且只能挂给一个输入框，别多处共用。
@@ -202,6 +235,14 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
   @override
   void initState() {
     super.initState();
+    _chatForGuide = context.read<XiaodouChatProvider>()..addListener(_guideSync);
+    // 新手引导：小豆页打开了，说明用户点了悬浮入口（tapEntry 步完成）。
+    // 不在这里推步，引导会一直停在「点我」那步等不到下文。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final guide = context.read<GuideController>();
+      if (guide.step == GuideStep.tapEntry) guide.advance();
+    });
     // 进门盘点：每次打开小豆页都重新盘一遍没办完的事（待付款/将过期券）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -230,6 +271,7 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
 
   @override
   void dispose() {
+    _chatForGuide?.removeListener(_guideSync);
     _inputFocusNode.dispose();
     super.dispose();
   }
@@ -290,6 +332,46 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
                 ],
               ),
             ),
+            // 新手引导三问面板：三问步期间贴在输入栏上方，提交后自动撤。
+            Builder(
+              builder: (context) {
+                final guide = context.watch<GuideController>();
+                final inPick = guide.step == GuideStep.pickType ||
+                    guide.step == GuideStep.pickSeries ||
+                    guide.step == GuideStep.pickBudget ||
+                    guide.step == GuideStep.submitOptions;
+                if (!inPick) return const SizedBox.shrink();
+                return Container(
+                  margin: EdgeInsets.fromLTRB(_xs(12), _xs(4), _xs(12), _xs(8)),
+                  padding: EdgeInsets.fromLTRB(_xs(12), _xs(10), _xs(12), _xs(12)),
+                  decoration: BoxDecoration(
+                    color: AppColors.card,
+                    borderRadius: BorderRadius.circular(_xs(14)),
+                    border: Border.all(color: AppColors.primaryLight),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '小豆想先问你三个小问题',
+                        style: TextStyle(
+                          fontSize: _xs(12) + AppScale.fontBump,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      _GroupedQuestionOptions(
+                        optionSet: _guideOptionSet(),
+                        onPick: (text) => _guideSubmitOptions(context, text),
+                        onMemory: (byLabel) =>
+                            context.read<StarwishProfileProvider>().rememberFromOptions(byLabel),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
             _CartConfirmBar(onActionTap: _endListeningForAction),
             _GuideChips(onActionTap: _endListeningForAction),
             _InputBar(
@@ -303,6 +385,56 @@ class _XiaodouChatPageState extends State<XiaodouChatPage> {
       ),
     );
   }
+}
+
+/// 新手引导的三问选项集（2026-11-27，主聊复核后改口径）：
+/// 现行服务端分组问答是两轮（第一轮送给谁＋预算，第二轮类型＋系列），
+/// 引导要的「手办→月光马戏团→50到100元」三枚不在同一轮里、第一轮
+/// 也没有手办/月光马戏团——等服务端提问走不通，引导自己亮这套面板。
+/// 标签必须与服务端一致（类型/系列/预算），「小豆记得你」的沉淀
+/// （rememberFromOptions）与预算换算都按这三个标签认。
+/// 预算档沿用服务端真选项（50元以内/50到100元/100到200元/200元以上）。
+XiaodouOptionSet _guideOptionSet() => const XiaodouOptionSet(
+      mode: 'each',
+      groups: [
+        XiaodouOptionGroup(
+          label: '类型',
+          options: ['玩具', '公仔', '手办', '谷子', '小卡', '文具', '实用类周边'],
+        ),
+        XiaodouOptionGroup(
+          label: '系列',
+          options: ['星屿邮局', '山海小食堂', '月光马戏团', '霓虹夜行', '深海观测站', '时光钟表店', '樱庭花艺社', '极光观测队'],
+        ),
+        XiaodouOptionGroup(
+          label: '预算',
+          options: ['50元以内', '50到100元', '100到200元', '200元以上'],
+        ),
+      ],
+    );
+
+/// 引导三问提交：按用户点的三个条件直接抽第一批牌（不经模型）。
+/// 输入是 _GroupedQuestionOptions 拼好的「类型，系列，预算」；
+/// 预算换算与 rememberFromOptions 同口径（50到100元→100）。
+Future<void> _guideSubmitOptions(BuildContext context, String joined) async {
+  final parts = joined.split('，');
+  final type = parts.isNotEmpty && parts[0].isNotEmpty ? parts[0] : '手办';
+  final series = parts.length > 1 && parts[1].isNotEmpty ? parts[1] : '月光马戏团';
+  final budget = parts.length > 2 ? parts[2] : '50到100元';
+  final maxPrice = switch (budget) {
+    '50元以内' => 50,
+    '50到100元' => 100,
+    '100到200元' => 200,
+    _ => null, // 200元以上不限
+  };
+  final guide = context.read<GuideController>();
+  guide.notifyOptionsSubmitted();
+  if (!context.mounted) return;
+  await context.read<XiaodouChatProvider>().drawGuideCards(
+        summary: joined,
+        majorCategory: type,
+        query: series,
+        maxPrice: maxPrice,
+      );
 }
 
 Future<void> _startNewChat(BuildContext context) async {
@@ -411,17 +543,55 @@ class _MessageList extends StatefulWidget {
   State<_MessageList> createState() => _MessageListState();
 }
 
-class _MessageListState extends State<_MessageList> {
+class _MessageListState extends State<_MessageList> with WidgetsBindingObserver {
   final _scrollController = ScrollController();
   int _lastMessageCount = 0;
   int _lastContentLength = 0;
-  // 上一帧的键盘高度：用来识别「键盘刚弹起」这一刻，触发滚到底（见 build）。
+  // 上一次量到的键盘高度：用来识别「键盘刚弹起」这一刻，触发滚到底。
   double _lastKeyboardInset = 0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// 键盘弹起时把对话滚到底，让小豆最后的回答露在键盘上方
+  /// （2026-11-26 hx 截图提的要求）。
+  ///
+  /// 为什么不在 build 里读 MediaQuery.viewInsets：这个列表在 Scaffold
+  /// 的 body 里面，Scaffold 为了把页面顶起来，已经把底部 inset「用掉」
+  /// 了，body 子树里再读永远是 0——上一版就是这样写坏的，触发条件永远
+  /// 不成立、滚到底从没执行过（2026-11-27 hx 真机复现后查明）。
+  /// 这里改走系统窗口指标回调 didChangeMetrics，直接读窗口原始的
+  /// viewInsets，不经过 Scaffold，键盘一动就能收到。
+  /// 坑：动画期间这个回调会连发多次，只认「从关到开」的跳变，
+  /// 避免重复触发；开后 350ms 再补滚一次，等键盘动画落定停在真底部。
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    if (!mounted) return;
+    final view = View.of(context);
+    final inset = view.viewInsets.bottom / view.devicePixelRatio;
+    final wasOpen = _lastKeyboardInset > 100;
+    final isOpen = inset > 100;
+    _lastKeyboardInset = inset;
+    if (wasOpen || !isOpen) return;
+    // 守卫与新消息滚底同一条：首页区还在时（没发过消息）不滚，
+    // 进门仍停在顶部（2026-11-26 上午定的规矩）。
+    final chat = context.read<XiaodouChatProvider>();
+    if (!chat.messages.any((m) => m.role == ChatRole.user)) return;
+    _scrollToBottom();
+    Future.delayed(const Duration(milliseconds: 350), () {
+      if (mounted) _scrollToBottom();
+    });
   }
 
   void _scrollToBottom() {
@@ -450,24 +620,8 @@ class _MessageListState extends State<_MessageList> {
         _scrollToBottom();
       }
     }
-    // 键盘弹起时把对话推到键盘上方：页面布局本身会随键盘变矮（输入栏已
-    // 经贴在键盘上沿），但列表的滚动位置不会自己动——视口一变矮，最新
-    // 回复的下半截就掉出可视区，看着像被键盘挡住（2026-11-26 hx 截图）。
-    // 所以键盘从无到有这一刻补一次滚到底，行为与微信等聊天 App 一致。
-    // 守卫与上面同一条：首页区还在时（没发过消息）不滚，进门仍停在顶部。
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    if (keyboardInset != _lastKeyboardInset) {
-      final keyboardOpened = keyboardInset > _lastKeyboardInset;
-      _lastKeyboardInset = keyboardInset;
-      if (keyboardOpened && chat.messages.any((m) => m.role == ChatRole.user)) {
-        _scrollToBottom();
-        // 键盘弹出动画约 300ms、视口是逐帧变矮的，第一下滚到的不是
-        // 最终底部；等动画落定再补滚一次，保证停在真正的最后一行。
-        Future.delayed(const Duration(milliseconds: 320), () {
-          if (mounted) _scrollToBottom();
-        });
-      }
-    }
+    // 键盘弹起滚到底不在这里做：body 子树里读不到键盘高度（原因见
+    // didChangeMetrics 的注释），改在那里的窗口指标回调里触发。
     // 首页区显隐只看一条规则：对话里还没有任何用户消息就显示，发第一句后整体消失。
     // 历史会话打开时已有用户消息，天然不显示，不用另写分支。
     final showHome = !chat.messages.any((m) => m.role == ChatRole.user);
@@ -791,8 +945,11 @@ class _MessageBubble extends StatelessWidget {
                         if (message.optionSet != null && !message.optionsUsed && isLastMessage && !sending)
                           _GroupedQuestionOptions(
                             optionSet: message.optionSet!,
-                            onPick: (text) =>
-                                context.read<XiaodouChatProvider>().chooseOption(msgIndex, text),
+                            onPick: (text) {
+                              context.read<XiaodouChatProvider>().chooseOption(msgIndex, text);
+                              // 新手引导：三问提交了，报控制器推到等牌步。
+                              context.read<GuideController>().notifyOptionsSubmitted();
+                            },
                             onMemory: (byLabel) =>
                                 context.read<StarwishProfileProvider>().rememberFromOptions(byLabel),
                           )
@@ -1109,10 +1266,25 @@ class _GroupedQuestionOptionsState extends State<_GroupedQuestionOptions> {
       } else {
         // multi 总数上限 2：已选满两组时，点未选组的选项不响应
         // （同组内换选不受限，因为总数不变）。
-        if (!_isEach && !_picked.containsKey(groupIndex) && _picked.length >= 2) return;
+        if (!_isEach && !_picked.containsKey(groupIndex) && _picked.length >= 2) {
+          // 新手引导要连点三枚（类型/系列/预算），multi 上限 2 会把第三枚挡死：
+          // 引导期间点的正是教学目标时，挤掉最早选的那组，让流程走得通。
+          final guideInToggle = context.read<GuideController>();
+          if (guideInToggle.chipNeed != null && option.contains(guideInToggle.chipNeed!)) {
+            _picked.remove(_picked.keys.first);
+          } else {
+            return;
+          }
+        }
         _picked[groupIndex] = option;
       }
     });
+    // 新手引导：正在教的那枚 chip 被选中了，就推一步（取消选中不算）。
+    final guide = context.read<GuideController>();
+    final need = guide.chipNeed;
+    if (need != null && _picked[groupIndex] == option && option.contains(need)) {
+      guide.advance();
+    }
   }
 
   void _submit() {
@@ -1130,9 +1302,56 @@ class _GroupedQuestionOptionsState extends State<_GroupedQuestionOptions> {
     widget.onPick(parts.join('，'));
   }
 
+  /// 一枚选项 chip。新手引导正在教的那枚套上 GuideTarget 测量套，
+  /// 让罩子能挖孔指着它；其余 chip 原样。只量位置、不拦点击。
+  Widget _chip(int groupIndex, String option, {bool guideTarget = false}) {
+    final chip = GestureDetector(
+      onTap: () => _toggle(groupIndex, option),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: _xs(12), vertical: _xs(7)),
+        decoration: BoxDecoration(
+          color: _picked[groupIndex] == option ? AppColors.primary : AppColors.card,
+          borderRadius: BorderRadius.circular(_xs(999)),
+          border: Border.all(color: AppColors.primaryLight),
+        ),
+        child: Text(
+          option,
+          style: TextStyle(
+            fontSize: _xs(12) + AppScale.fontBump,
+            fontWeight: FontWeight.w600,
+            color: _picked[groupIndex] == option ? Colors.white : AppColors.primary,
+          ),
+        ),
+      ),
+    );
+    return guideTarget ? GuideTarget(id: 'guide:chip', child: chip) : chip;
+  }
+
   @override
   Widget build(BuildContext context) {
     final set = widget.optionSet;
+    // 新手引导：算出这一步要指的 chip（按控制器给的关键字全组搜）。
+    // 搜不到说明问题数据变了——别把用户卡死，自动跳过这一小步。
+    final guide = context.watch<GuideController>();
+    final need = guide.chipNeed;
+    var targetGroup = -1;
+    String? targetOption;
+    if (need != null) {
+      for (var g = 0; g < set.groups.length && targetGroup < 0; g++) {
+        for (final o in set.groups[g].options) {
+          if (o.contains(need)) {
+            targetGroup = g;
+            targetOption = o;
+            break;
+          }
+        }
+      }
+      if (targetGroup < 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) guide.advance();
+        });
+      }
+    }
     return Padding(
       padding: EdgeInsets.only(top: _xs(10)),
       child: Column(
@@ -1153,32 +1372,16 @@ class _GroupedQuestionOptionsState extends State<_GroupedQuestionOptions> {
               runSpacing: _xs(8),
               children: [
                 for (final option in set.groups[i].options)
-                  GestureDetector(
-                    onTap: () => _toggle(i, option),
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: _xs(12), vertical: _xs(7)),
-                      decoration: BoxDecoration(
-                        color: _picked[i] == option ? AppColors.primary : AppColors.card,
-                        borderRadius: BorderRadius.circular(_xs(999)),
-                        border: Border.all(color: AppColors.primaryLight),
-                      ),
-                      child: Text(
-                        option,
-                        style: TextStyle(
-                          fontSize: _xs(12) + AppScale.fontBump,
-                          fontWeight: FontWeight.w600,
-                          color: _picked[i] == option ? Colors.white : AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ),
+                  _chip(i, option, guideTarget: i == targetGroup && option == targetOption),
               ],
             ),
             SizedBox(height: _xs(10)),
           ],
           Row(
             children: [
-              GestureDetector(
+              GuideTarget(
+                id: 'guide:submit',
+                child: GestureDetector(
                 onTap: _canSubmit ? _submit : null,
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: _xs(16), vertical: _xs(8)),
@@ -1195,6 +1398,7 @@ class _GroupedQuestionOptionsState extends State<_GroupedQuestionOptions> {
                     ),
                   ),
                 ),
+              ),
               ),
               if (set.anyOption != null) ...[
                 SizedBox(width: _xs(8)),

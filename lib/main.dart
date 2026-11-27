@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'providers/app_tab_provider.dart';
+import 'providers/guide_controller.dart';
 import 'providers/auth_provider.dart';
 import 'providers/support_chat_provider.dart';
 import 'providers/xiaodou_chat_provider.dart';
@@ -16,6 +17,7 @@ import 'theme/app_theme.dart';
 import 'utils/app_stability.dart';
 import 'utils/app_log.dart';
 import 'widgets/click_effect/click_effect.dart';
+import 'widgets/guide_overlay.dart';
 
 void main() {
   AppStability.runGuarded(() async {
@@ -52,8 +54,10 @@ class FunPlanetApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => XiaodouChatProvider()),
         ChangeNotifierProvider(create: (_) => StarwishProfileProvider()),
         ChangeNotifierProvider(create: (_) => SupportChatProvider()),
+        ChangeNotifierProvider(create: (_) => GuideController()),
       ],
       child: MaterialApp(
+        navigatorKey: GuideNav.navigatorKey,
         title: '趣玩星球',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
@@ -74,7 +78,14 @@ class FunPlanetApp extends StatelessWidget {
             data: AppTheme.withReadableType(Theme.of(context)),
             child: DefaultTextStyle.merge(
               style: AppTheme.baseText,
-              child: wrapWithClickEffect(context, child),
+              // 新手引导罩挂在最顶层：盖得住所有页面（含小豆页、翻牌层），
+              // 引导没跑时它自己是零尺寸、不拦任何点击。
+              child: Stack(
+                children: [
+                  if (child != null) wrapWithClickEffect(context, child),
+                  const GuideOverlay(),
+                ],
+              ),
             ),
           );
         },

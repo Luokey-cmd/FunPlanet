@@ -52,6 +52,7 @@ function serializeProfile(user, profile) {
     vipLevel: profile.vipLevel,
     avatarPath: profile.avatarPath,
     newcomerClaimed: profile.newcomerClaimed,
+    guideRewardClaimed: profile.guideRewardClaimed,
     // 会员月券是否已领：一律按「本月口径」输出，不能直接透传数据库布尔值（跨月它还是上个月的真）
     memberMonthlyCouponClaimed: isMemberCouponClaimedThisMonth(profile),
     dailyCheckInDone: profile.dailyCheckInDone,
@@ -319,6 +320,26 @@ router.post('/actions/:action', authRequired, async (req, res) => {
             refId: currentDailyDate(),
           });
         }
+        return next;
+      });
+      break;
+    }
+    case 'guide-reward': {
+      // 新手引导完成奖励：20 趣玩币，一辈子一次，判重只看 guideRewardClaimed。
+      if (profile.guideRewardClaimed) return fail(res, 409, '新手引导奖励已领取');
+      profile = await prisma.$transaction(async (tx) => {
+        const next = await tx.userProfile.update({
+          where: { userId: req.user.sub },
+          data: { guideRewardClaimed: true, funCoins: { increment: 20 } },
+        });
+        await recordWalletLedger(tx, {
+          userId: req.user.sub,
+          walletType: 'coins',
+          amount: 20,
+          title: '新手引导奖励',
+          refType: 'guide_reward',
+          refId: 'once',
+        });
         return next;
       });
       break;

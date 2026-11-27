@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
+import '../providers/guide_controller.dart';
 import '../theme/app_scale.dart';
 
 enum _DockSide { left, right }
@@ -272,7 +273,9 @@ class _FloatingAiAssistantState extends State<FloatingAiAssistant> with SingleTi
                   child: child,
                 );
               },
-              child: RepaintBoundary(
+              child: GuideTarget(
+                id: 'guide:xiaodouEntry',
+                child: RepaintBoundary(
                 child: _AssistantBody(
                   hitSize: hitSize,
                   imageSize: imageSize,
@@ -286,6 +289,7 @@ class _FloatingAiAssistantState extends State<FloatingAiAssistant> with SingleTi
                   onPointerMove: _onPointerMove,
                   onPointerUp: _onPointerUp,
                   onPointerCancel: _onPointerCancel,
+                ),
                 ),
               ),
             ),

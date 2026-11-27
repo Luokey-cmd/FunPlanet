@@ -45,6 +45,8 @@ class UserProvider extends ChangeNotifier {
   bool newcomerClaimed = false;
   bool dailyCheckInDone = false;
   bool dailyShareDone = false;
+  // 新手引导奖励是否已领（服务端判重，一辈子一次）
+  bool guideRewardClaimed = false;
   bool dailyBrowseRewardClaimed = false;
   int dailyBrowseCount = 0;
   // 每日/每周任务扩展（2026-11-26）：Done 是服务端行为埋点记的进度、
@@ -117,6 +119,7 @@ class UserProvider extends ChangeNotifier {
         json['memberMonthlyCouponClaimed'] as bool? ?? memberMonthlyCouponClaimed;
     dailyCheckInDone = json['dailyCheckInDone'] as bool? ?? dailyCheckInDone;
     dailyShareDone = json['dailyShareDone'] as bool? ?? dailyShareDone;
+    guideRewardClaimed = json['guideRewardClaimed'] as bool? ?? guideRewardClaimed;
     dailyBrowseRewardClaimed =
         json['dailyBrowseRewardClaimed'] as bool? ?? dailyBrowseRewardClaimed;
     dailyBrowseCount = json['dailyBrowseCount'] as int? ?? dailyBrowseCount;
@@ -496,6 +499,21 @@ class UserProvider extends ChangeNotifier {
       return true;
     }
     dailyShareDone = true;
+    funCoins += 20;
+    notifyListeners();
+    return true;
+  }
+
+  /// 新手引导完成领奖：20 趣玩币，一辈子一次（服务端判重）。
+  /// 云端模式走 profileAction('guide-reward')，回来以服务端资料为准；
+  /// 本地模式直接记账。已领过再调直接返回 false，不重复发。
+  bool claimGuideReward() {
+    if (guideRewardClaimed) return false;
+    if (_cloudSync) {
+      unawaited(_profileAction('guide-reward'));
+      return true;
+    }
+    guideRewardClaimed = true;
     funCoins += 20;
     notifyListeners();
     return true;

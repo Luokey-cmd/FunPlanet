@@ -9,6 +9,7 @@ import '../pages/messages_page.dart';
 import '../pages/profile_page.dart';
 import '../pages/xiaodou_chat_page.dart';
 import '../providers/app_tab_provider.dart';
+import '../providers/guide_controller.dart';
 import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
 import '../utils/user_session_sync.dart';
@@ -53,6 +54,10 @@ class _MainScreenState extends State<MainScreen>
   @override
   void initState() {
     super.initState();
+    // 新手引导：主界面站稳后问控制器要不要自动开跑（首次/中途退出过才弹）。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<GuideController>().maybeAutoStart();
+    });
     _slideCtrl.addStatusListener((status) {
       if (status == AnimationStatus.completed && _outgoingTab != null) {
         setState(() => _outgoingTab = null);

@@ -14,13 +14,12 @@ import '../widgets/notification_sheet.dart';
 import '../widgets/sparkle_background.dart';
 import '../widgets/xiaodou_agent_card.dart';
 import 'ai_community_page.dart';
-import 'orders_sheet.dart';
 import 'support_chat_page.dart';
 import 'xiaodou_chat_page.dart';
 
 /// 聚合消息页（底部导航正中间，hx 2026-11-23 拍板）：把原本散在三处
 /// 的消息收成一页——交易通知（原「我的」页铃铛）、客服会话、小豆盘点
-/// 提醒，再加上全部通知的时间流。本页不造新数据：通知读 UserProvider、
+/// 提醒。本页不造新数据：通知读 UserProvider、
 /// 客服读 SupportChatProvider 的会话汇总、提醒读 XiaodouChatProvider
 /// 的进门盘点（briefing），三处都拉不到就静默降级，不弹错。
 class MessagesPage extends StatefulWidget {
@@ -62,20 +61,6 @@ class _MessagesPageState extends State<MessagesPage> {
       parts.add('共 ${matters.length} 件事待办');
     }
     return parts.join('；');
-  }
-
-  /// 时间流单条点击：与原铃铛页行为完全一致（点即标已读、support 类
-  /// 进客服、带 order 目标的进订单列表）。区别只有一条：本页是标签页
-  /// 不是弹出的子页，跳转前不 pop。
-  void _onNotificationTap(BuildContext context, AppNotification n) {
-    context.read<UserProvider>().markNotificationRead(n.id);
-    if (n.type == NotificationType.support) {
-      SupportChatPage.openGeneral(context);
-      return;
-    }
-    if (n.targetType == 'order') {
-      OrdersSheet.show(context);
-    }
   }
 
   @override
@@ -159,25 +144,9 @@ class _MessagesPageState extends State<MessagesPage> {
                     onTap: () => XiaodouChatPage.open(context),
                   ),
                 ],
-                SizedBox(height: AppScale.s(20)),
-                Text('全部消息', style: FeaturePageStyle.sectionTitle()),
-                SizedBox(height: AppScale.s(8)),
-                if (notifications.isEmpty)
-                  Padding(
-                    padding: EdgeInsets.symmetric(vertical: AppScale.s(24)),
-                    child: Center(
-                      child: Text('暂无消息', style: FeaturePageStyle.empty()),
-                    ),
-                  )
-                else
-                  for (var i = 0; i < notifications.length; i++) ...[
-                    if (i > 0)
-                      Divider(color: AppColors.border, height: AppScale.s(16)),
-                    _NotificationTile(
-                      notification: notifications[i],
-                      onTap: () => _onNotificationTap(context, notifications[i]),
-                    ),
-                  ],
+                // 「全部消息」时间流已删（hx 2026-11-27 点名）：它与上方
+                // 「交易通知」入口完全重复——入口点开的通知面板里就是
+                // 全部通知，本页只留入口行，不再平铺一遍。
               ],
             ),
           ),
@@ -307,55 +276,6 @@ class _CountBadge extends StatelessWidget {
           fontWeight: FontWeight.bold,
           height: 1,
         ),
-      ),
-    );
-  }
-}
-
-/// 时间流单条：照原铃铛页的渲染（未读小红点 + 标题/正文/时间），
-/// 单条只用红点不用数字——数字角标只出现在入口行与底部导航。
-class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({required this.notification, required this.onTap});
-
-  final AppNotification notification;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final n = notification;
-    return AppInkWell(
-      onTap: onTap,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!n.read)
-            Container(
-              width: AppScale.s(10),
-              height: AppScale.s(10),
-              margin: EdgeInsets.only(top: AppScale.s(8), right: AppScale.s(10)),
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-            )
-          else
-            SizedBox(width: AppScale.s(20)),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(n.title, style: FeaturePageStyle.bodyBold()),
-                SizedBox(height: AppScale.s(6)),
-                Text(
-                  n.body,
-                  style: FeaturePageStyle.body(color: AppColors.mutedForeground),
-                ),
-                SizedBox(height: AppScale.s(6)),
-                Text(n.time, style: FeaturePageStyle.caption()),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

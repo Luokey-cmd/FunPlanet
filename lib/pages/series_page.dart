@@ -10,6 +10,8 @@ import 'xiaodou_chat_page.dart';
 /// 系列页（2026-11-27，系列横幅的落点）：首页轮播点系列横幅进来。
 /// 结构自上而下：横幅大图（图里已烧系列名）→ 一句话世界 → 角色阵容 →
 /// 「让小豆带我逛这个系列」→ 这个系列的全部商品（商城同款卡片网格）。
+/// 角色头像可点：跳到角色商品页，只看这一个角色的商品
+/// （匹配口径见 _characterProducts 的注释）。
 /// 商品按 Product.series 精确匹配取，页内按销量从高到低；
 /// 系列介绍与阵容是设计稿定死的文案，写在本文件 _seriesInfo 里，
 /// 数据库不存这些（商品表只有系列名一列）。
@@ -76,25 +78,39 @@ class SeriesPage extends StatelessWidget {
                       separatorBuilder: (_, _) => SizedBox(width: AppScale.s(14)),
                       itemBuilder: (context, i) {
                         final member = info.cast[i];
-                        return Column(
-                          children: [
-                            // 头像图是从对应系列横幅里裁的角色脸（hx 2026-11-27
-                            // 点名），底色保留作图片加载前的占位。
-                            CircleAvatar(
-                              radius: AppScale.s(24),
-                              backgroundColor: member.color,
-                              backgroundImage: AssetImage(member.avatar),
+                        // 点头像（连同名字整块）跳角色商品页（hx 2026-11-27 点名）：
+                        // 只列这一个角色的商品，匹配口径见 _characterProducts。
+                        return GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => _CharacterProductsPage(
+                                seriesName: seriesName,
+                                member: member,
+                                castNames: info.cast.map((m) => m.name).toList(),
+                              ),
                             ),
-                            SizedBox(height: AppScale.s(5)),
-                            Text(
-                              member.name,
-                              style: TextStyle(fontSize: AppScale.t(12.5), fontWeight: FontWeight.w600, color: AppColors.foreground),
-                            ),
-                            Text(
-                              member.role,
-                              style: TextStyle(fontSize: AppScale.t(10.5), color: AppColors.mutedForeground),
-                            ),
-                          ],
+                          ),
+                          child: Column(
+                            children: [
+                              // 头像图是从对应系列横幅里裁的角色脸（hx 2026-11-27
+                              // 点名），底色保留作图片加载前的占位。
+                              CircleAvatar(
+                                radius: AppScale.s(24),
+                                backgroundColor: member.color,
+                                backgroundImage: AssetImage(member.avatar),
+                              ),
+                              SizedBox(height: AppScale.s(5)),
+                              Text(
+                                member.name,
+                                style: TextStyle(fontSize: AppScale.t(12.5), fontWeight: FontWeight.w600, color: AppColors.foreground),
+                              ),
+                              Text(
+                                member.role,
+                                style: TextStyle(fontSize: AppScale.t(10.5), color: AppColors.mutedForeground),
+                              ),
+                            ],
+                          ),
                         );
                       },
                     ),
@@ -124,6 +140,103 @@ class SeriesPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 挑「这一个角色的商品」：输入是系列名、角色名和本系列全部角色名，
+/// 输出是该角色的商品列表（按销量从高到低，与系列页同口径）。
+/// 匹配规则两层：① 商品名里带角色名 → 就是这个角色的商品；
+/// ② 商品名里不带任何角色名、但介绍里提了这个角色 → 是全员/场景类
+/// 商品（如三人同框的吧唧、拼图、场景手办），也算「包含这个角色」。
+/// 坑：第②层必须先卡「名里没有任何角色名」，否则单人商品介绍里的
+/// 串场提及（「和岚音、小满摆一起」）会把别人的商品误收进来。
+List<Product> _characterProducts(String seriesName, String memberName, List<String> castNames) {
+  final items = products.where((p) => p.series == seriesName);
+  final matched = items.where((p) {
+    if (p.name.contains(memberName)) return true;
+    if (castNames.any((n) => p.name.contains(n))) return false;
+    return p.description.contains(memberName);
+  }).toList();
+  matched.sort((a, b) => b.sales.compareTo(a.sales));
+  return matched;
+}
+
+/// 角色商品页（2026-11-27，hx 点名）：在系列页点角色头像进来，
+/// 只看这一个角色的商品。结构：顶栏（返回 + 头像 + 角色名/系列名/件数）
+/// → 商城同款卡片网格；一件都没有时给空态文案，不白屏。
+class _CharacterProductsPage extends StatelessWidget {
+  const _CharacterProductsPage({required this.seriesName, required this.member, required this.castNames});
+
+  final String seriesName;
+  final _CastMember member;
+  final List<String> castNames;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _characterProducts(seriesName, member.name, castNames);
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(AppScale.s(10), AppScale.s(8), AppScale.s(16), AppScale.s(8)),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      padding: EdgeInsets.all(AppScale.s(7)),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF1F0F5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.arrow_back, size: AppScale.s(19), color: AppColors.foreground),
+                    ),
+                  ),
+                  SizedBox(width: AppScale.s(10)),
+                  CircleAvatar(
+                    radius: AppScale.s(20),
+                    backgroundColor: member.color,
+                    backgroundImage: AssetImage(member.avatar),
+                  ),
+                  SizedBox(width: AppScale.s(10)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          member.name,
+                          style: TextStyle(fontSize: AppScale.t(16), fontWeight: FontWeight.w700, color: AppColors.foreground),
+                        ),
+                        Text(
+                          '$seriesName · ${member.role} · 共 ${items.length} 件',
+                          style: TextStyle(fontSize: AppScale.t(11.5), color: AppColors.mutedForeground),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: items.isEmpty
+                  ? Center(
+                      child: Text(
+                        '这个角色暂时还没有专属商品',
+                        style: TextStyle(fontSize: AppScale.t(13), color: AppColors.mutedForeground),
+                      ),
+                    )
+                  : ListView(
+                      padding: EdgeInsets.fromLTRB(AppScale.s(16), AppScale.s(6), AppScale.s(16), AppScale.s(24)),
+                      children: [StaggeredProductGrid(products: items)],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

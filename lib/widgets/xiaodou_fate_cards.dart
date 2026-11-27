@@ -5,10 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/product_data.dart';
-import '../pages/address_edit_page.dart';
 import '../pages/orders_sheet.dart';
 import '../pages/product_detail_page.dart';
+import '../providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/guide_controller.dart';
 import '../providers/order_provider.dart';
 import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
@@ -68,6 +69,8 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
   /// 回来后 setState 前仍要查 mounted（用户可能在层开着时退出聊天页）。
   Future<void> _select(int index) async {
     if (_phase != _Phase.idle) return;
+    // 新手引导：目标牌被点了，报控制器进翻牌演出步（罩子这段时间藏起来）。
+    context.read<GuideController>().notifyCardTapped();
     _selected = index;
     final product = widget.products[index];
     final settled = await Navigator.of(context, rootNavigator: true).push<bool>(
@@ -92,6 +95,8 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
         _phase = _Phase.detail;
         _detailShown = true;
       });
+      // 新手引导：详细卡落定了，报控制器进看清单步。
+      context.read<GuideController>().notifyDetailLanded();
     }
   }
 
@@ -129,7 +134,9 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Opacity(
+                GuideTarget(
+                  id: 'guide:detail',
+                  child: Opacity(
                   opacity: _detailShown ? 1 : 0,
                   child: KeyedSubtree(
                     key: _detailKey,
@@ -137,6 +144,7 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
                       product: _selectedProduct,
                       trait: widget.traits[_selectedProduct.id],
                     ),
+                  ),
                   ),
                 ),
                 SizedBox(height: AppScale.s(10)),
@@ -164,6 +172,23 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
           : LayoutBuilder(
               builder: (context, constraints) {
                 final w = constraints.maxWidth;
+                // 新手引导要指的牌：带「口碑」特点的那张优先，没有就第一张；
+                // 是不是口碑牌报给控制器，决定气泡文案怎么说。
+                var guideTarget = 0;
+                var guideIsReputation = false;
+                for (var k = 0; k < widget.products.length; k++) {
+                  if ((widget.traits[widget.products[k].id] ?? '').contains('口碑')) {
+                    guideTarget = k;
+                    guideIsReputation = true;
+                    break;
+                  }
+                }
+                final guideCtrl = context.read<GuideController>();
+                if (guideCtrl.active) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    guideCtrl.cardTargetIsReputation = guideIsReputation;
+                  });
+                }
                 final gap = AppScale.s(10);
                 final miniW = (w - gap * 2) / 3;
                 final miniH = miniW * 1.46;
@@ -181,13 +206,24 @@ class _XiaodouFateBoardState extends State<XiaodouFateBoard> {
                           if (i > 0) SizedBox(width: gap),
                           _FadeIn(
                             delay: Duration(milliseconds: i * 70),
-                            child: _MiniCard(
-                              product: widget.products[i],
-                              trait: widget.traits[widget.products[i].id],
-                              width: miniW,
-                              height: miniH,
-                              onTap: () => _select(i),
-                            ),
+                            child: i == guideTarget
+                                ? GuideTarget(
+                                    id: 'guide:card',
+                                    child: _MiniCard(
+                                      product: widget.products[i],
+                                      trait: widget.traits[widget.products[i].id],
+                                      width: miniW,
+                                      height: miniH,
+                                      onTap: () => _select(i),
+                                    ),
+                                  )
+                                : _MiniCard(
+                                    product: widget.products[i],
+                                    trait: widget.traits[widget.products[i].id],
+                                    width: miniW,
+                                    height: miniH,
+                                    onTap: () => _select(i),
+                                  ),
                           ),
                         ],
                       ],
@@ -887,7 +923,7 @@ class _DetailCard extends StatelessWidget {
                   ],
                 ),
                 SizedBox(height: AppScale.s(11)),
-                _buttons(context),
+                _DetailCardButtons(product: product),
               ],
             ),
           ),
@@ -1110,15 +1146,127 @@ class _DetailCard extends StatelessWidget {
     ];
   }
 
-  // 底部双按钮（照动画那张）：加购走购物车 + 顶部提示，购买走快捷结算。
-  // 按钮是牌身 GestureDetector 的子手势，点击会先命中按钮、不会触发进详情。
-  Widget _buttons(BuildContext context) {
+  // 价格文案与旧牌面同口径：整数不带小数，非整数保留两位。
+  String _priceText(double price) =>
+      '¥${price.toStringAsFixed(price.truncateToDouble() == price ? 0 : 2)}';
+}
+
+/// 详细卡底部按钮区（独立成有状态组件，2026-11-27）：管两件事——
+/// 「加入购物车」与「立即购买」=小豆代买。
+/// 代买成功后**不跳页**（hx 2026-11-27 真机点名：点立即购买应该是
+/// 在对话里把单下掉，不要把人甩到订单详情页）：按钮区原地变成
+/// 「已下单 · 实付 ¥X」状态片 + 「去支付」按钮，用户自己点去支付
+/// 时才进订单详情付款。
+/// 静态版详细卡（interactive=false，全屏翻牌层里那张）也被 IgnorePointer
+/// 罩着、点不动，这里的状态永远不会被触发，不用另做区分。
+class _DetailCardButtons extends StatefulWidget {
+  const _DetailCardButtons({required this.product});
+
+  final Product product;
+
+  @override
+  State<_DetailCardButtons> createState() => _DetailCardButtonsState();
+}
+
+class _DetailCardButtonsState extends State<_DetailCardButtons> {
+  // 代买成功后存下订单：非空 = 已下单，按钮区切换成付款形态。
+  Order? _placedOrder;
+
+  @override
+  Widget build(BuildContext context) {
+    // 新手引导演示下单完成：按钮区换成演示成功片（没有真订单、不给去支付）。
+    final guide = context.watch<GuideController>();
+    if (guide.demoOrderPlaced && _placedOrder == null) {
+      return Container(
+        padding: EdgeInsets.symmetric(vertical: AppScale.s(9)),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8F7EE),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle, size: AppScale.s(15), color: const Color(0xFF1F9D55)),
+            SizedBox(width: AppScale.s(4)),
+            Text(
+              '演示下单成功（未真实下单）',
+              style: TextStyle(
+                fontSize: AppScale.t(12.5),
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1F9D55),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    final placed = _placedOrder;
+    if (placed != null) {
+      return Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: AppScale.s(9)),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F7EE),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle, size: AppScale.s(15), color: const Color(0xFF1F9D55)),
+                  SizedBox(width: AppScale.s(4)),
+                  Text(
+                    '已下单 · 实付 ${_priceText(placed.total)}',
+                    style: TextStyle(
+                      fontSize: AppScale.t(12.5),
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1F9D55),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(width: AppScale.s(9)),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => openOrderDetail(context, placed),
+              child: Container(
+                padding: EdgeInsets.symmetric(vertical: AppScale.s(9)),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF8A5FD6), AppColors.primary],
+                  ),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.payments_outlined, size: AppScale.s(15), color: Colors.white),
+                    SizedBox(width: AppScale.s(4)),
+                    Text(
+                      '去支付',
+                      style: TextStyle(
+                        fontSize: AppScale.t(12.5),
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     return Row(
       children: [
         Expanded(
           child: GestureDetector(
             onTap: () {
-              context.read<CartProvider>().addItem(product);
+              context.read<CartProvider>().addItem(widget.product);
               showTopSnackBar(
                 context,
                 content: Text(
@@ -1157,8 +1305,28 @@ class _DetailCard extends StatelessWidget {
         ),
         SizedBox(width: AppScale.s(9)),
         Expanded(
-          child: GestureDetector(
-            onTap: () => _agentBuy(context),
+          child: GuideTarget(
+            id: 'guide:buy',
+            child: GestureDetector(
+            onTap: () {
+              // 新手引导的最后一步：点这里不真下单，走演示表单。
+              final guide = context.read<GuideController>();
+              if (guide.step == GuideStep.buyDemo) {
+                guide.advance();
+                showModalBottomSheet<void>(
+                  context: context,
+                  useRootNavigator: true,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(AppScale.s(18))),
+                  ),
+                  builder: (_) => const _GuideDemoSheet(),
+                ).then((_) => guide.notifyDemoSheetClosed());
+              } else {
+                _agentBuy(context);
+              }
+            },
             child: Container(
               padding: EdgeInsets.symmetric(vertical: AppScale.s(9)),
               decoration: BoxDecoration(
@@ -1183,6 +1351,7 @@ class _DetailCard extends StatelessWidget {
                 ],
               ),
             ),
+            ),
           ),
         ),
       ],
@@ -1191,38 +1360,30 @@ class _DetailCard extends StatelessWidget {
 
   // 「立即购买」= 小豆代买（2026-11-27 hx 定）：点一下，小豆用默认地址
   // 直接把待付款订单办好——券由服务端自动挑最划算的一张、满减与会员
-  // 95 折照算，用户只剩最后在订单详情里点「去支付」。
+  // 95 折照算。成功后不跳页：按钮区原地变「已下单 + 去支付」（见类注释）。
   // 注意只有小豆里的卡片走代买；小豆之外（商品详情页等）的立即购买
   // 仍走正常结算页，不要把那边的入口改到这里来。
-  // 没有任何地址时先弹提示：「去填写地址」跳新增地址页（那页会预填
-  // 昵称和注册手机号），填完回来自动接着下单；没填成则停在这一步。
+  // 没有任何地址时在对话里弹快速表单当场填（见 _QuickAddressForm），
+  // 存好自动接着下单；关掉表单则停在这一步，不下单。
   Future<void> _agentBuy(BuildContext context) async {
+    final product = widget.product;
     final user = context.read<UserProvider>();
     var address = user.defaultAddress;
     if (address == null) {
-      final goFill = await showDialog<bool>(
+      // 没地址不在对话里弹通知框、更不跳填写页（hx 2026-11-27 点名）：
+      // 从对话底部弹一张快速表单当场填，存好自动接着下单。
+      final saved = await showModalBottomSheet<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('还没有收货地址'),
-          content: const Text('小豆帮你下单要用一个收货地址，先去填一个吧。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('稍后再说'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('去填写地址'),
-            ),
-          ],
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppScale.s(18))),
         ),
+        builder: (_) => const _QuickAddressForm(),
       );
-      if (goFill != true || !context.mounted) return;
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute(builder: (_) => const AddressEditPage()),
-      );
-      if (!context.mounted) return;
-      await user.loadFromRemote();
+      if (saved != true || !context.mounted) return;
+      // saveAddress 内部已刷新地址列表，直接取默认地址接着下单。
       address = user.defaultAddress;
       if (address == null) return;
     }
@@ -1264,10 +1425,273 @@ class _DetailCard extends StatelessWidget {
         style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600),
       ),
     );
-    openOrderDetail(context, order);
+    // 不跳页：把订单存进状态，按钮区原地切换成「已下单 + 去支付」。
+    if (mounted) setState(() => _placedOrder = order);
   }
 
-  // 价格文案与旧牌面同口径：整数不带小数，非整数保留两位。
+  // 价格文案与牌面同口径：整数不带小数，非整数保留两位。
   String _priceText(double price) =>
       '¥${price.toStringAsFixed(price.truncateToDouble() == price ? 0 : 2)}';
+}
+
+/// 对话内快速地址表单（2026-11-27，hx 点名）：代买时没地址就从对话底部
+/// 弹出来，当场填、当场存，不跳地址编辑页。
+/// 预填口径与地址编辑页完全一致：收货人先写昵称加「（可修改）」后缀
+/// （保存时自动摘掉）、手机号先写注册号；存的时候直接设为默认地址，
+/// 回到 _agentBuy 就能拿它下单。
+/// 输出：保存成功返回 true；取消或关掉返回 null，_agentBuy 就停手。
+class _QuickAddressForm extends StatefulWidget {
+  const _QuickAddressForm();
+
+  @override
+  State<_QuickAddressForm> createState() => _QuickAddressFormState();
+}
+
+class _QuickAddressFormState extends State<_QuickAddressForm> {
+  // 与地址编辑页同名的预填后缀，保存时摘掉、不存进地址。
+  static const _prefillHint = '（可修改）';
+
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _detailController = TextEditingController();
+  bool _prefilled = false;
+  bool _saving = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_prefilled) return;
+    _prefilled = true;
+    final user = context.read<AuthProvider>().currentUser;
+    if (user == null) return;
+    if (user.nickname.isNotEmpty) {
+      _nameController.text = '${user.nickname}$_prefillHint';
+    }
+    if (user.phone.isNotEmpty) {
+      _phoneController.text = user.phone;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _detailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    var name = _nameController.text.trim();
+    if (name.endsWith(_prefillHint)) {
+      name = name.substring(0, name.length - _prefillHint.length).trim();
+    }
+    final phone = _phoneController.text.trim();
+    final detail = _detailController.text.trim();
+    if (name.isEmpty || phone.isEmpty || detail.isEmpty) {
+      showTopSnackBar(
+        context,
+        content: Text(
+          '请把收货人、手机号和详细地址填完整',
+          style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600),
+        ),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    final error = await context.read<UserProvider>().saveAddress(
+          name: name,
+          phone: phone,
+          detail: detail,
+          isDefault: true,
+        );
+    if (!mounted) return;
+    if (error != null) {
+      setState(() => _saving = false);
+      showTopSnackBar(
+        context,
+        content: Text(error, style: TextStyle(fontSize: AppScale.t(13), fontWeight: FontWeight.w600)),
+      );
+      return;
+    }
+    Navigator.of(context).pop(true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 表单在键盘上方：底部让出键盘高度，键盘弹起时字段不被挡。
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(AppScale.s(20), AppScale.s(18), AppScale.s(20), AppScale.s(20)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              '填个收货地址',
+              style: TextStyle(fontSize: AppScale.t(17), fontWeight: FontWeight.w700, color: AppColors.foreground),
+            ),
+            SizedBox(height: AppScale.s(4)),
+            Text(
+              '小豆用这个地址帮你下单，填一次，以后自动就用它。',
+              style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground),
+            ),
+            SizedBox(height: AppScale.s(14)),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: '收货人'),
+            ),
+            SizedBox(height: AppScale.s(10)),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: '手机号'),
+            ),
+            SizedBox(height: AppScale.s(10)),
+            TextField(
+              controller: _detailController,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: '详细地址'),
+            ),
+            SizedBox(height: AppScale.s(18)),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                    child: const Text('取消'),
+                  ),
+                ),
+                SizedBox(width: AppScale.s(12)),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _saving ? null : _save,
+                    style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                    child: Text(_saving ? '保存中…' : '保存并下单'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 新手引导的演示地址表单：长相和对话内快速地址表单（_QuickAddressForm）
+/// 一套，但整张都是假的——预填演示数据、顶部挂演示横幅、主按钮叫
+/// 「完成演示」，点了只报引导控制器收尾，不调任何下单/存地址接口。
+/// 输入无；输出无（完成与否经 GuideController.notifyDemoPlaced /
+/// notifyDemoSheetClosed 回报）。坑：真表单上线后若改版式，这张演示的
+/// 跟着改，两张脸要保持一致，用户看的就是「真下单长这样」。
+class _GuideDemoSheet extends StatefulWidget {
+  const _GuideDemoSheet();
+
+  @override
+  State<_GuideDemoSheet> createState() => _GuideDemoSheetState();
+}
+
+class _GuideDemoSheetState extends State<_GuideDemoSheet> {
+  final _nameController = TextEditingController(text: '小豆演示');
+  final _phoneController = TextEditingController(text: '138 0000 0000');
+  final _detailController = TextEditingController(text: '星屿邮局 1 号（演示地址）');
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _phoneController.dispose();
+    _detailController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(AppScale.s(20), AppScale.s(18), AppScale.s(20), AppScale.s(20)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: AppScale.s(12), vertical: AppScale.s(8)),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3D6),
+                borderRadius: BorderRadius.circular(AppScale.s(10)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.school_outlined, size: AppScale.s(16), color: const Color(0xFFB07D10)),
+                  SizedBox(width: AppScale.s(6)),
+                  Expanded(
+                    child: Text(
+                      '演示模式 · 不会真的下单、不扣款',
+                      style: TextStyle(
+                        fontSize: AppScale.t(12.5),
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFFB07D10),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: AppScale.s(14)),
+            Text(
+              '填个收货地址（演示）',
+              style: TextStyle(fontSize: AppScale.t(17), fontWeight: FontWeight.w700, color: AppColors.foreground),
+            ),
+            SizedBox(height: AppScale.s(4)),
+            Text(
+              '真买的时候，小豆就用这个地址帮你下单，填一次，以后自动就用它。',
+              style: TextStyle(fontSize: AppScale.t(12), color: AppColors.mutedForeground),
+            ),
+            SizedBox(height: AppScale.s(14)),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: '收货人'),
+            ),
+            SizedBox(height: AppScale.s(10)),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: '手机号'),
+            ),
+            SizedBox(height: AppScale.s(10)),
+            TextField(
+              controller: _detailController,
+              maxLines: 2,
+              decoration: const InputDecoration(labelText: '详细地址'),
+            ),
+            SizedBox(height: AppScale.s(18)),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('取消'),
+                  ),
+                ),
+                SizedBox(width: AppScale.s(12)),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      context.read<GuideController>().notifyDemoPlaced();
+                      Navigator.of(context).pop();
+                    },
+                    style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                    child: const Text('完成演示'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

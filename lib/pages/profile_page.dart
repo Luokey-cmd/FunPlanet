@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../data/product_data.dart';
+import '../providers/guide_controller.dart';
 import '../providers/order_provider.dart';
 import '../providers/user_provider.dart';
 import '../theme/app_colors.dart';
@@ -985,6 +986,41 @@ class _ContentSection extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+            SizedBox(height: _ps(10)),
+            Divider(height: 1, color: AppColors.border.withValues(alpha: 0.7)),
+            // 新手引导入口：没领过奖时用奖励勾着回来做完；领过显示已完成、可重玩。
+            Builder(
+              builder: (context) {
+                final claimed = context.watch<UserProvider>().guideRewardClaimed;
+                return InkWell(
+                  onTap: () => context.read<GuideController>().startManual(),
+                  child: Padding(
+                    padding: EdgeInsets.only(top: _ps(10)),
+                    child: Row(
+                      children: [
+                        Icon(Icons.school_outlined, size: _ps(19), color: AppColors.primary),
+                        SizedBox(width: _ps(8)),
+                        Expanded(
+                          child: Text(
+                            '新手引导',
+                            style: TextStyle(fontSize: _pt(13), fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Text(
+                          claimed ? '已完成，可重玩' : '完成得 20 趣玩币',
+                          style: TextStyle(
+                            fontSize: _pt(11),
+                            fontWeight: claimed ? FontWeight.w400 : FontWeight.w700,
+                            color: claimed ? AppColors.mutedForeground : AppColors.primary,
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, size: _ps(16), color: AppColors.mutedForeground),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ],
         ),
