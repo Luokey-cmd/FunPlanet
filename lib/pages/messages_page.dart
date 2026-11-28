@@ -4,24 +4,22 @@ import 'package:provider/provider.dart';
 import '../data/product_data.dart';
 import '../providers/support_chat_provider.dart';
 import '../providers/user_provider.dart';
-import '../providers/xiaodou_chat_provider.dart';
-import '../services/xiaodou_chat_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../theme/feature_page_style.dart';
 import '../widgets/click_effect/app_pressable.dart';
 import '../widgets/notification_sheet.dart';
 import '../widgets/sparkle_background.dart';
-import '../widgets/xiaodou_agent_card.dart';
 import 'ai_community_page.dart';
 import 'support_chat_page.dart';
-import 'xiaodou_chat_page.dart';
 
 /// 聚合消息页（底部导航正中间，hx 2026-11-23 拍板）：把原本散在三处
-/// 的消息收成一页——交易通知（原「我的」页铃铛）、客服会话、小豆盘点
-/// 提醒。本页不造新数据：通知读 UserProvider、
-/// 客服读 SupportChatProvider 的会话汇总、提醒读 XiaodouChatProvider
-/// 的进门盘点（briefing），三处都拉不到就静默降级，不弹错。
+/// 的消息收成一页——交易通知（原「我的」页铃铛）、客服会话、AI 社区。
+/// 本页不造新数据：通知读 UserProvider、客服读 SupportChatProvider
+/// 的会话汇总、社区未读读 UserProvider，拉不到就静默降级，不弹错。
+/// 小豆盘点提醒行已于 2026-11-28 整行删除（hx 点名）：待付款订单在
+/// 交易通知与订单列表里都有正经入口，不再借小豆的名义重复提醒；
+/// 底部导航消息角标同步去掉小豆盘点事项一路。
 class MessagesPage extends StatefulWidget {
   const MessagesPage({super.key});
 
@@ -41,35 +39,14 @@ class _MessagesPageState extends State<MessagesPage> {
       if (!mounted) return;
       context.read<UserProvider>().loadFromRemote();
       context.read<SupportChatProvider>().refreshConversationSummaries();
-      context.read<XiaodouChatProvider>().refreshBriefing();
     });
-  }
-
-  /// 小豆提醒行的副标题：把盘点事项翻成人话，最多拼两件，多的用总数兜底。
-  /// 输入：盘点事项列表；输出：一行展示文案。金额格式与小豆简报卡共用
-  /// formatYuan，避免两处写出两种价格样子。
-  String _xiaodouSummary(List<BriefingMatter> matters) {
-    final parts = <String>[];
-    for (final matter in matters.take(2)) {
-      if (matter.isPendingOrder) {
-        parts.add('有订单还没付款 · 应付 ${formatYuan(matter.total)}');
-      } else {
-        parts.add('『${matter.title}』快到期了');
-      }
-    }
-    if (matters.length > 2) {
-      parts.add('共 ${matters.length} 件事待办');
-    }
-    return parts.join('；');
   }
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<UserProvider>();
     final support = context.watch<SupportChatProvider>();
-    final xiaodou = context.watch<XiaodouChatProvider>();
     final notifications = user.notifications;
-    final matters = xiaodou.briefingMatters;
     final top = MediaQuery.paddingOf(context).top;
 
     return SparkleBackground(
@@ -132,18 +109,6 @@ class _MessagesPageState extends State<MessagesPage> {
                     MaterialPageRoute(builder: (_) => const AiCommunityPage()),
                   ),
                 ),
-                // 小豆提醒是条件行：没有待办事项时整行不显示、不占位，
-                // 角标就是事项数（与底部导航消息角标的口径一致）。
-                if (matters.isNotEmpty) ...[
-                  SizedBox(height: AppScale.s(10)),
-                  _EntryRow(
-                    icon: Icons.auto_awesome_outlined,
-                    title: '小豆提醒',
-                    subtitle: _xiaodouSummary(matters),
-                    badgeCount: matters.length,
-                    onTap: () => XiaodouChatPage.open(context),
-                  ),
-                ],
                 // 「全部消息」时间流已删（hx 2026-11-27 点名）：它与上方
                 // 「交易通知」入口完全重复——入口点开的通知面板里就是
                 // 全部通知，本页只留入口行，不再平铺一遍。

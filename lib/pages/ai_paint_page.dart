@@ -36,7 +36,11 @@ class _AiPaintPageState extends State<AiPaintPage> {
   AiPaintQuota? _quota;
   String _styleKey = 'default';
   String _ratioKey = 'square';
-  int _drawCount = 2;
+  // 我的作品多选模式：开着时点作品图是勾选（不是打开预览），
+  // 底部操作条批量下载/删除；取消或处理完自动退出。
+  bool _selecting = false;
+  final Set<String> _selectedIds = <String>{};
+  bool _batchBusy = false;
   bool _loadingPage = true;
   bool _generating = false;
 
@@ -137,7 +141,6 @@ class _AiPaintPageState extends State<AiPaintPage> {
         prompt: prompt,
         style: _styleKey,
         size: ratio.size,
-        count: _drawCount,
       );
       if (!mounted) return;
       final fresh = result.artworks;
@@ -206,6 +209,125 @@ class _AiPaintPageState extends State<AiPaintPage> {
     );
   }
 
+  void _toast(String message) {
+    showTopSnackBar(
+      context,
+      content: Text(
+        message,
+        style: TextStyle(fontSize: FeaturePageStyle.t(14), fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  // 进出多选模式：退出时把已勾的清空，别让勾选状态赖到下一次。
+  void _toggleSelecting() {
+    setState(() {
+      _selecting = !_selecting;
+      if (!_selecting) _selectedIds.clear();
+    });
+  }
+
+  void _toggleSelected(AiArtwork artwork) {
+    setState(() {
+      if (!_selectedIds.remove(artwork.id)) {
+        _selectedIds.add(artwork.id);
+      }
+    });
+  }
+
+  // 批量下载选中的作品到相册：一张张存，个别失败不挡其余的，最后汇总报数；
+  // 全成功才退出多选，有失败的留在多选里方便重试。
+  Future<void> _downloadSelected() async {
+    if (_selectedIds.isEmpty || _batchBusy) return;
+    final targets = _artworks.where((a) => _selectedIds.contains(a.id)).toList();
+    setState(() => _batchBusy = true);
+    var saved = 0;
+    String? firstError;
+    for (final artwork in targets) {
+      try {
+        await saveArtworkImageToGallery(artwork.imagePath);
+        saved += 1;
+      } catch (error) {
+        firstError ??= error is SaveArtworkImageException ? error.message : '$error';
+      }
+    }
+    if (!mounted) return;
+    setState(() => _batchBusy = false);
+    if (saved == targets.length) {
+      _toggleSelecting();
+      _toast('已保存 $saved 张到相册');
+    } else if (saved > 0) {
+      _toast('已保存 $saved 张，${targets.length - saved} 张失败：${firstError ?? ''}');
+    } else {
+      _toast(firstError ?? '保存失败，请稍后重试');
+    }
+  }
+
+  // 批量删除选中的作品：先弹确认，服务端删记录连磁盘文件一起清，
+  // 回来把本地列表同步摘掉；正打开看的那张若被删，结果卡一并清掉。
+  Future<void> _deleteSelected() async {
+    if (_selectedIds.isEmpty || _batchBusy) return;
+    final targets = _artworks.where((a) => _selectedIds.contains(a.id)).toList();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('删除作品', style: TextStyle(fontSize: FeaturePageStyle.t(16), fontWeight: FontWeight.w700)),
+        content: Text(
+          '确定删除选中的 ${targets.length} 张作品吗？删除后无法恢复。',
+          style: TextStyle(fontSize: FeaturePageStyle.t(14), height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text('取消', style: TextStyle(fontSize: FeaturePageStyle.t(14))),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              '删除',
+              style: TextStyle(color: AppColors.priceRed, fontWeight: FontWeight.w600, fontSize: FeaturePageStyle.t(14)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _batchBusy = true);
+    try {
+      final deleted = await _service.deleteArtworks(targets.map((a) => a.id).toList());
+      if (!mounted) return;
+      final ids = targets.map((a) => a.id).toSet();
+      setState(() {
+        _artworks = _artworks.where((a) => !ids.contains(a.id)).toList();
+        if (_currentArtwork != null && ids.contains(_currentArtwork!.id)) {
+          _currentArtwork = null;
+        }
+        _selectedIds.clear();
+        _selecting = false;
+        _batchBusy = false;
+      });
+      if (deleted != targets.length) {
+        // 服务端实际删掉的张数对不上（比如作品已被别处处理过），重拉一遍列表对齐。
+        unawaited(_reloadArtworks());
+      }
+      _toast('已删除 $deleted 张作品');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _batchBusy = false);
+      _toast(_formatLoadError(error));
+    }
+  }
+
+  Future<void> _reloadArtworks() async {
+    try {
+      final rows = await _service.fetchArtworks();
+      if (!mounted) return;
+      setState(() => _artworks = rows);
+    } catch (_) {
+      // 对齐失败不打扰用户：列表下次进页面时会重新拉。
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -272,11 +394,6 @@ class _AiPaintPageState extends State<AiPaintPage> {
                             selectedKey: _ratioKey,
                             onSelected: (key) => setState(() => _ratioKey = key),
                           ),
-                          SizedBox(height: FeaturePageStyle.s(14)),
-                          _CountSection(
-                            selected: _drawCount,
-                            onSelected: (value) => setState(() => _drawCount = value),
-                          ),
                           SizedBox(height: FeaturePageStyle.s(16)),
                           _GenerateButton(
                             generating: _generating,
@@ -298,11 +415,30 @@ class _AiPaintPageState extends State<AiPaintPage> {
                           ],
                           if (_artworks.isNotEmpty) ...[
                             SizedBox(height: FeaturePageStyle.s(22)),
-                            Text('我的作品', style: FeaturePageStyle.sectionTitle()),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text('我的作品', style: FeaturePageStyle.sectionTitle()),
+                                ),
+                                TextButton(
+                                  onPressed: _toggleSelecting,
+                                  child: Text(
+                                    _selecting ? '取消' : '多选',
+                                    style: FeaturePageStyle.action(color: AppColors.primary),
+                                  ),
+                                ),
+                              ],
+                            ),
                             SizedBox(height: FeaturePageStyle.s(12)),
                             _ArtworkGrid(
                               artworks: _artworks,
+                              selecting: _selecting,
+                              selectedIds: _selectedIds,
                               onTap: (artwork) {
+                                if (_selecting) {
+                                  _toggleSelected(artwork);
+                                  return;
+                                }
                                 setState(() => _currentArtwork = artwork);
                                 _openPreview(artwork);
                               },
@@ -312,6 +448,13 @@ class _AiPaintPageState extends State<AiPaintPage> {
                       ),
                     ),
             ),
+            if (_selecting)
+              _SelectionBar(
+                count: _selectedIds.length,
+                busy: _batchBusy,
+                onDownload: _downloadSelected,
+                onDelete: _deleteSelected,
+              ),
           ],
         ),
       ),
@@ -364,7 +507,7 @@ class _HintCard extends StatelessWidget {
           SizedBox(width: FeaturePageStyle.s(10)),
           Expanded(
             child: Text(
-              '描述你想画的画面，选好风格与画幅，一次生成 1～2 张候选图。',
+              '描述你想画的画面，选好风格与画幅，一次生成一张图。',
               style: FeaturePageStyle.secondary(color: AppColors.foreground.withValues(alpha: 0.82)),
             ),
           ),
@@ -507,42 +650,6 @@ class _RatioSection extends StatelessWidget {
   }
 }
 
-class _CountSection extends StatelessWidget {
-  const _CountSection({required this.selected, required this.onSelected});
-
-  final int selected;
-  final ValueChanged<int> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('生成张数', style: FeaturePageStyle.sectionTitle()),
-        SizedBox(height: FeaturePageStyle.s(10)),
-        Wrap(
-          spacing: FeaturePageStyle.s(8),
-          runSpacing: FeaturePageStyle.s(8),
-          children: [1, 2].map((value) {
-            final active = value == selected;
-            return ChoiceChip(
-              label: Text(value == 1 ? '1 张' : '2 张候选'),
-              selected: active,
-              onSelected: (_) => onSelected(value),
-              selectedColor: AppColors.secondary,
-              labelStyle: FeaturePageStyle.caption(
-                color: active ? AppColors.primary : AppColors.mutedForeground,
-                weight: active ? FontWeight.w600 : FontWeight.normal,
-              ),
-              side: BorderSide(color: active ? AppColors.primaryLight : AppColors.border),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-}
-
 class _GenerateButton extends StatelessWidget {
   const _GenerateButton({
     required this.generating,
@@ -656,12 +763,17 @@ class _ResultCard extends StatelessWidget {
               children: [
                 Text(artwork.prompt, maxLines: 3, overflow: TextOverflow.ellipsis, style: FeaturePageStyle.body()),
                 SizedBox(height: FeaturePageStyle.s(12)),
+                // 三个按钮等宽平分：「保存到本地」是 5 个字，窄屏下会折成两行，
+                // 标签一律套 FittedBox 等比缩小兜底，宁可字小一点也不换行。
                 Row(
                   children: [
                     Expanded(
                       child: AppOutlinedButton(
                         onPressed: onPreview,
-                        child: Text('查看大图', style: FeaturePageStyle.action()),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('查看大图', softWrap: false, style: FeaturePageStyle.action()),
+                        ),
                       ),
                     ),
                     SizedBox(width: FeaturePageStyle.s(8)),
@@ -669,14 +781,20 @@ class _ResultCard extends StatelessWidget {
                       child: AppFilledButton(
                         onPressed: onRegenerate,
                         style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-                        child: Text('再次生成', style: FeaturePageStyle.action(color: Colors.white)),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('再次生成', softWrap: false, style: FeaturePageStyle.action(color: Colors.white)),
+                        ),
                       ),
                     ),
                     SizedBox(width: FeaturePageStyle.s(8)),
                     Expanded(
                       child: AppOutlinedButton(
                         onPressed: onSave,
-                        child: Text('保存到本地', style: FeaturePageStyle.action()),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('保存到本地', softWrap: false, style: FeaturePageStyle.action()),
+                        ),
                       ),
                     ),
                   ],
@@ -690,15 +808,72 @@ class _ResultCard extends StatelessWidget {
   }
 }
 
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({
+    required this.count,
+    required this.busy,
+    required this.onDownload,
+    required this.onDelete,
+  });
+
+  final int count;
+  final bool busy;
+  final VoidCallback onDownload;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.card,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        FeaturePageStyle.s(16),
+        FeaturePageStyle.s(10),
+        FeaturePageStyle.s(16),
+        FeaturePageStyle.s(10) + bottomPadding,
+      ),
+      child: Row(
+        children: [
+          Text('已选 $count 张', style: FeaturePageStyle.bodyBold()),
+          const Spacer(),
+          AppOutlinedButton(
+            onPressed: busy || count == 0 ? null : onDownload,
+            child: Text('下载', style: FeaturePageStyle.action()),
+          ),
+          SizedBox(width: FeaturePageStyle.s(10)),
+          AppFilledButton(
+            onPressed: busy || count == 0 ? null : onDelete,
+            style: FilledButton.styleFrom(backgroundColor: AppColors.priceRed),
+            child: Text(busy ? '处理中…' : '删除', style: FeaturePageStyle.action(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ArtworkGrid extends StatelessWidget {
-  const _ArtworkGrid({required this.artworks, required this.onTap});
+  const _ArtworkGrid({
+    required this.artworks,
+    required this.selecting,
+    required this.selectedIds,
+    required this.onTap,
+  });
 
   final List<AiArtwork> artworks;
+  final bool selecting;
+  final Set<String> selectedIds;
   final ValueChanged<AiArtwork> onTap;
 
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
+      // 坑：GridView 不写 padding 时会自动拿状态栏高度当顶部留白，
+      // 本网格又嵌在整页滚动里，作品区上方会多出一条空带，必须显式归零。
+      padding: EdgeInsets.zero,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: artworks.length,
@@ -710,13 +885,43 @@ class _ArtworkGrid extends StatelessWidget {
       ),
       itemBuilder: (context, index) {
         final artwork = artworks[index];
+        final selected = selecting && selectedIds.contains(artwork.id);
         return Material(
           color: AppColors.card,
           borderRadius: BorderRadius.circular(FeaturePageStyle.s(12)),
           clipBehavior: Clip.antiAlias,
           child: AppInkWell(
             onTap: () => onTap(artwork),
-            child: _ArtworkImage(imagePath: artwork.imagePath),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _ArtworkImage(imagePath: artwork.imagePath),
+                if (selected)
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.primary, width: 2.5),
+                      borderRadius: BorderRadius.circular(FeaturePageStyle.s(12)),
+                    ),
+                  ),
+                if (selecting)
+                  Positioned(
+                    right: FeaturePageStyle.s(6),
+                    top: FeaturePageStyle.s(6),
+                    child: Container(
+                      width: FeaturePageStyle.s(22),
+                      height: FeaturePageStyle.s(22),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: selected ? AppColors.primary : Colors.black.withValues(alpha: 0.35),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: selected
+                          ? Icon(Icons.check, size: FeaturePageStyle.s(14), color: Colors.white)
+                          : null,
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },

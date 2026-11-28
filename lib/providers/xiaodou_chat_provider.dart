@@ -34,44 +34,12 @@ class XiaodouChatProvider extends ChangeNotifier {
   bool _historyReady = false;
   Map<String, dynamic>? _starwish;
 
-  // 进门盘点（长记性）：进小豆页时拉一次，没办完的事挂在首页区顶部；
-  // 用户点叉关掉就不再打扰（本次打开内有效）。
-  List<BriefingMatter> _briefingMatters = [];
-  bool _briefingDismissed = false;
-
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   List<XiaodouChatSession> get sessions => List.unmodifiable(_sessions);
   bool get sending => _sending;
   String? get error => _error;
   bool get historyReady => _historyReady;
   String? get currentSessionId => _currentSessionId;
-  List<BriefingMatter> get briefingMatters => List.unmodifiable(_briefingMatters);
-  bool get briefingDismissed => _briefingDismissed;
-
-  // 每次打开小豆页都重新盘一遍（页面 initState 调）：刚付完的订单
-  // 不再挂着、刚建的待付款能及时出现，别拿旧盘点糊弄人。
-  void refreshBriefing() {
-    if (_userKey == null) return;
-    _loadBriefing();
-  }
-
-  void dismissBriefing() {
-    if (_briefingDismissed) return;
-    _briefingDismissed = true;
-    notifyListeners();
-  }
-
-  // 盘点是锦上添花：拉不到就当没事发生，绝不挡聊天、不报错。
-  Future<void> _loadBriefing() async {
-    try {
-      final matters = await _service.fetchBriefing();
-      _briefingMatters = matters;
-      _briefingDismissed = false;
-      notifyListeners();
-    } catch (_) {
-      _briefingMatters = [];
-    }
-  }
 
   Future<void> bindUser(String? userId) async {
     if (_userKey == userId) return;
@@ -80,12 +48,6 @@ class XiaodouChatProvider extends ChangeNotifier {
     await _loadHistory();
     _initSession();
     notifyListeners();
-    // 换人/首次绑定后盘一遍没办完的事（不 await，回来自己刷新界面）。
-    if (userId != null) {
-      _loadBriefing();
-    } else {
-      _briefingMatters = [];
-    }
   }
 
   Future<void> send(

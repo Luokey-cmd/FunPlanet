@@ -4,7 +4,7 @@ import { authRequired } from '../middleware/auth.js';
 import { formatChinaDate } from '../utils/datetime.js';
 import { fail, ok } from '../utils/response.js';
 import { log } from '../utils/log.js';
-import { formatWanxErrorMessage, generateWanxImage, persistRemoteImage } from '../utils/wanx-image.js';
+import { deletePersistedArtwork, formatWanxErrorMessage, generateWanxImage, persistRemoteImage } from '../utils/wanx-image.js';
 
 const router = Router();
 
@@ -12,8 +12,8 @@ const DAILY_LIMIT = 20;
 const MAX_PROMPT_LEN = 500;
 // 画幅白名单：只认 App 画幅预设这五种尺寸，乱传一律回落方图（与 lib/models/ai_artwork.dart 的 aiRatioPresets 对齐，改尺寸两边一起改）。
 const ALLOWED_SIZES = new Set(['1280*1280', '960*1280', '1280*960', '1280*720', '720*1280']);
-// 单次最多出 2 张候选：逐张单独调模型（不赌 n 参数在多模态接口上的支持情况），每张都计入每日张数。
-const MAX_COUNT_PER_DRAW = 2;
+// 单次只出 1 张（2026-11-28 hx 点名去掉两张候选）：App 不再传别的张数，这里也钉死。
+const MAX_COUNT_PER_DRAW = 1;
 
 function serializeArtwork(row) {
   return {
@@ -61,6 +61,29 @@ router.get('/artworks', authRequired, async (req, res) => {
   ok(res, { artworks: rows.map(serializeArtwork) });
 });
 
+// 批量删除自己的作品（App「我的作品」多选删除）：只删属于当前用户的行，
+// 磁盘上的成图文件顺手清掉；混进别人的 id 会被过滤掉、不报错。
+router.post('/artworks/delete', authRequired, async (req, res) => {
+  const rawIds = Array.isArray(req.body?.ids) ? req.body.ids : [];
+  const ids = [...new Set(rawIds.map((id) => String(id)).filter(Boolean))].slice(0, 50);
+  if (ids.length === 0) {
+    fail(res, 400, '请选择要删除的作品');
+    return;
+  }
+  const rows = await prisma.aiArtwork.findMany({
+    where: { id: { in: ids }, userId: req.user.sub },
+    select: { id: true, imagePath: true },
+  });
+  if (rows.length > 0) {
+    await prisma.aiArtwork.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
+    for (const row of rows) {
+      deletePersistedArtwork(row.imagePath);
+    }
+  }
+  log.info('AI绘画', `用户 id ${req.user.sub} 删除作品 ${rows.length} 张`);
+  ok(res, { deleted: rows.length });
+});
+
 router.post('/draw', authRequired, async (req, res) => {
   const prompt = String(req.body?.prompt ?? '').trim();
   const style = String(req.body?.style ?? '').trim().slice(0, 32);
@@ -82,7 +105,7 @@ router.post('/draw', authRequired, async (req, res) => {
     return;
   }
 
-  // 画幅与张数（2026-11-26 新增）：size 只认白名单；count 钳在 1～2，再按今日剩余张数收口。
+  // 画幅与张数：size 只认白名单；count 钳在 1（已去掉两张候选），再按今日剩余张数收口。
   const requestedSize = String(req.body?.size ?? '').trim();
   const size = ALLOWED_SIZES.has(requestedSize) ? requestedSize : (process.env.WANX_SIZE || '1280*1280');
   const requestedCount = Math.min(Math.max(Number(req.body?.count) || 1, 1), MAX_COUNT_PER_DRAW);
@@ -123,7 +146,7 @@ router.post('/draw', authRequired, async (req, res) => {
     if (artworks.length === 0) throw lastError ?? new Error('生成失败，请稍后重试');
 
     ok(res, {
-      // artwork 保留第一张兼容老版 App；artworks 是本批全部成图，新版 App 用它一次展示多张候选。
+      // artwork 保留第一张兼容老版 App；artworks 是本批成图（现恒 1 张），新版 App 用它展示结果。
       artwork: serializeArtwork(artworks[0]),
       artworks: artworks.map(serializeArtwork),
       remainingToday: Math.max(0, DAILY_LIMIT - used - artworks.length),

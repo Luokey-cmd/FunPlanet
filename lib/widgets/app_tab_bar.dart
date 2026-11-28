@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/support_chat_provider.dart';
 import '../providers/user_provider.dart';
-import '../providers/xiaodou_chat_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_scale.dart';
 import '../theme/app_theme.dart';
@@ -57,14 +56,13 @@ class AppTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalCount = context.watch<CartProvider>().totalCount;
-    // 消息角标 = 消息页四行角标之和（hx 2026-11-23 定：内外必须一致；
-    // 2026-11-26 社区行加未读回复角标后扩为四路）：
-    // 未读通知 + 客服未读 + 小豆盘点事项数（待付款笔数 + 快到期券张数）
-    // + 社区未读回复数（我的帖子收到的他人新评论，进社区页即清零）。
-    // 小豆事项办完/过期后盘点自然归零、社区看过即消，角标跟着消，不会赖着不走。
+    // 消息角标 = 消息页各行角标之和（hx 2026-11-23 定：内外必须一致；
+    // 2026-11-26 社区行加未读回复角标后扩为多路）：
+    // 未读通知 + 客服未读 + 社区未读回复数（我的帖子收到的他人新评论，
+    // 进社区页即清零）。小豆盘点事项一路已于 2026-11-28 随小豆提醒整行
+    // 删除同步去掉；剩下的角标看过即消，不会赖着不走。
     final messageCount = context.watch<UserProvider>().unreadNotificationCount +
         context.watch<SupportChatProvider>().supportUnreadTotal +
-        context.watch<XiaodouChatProvider>().briefingMatters.length +
         context.watch<UserProvider>().communityUnreadReplies;
 
     return Container(

@@ -157,3 +157,18 @@ export async function persistRemoteImage(remoteUrl, userId) {
 
   return `assets/images/ai-art/${safeUserId}/${filename}`;
 }
+
+// 删除 persistRemoteImage 存下的成图文件（用户在 App 里删作品时连文件一起清）。
+// 输入：作品记录里的 imagePath（形如 assets/images/ai-art/<用户>/<文件>.png）；无返回值。
+// 坑：只认 ai-art 目录内的路径——拼好绝对路径后校验仍在该目录里，防路径穿越删到别处；
+// 文件不存在或删除失败都静默：删记录才是正事，残留文件只是占一点磁盘。
+export function deletePersistedArtwork(imagePath) {
+  try {
+    const artRoot = path.join(assetsRoot, 'images', 'ai-art');
+    const target = path.resolve(path.dirname(assetsRoot), String(imagePath ?? ''));
+    if (!target.startsWith(artRoot + path.sep)) return;
+    fs.rmSync(target, { force: true });
+  } catch {
+    // 删文件失败不挡业务，静默即可。
+  }
+}

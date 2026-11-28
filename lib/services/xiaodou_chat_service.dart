@@ -165,47 +165,6 @@ class CloudChatMessage {
   }
 }
 
-/// 进门盘点的一条事项（Agent 第三步「长记性」）：一笔待付款订单，
-/// 或一张快过期的券。字段与服务端 GET /api/chat/briefing 对齐，
-/// App 只负责展示，不自己算金额和到期时间。
-class BriefingMatter {
-  const BriefingMatter({
-    required this.kind,
-    this.orderId,
-    this.orderNo,
-    this.total = 0,
-    this.summary = '',
-    this.title = '',
-    this.condition = '',
-    this.expireAt,
-  });
-
-  /// pending_order 待付款订单 / expiring_coupon 将过期的券
-  final String kind;
-  final String? orderId;
-  final String? orderNo;
-  final double total;
-  final String summary;
-  final String title;
-  final String condition;
-  final DateTime? expireAt;
-
-  bool get isPendingOrder => kind == 'pending_order';
-
-  factory BriefingMatter.fromJson(Map<String, dynamic> json) {
-    return BriefingMatter(
-      kind: json['kind'] as String? ?? '',
-      orderId: json['orderId'] as String?,
-      orderNo: json['orderNo'] as String?,
-      total: (json['total'] as num?)?.toDouble() ?? 0,
-      summary: json['summary'] as String? ?? '',
-      title: json['title'] as String? ?? '',
-      condition: json['condition'] as String? ?? '',
-      expireAt: DateTime.tryParse(json['expireAt'] as String? ?? ''),
-    );
-  }
-}
-
 class XiaodouChatService {
   XiaodouChatService({http.Client? client, TokenStorage? tokenStorage})
       : _client = client ?? http.Client(),
@@ -230,15 +189,6 @@ class XiaodouChatService {
     final list = conversation['messages'] as List<dynamic>? ?? [];
     return list
         .map((e) => CloudChatMessage.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  // 拉进门盘点：没办完的事（待付款订单、将过期的券），没有就空列表。
-  Future<List<BriefingMatter>> fetchBriefing() async {
-    final json = await _getJson('/api/chat/briefing');
-    final list = json['matters'] as List<dynamic>? ?? [];
-    return list
-        .map((e) => BriefingMatter.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
