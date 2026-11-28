@@ -128,9 +128,11 @@
 
 商城页可按 7 大类筛选商品，也能按系列、角色与品类搜索；消息页把交易通知、客服中心与 AI 社区互动汇总在一处，未读数同步显示在底部导航角标上。下图从左到右依次是首页、商城、消息：
 
-<img src="screenshots/007.jpg" alt="步骤 7：首页" width="32%" />
-<img src="screenshots/016.jpg" alt="商城页：分类筛选与商品列表" width="32%" />
-<img src="screenshots/017.jpg" alt="消息页：交易通知、客服与社区互动汇总" width="32%" />
+<table><tr>
+<td><img src="screenshots/007.jpg" alt="步骤 7：首页" width="100%" /></td>
+<td><img src="screenshots/016.jpg" alt="商城页：分类筛选与商品列表" width="100%" /></td>
+<td><img src="screenshots/017.jpg" alt="消息页：交易通知、客服与社区互动汇总" width="100%" /></td>
+</tr></table>
 
 #### 步骤 8 · 商品详情
 
@@ -138,9 +140,11 @@
 
 加入购物车后，可在购物车里调整数量、确认合计金额，再去结算；商品页还可查看真实用户评价与详细参数（规格、材质、比例、包装等）。下图从左到右依次是商品详情、购物车、评价与参数：
 
-<img src="screenshots/015.jpg" alt="步骤 8：商品详情" width="32%" />
-<img src="screenshots/018.jpg" alt="购物车：确认商品与合计金额" width="32%" />
-<img src="screenshots/019.jpg" alt="商品评价与详情参数" width="32%" />
+<table><tr>
+<td><img src="screenshots/015.jpg" alt="步骤 8：商品详情" width="100%" /></td>
+<td><img src="screenshots/018.jpg" alt="购物车：确认商品与合计金额" width="100%" /></td>
+<td><img src="screenshots/019.jpg" alt="商品评价与详情参数" width="100%" /></td>
+</tr></table>
 
 #### 步骤 9 · 小豆 AI 导购（Agent 选品）
 
@@ -152,10 +156,12 @@
 
 下图从左到右依次是翻牌、翻开后的详细卡、小豆代办整理、演示完成领奖励：
 
-<img src="screenshots/020.jpg" alt="新手引导：点一张牌，整屏翻牌" width="24%" />
-<img src="screenshots/021.jpg" alt="翻牌后的详细卡：价格、口碑标签与立即购买" width="24%" />
-<img src="screenshots/022.jpg" alt="小豆代办：整理优惠券与收货地址，最后点去下单" width="24%" />
-<img src="screenshots/023.jpg" alt="演示完成：20 趣玩币已发放到钱包" width="24%" />
+<table><tr>
+<td><img src="screenshots/020.jpg" alt="新手引导：点一张牌，整屏翻牌" width="100%" /></td>
+<td><img src="screenshots/021.jpg" alt="翻牌后的详细卡：价格、口碑标签与立即购买" width="100%" /></td>
+<td><img src="screenshots/022.jpg" alt="小豆代办：整理优惠券与收货地址，最后点去下单" width="100%" /></td>
+<td><img src="screenshots/023.jpg" alt="演示完成：20 趣玩币已发放到钱包" width="100%" /></td>
+</tr></table>
 
 #### 步骤 10 · 小豆 AI 答疑
 
