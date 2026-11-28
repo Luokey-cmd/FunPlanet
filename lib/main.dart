@@ -18,8 +18,17 @@ import 'utils/app_stability.dart';
 import 'utils/app_log.dart';
 import 'widgets/click_effect/click_effect.dart';
 import 'widgets/guide_overlay.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 void main() {
+  // 【调试抓包开关】只在调试版生效：让 App 的所有请求先经过电脑上的
+  // Fiddler（192.168.226.184:8888），方便在 Fiddler 里看请求和返回。
+  // 正式包里 kDebugMode 是 false，这段不执行，不影响正式版本。
+  // 不想抓包时把这几行注释掉；电脑 IP 变了就改 _FiddlerProxyOverrides 里的地址。
+  if (kDebugMode) {
+    HttpOverrides.global = _FiddlerProxyOverrides();
+  }
   AppStability.runGuarded(() async {
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -92,5 +101,18 @@ class FunPlanetApp extends StatelessWidget {
         home: const FirstEntryIntroGate(),
       ),
     );
+  }
+}
+
+/// 调试专用：把 App 创建的网络客户端指向 Fiddler 代理。
+/// 输入：系统默认的 HttpClient；输出：设好代理的同一个 client。
+/// 坑：Fiddler 没开时，App 的请求会全部失败（和手机代理开着却关
+/// Fiddler 一个道理）；地址是电脑局域网 IP，换了网络要同步改这里。
+class _FiddlerProxyOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    final client = super.createHttpClient(context);
+    client.findProxy = (uri) => 'PROXY 192.168.226.184:8888';
+    return client;
   }
 }
