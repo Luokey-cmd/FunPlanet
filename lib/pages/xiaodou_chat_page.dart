@@ -1044,17 +1044,21 @@ class _VisionChoice extends StatelessWidget {
 /// ——收货人、手机号、省市区、详细地址——给用户看清楚小豆整理好
 /// 的是哪一份；只列不填（hx 2026-11-27 17:10 点名：不要一段话
 /// 概括、需要填的地方不让他填、括号注明只是演示）。
-/// 数据取用户存好的默认地址（拆出省市区与街道段展示）；没有默认
-/// 地址时，收货人/手机号按账号资料列、省市区与详细地址留空位。
+/// 收货人/手机号一律按账号资料列：收货人 = 账号昵称、手机号 = 注册
+/// 手机号，不取默认地址里存的那份（hx 2026-11-28 点名：地址里的收件人
+/// 可能是测试时随手填的、与账号本人对不上，看着像乱写；演示虽不真买，
+/// 这两项也要准确）。省市区/详细地址仍取默认地址拆出展示；没有默认
+/// 地址时这两行留空位。
 class _GuideDemoAddressCard extends StatelessWidget {
   const _GuideDemoAddressCard();
 
   @override
   Widget build(BuildContext context) {
-    final address = context.watch<UserProvider>().defaultAddress;
+    final user = context.watch<UserProvider>();
+    final address = user.defaultAddress;
     final account = context.watch<AuthProvider>().currentUser;
-    final name = address?.name ?? account?.nickname ?? '——';
-    final phone = address?.phone ?? account?.phone ?? '——';
+    final name = (account?.nickname.isNotEmpty ?? false) ? account!.nickname : user.nickname;
+    final phone = (account?.phone.isNotEmpty ?? false) ? account!.phone : '——';
     var region = '——';
     var street = '——';
     final detail = address?.detail ?? '';

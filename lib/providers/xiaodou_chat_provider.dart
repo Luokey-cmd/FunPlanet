@@ -577,7 +577,7 @@ class XiaodouChatProvider extends ChangeNotifier {
     await Future<void>.delayed(const Duration(milliseconds: 800));
     _messages.add(const ChatMessage(
       role: ChatRole.assistant,
-      content: '收货地址也整理好了，就是你存好的这一份：',
+      content: '收货地址也整理好了，按你账号的资料写的，你看一下：',
       isGuideDemoAddress: true,
     ));
     notifyListeners();

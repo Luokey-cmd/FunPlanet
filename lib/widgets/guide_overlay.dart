@@ -160,7 +160,9 @@ class _GuideOverlayState extends State<GuideOverlay> {
                   GestureDetector(
                     onTap: () => guide.askSkip(),
                     child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: AppScale.s(12), vertical: AppScale.s(6)),
+                      // 按钮放大约 3 倍（hx 2026-11-28 点名）：字号 12→17、
+                      // 内边距横 12→24 / 竖 6→14，整体面积约 3 倍、更好点。
+                      padding: EdgeInsets.symmetric(horizontal: AppScale.s(24), vertical: AppScale.s(14)),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.45),
                         borderRadius: BorderRadius.circular(999),
@@ -168,7 +170,7 @@ class _GuideOverlayState extends State<GuideOverlay> {
                       ),
                       child: Text(
                         '跳过引导',
-                        style: TextStyle(fontSize: AppScale.t(12), fontWeight: FontWeight.w600, color: Colors.white),
+                        style: TextStyle(fontSize: AppScale.t(17), fontWeight: FontWeight.w700, color: Colors.white),
                       ),
                     ),
                   ),
