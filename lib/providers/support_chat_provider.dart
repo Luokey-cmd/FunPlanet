@@ -282,22 +282,59 @@ class SupportChatProvider extends ChangeNotifier {
     if (conv == null || _loading) return;
 
     try {
-      final after = _messages.isEmpty ? null : _messages.last.createdAt;
-      final incoming = await _service.fetchMessages(conv.id, after: after);
+      // 全量拉取而不是只拉新增：撤回改的是旧消息的状态（recalledAt），
+      // 只按时间拉新增，对方撤回了这边永远看不到。客服会话消息量小，
+      // 全量换状态同步划算；合并按 id 原位更新状态、新消息追加，
+      // 发送中的本地临时消息不在服务端列表里，不受影响。
+      final incoming = await _service.fetchMessages(conv.id);
       if (incoming.isEmpty) return;
 
+      var changed = false;
+      var hasNewAdmin = false;
       final existingIds = _messages.map((m) => m.id).toSet();
-      final fresh = incoming.where((m) => !existingIds.contains(m.id)).toList();
-      if (fresh.isEmpty) return;
+      for (final serverMessage in incoming) {
+        if (existingIds.contains(serverMessage.id)) {
+          final index = _messages.indexWhere((m) => m.id == serverMessage.id);
+          if (index >= 0 && _messages[index].recalledAt != serverMessage.recalledAt) {
+            _messages[index] = serverMessage;
+            changed = true;
+          }
+        } else {
+          _messages.add(serverMessage);
+          existingIds.add(serverMessage.id);
+          changed = true;
+          if (serverMessage.senderRole == SupportSenderRole.admin) {
+            hasNewAdmin = true;
+          }
+        }
+      }
+      if (!changed) return;
 
-      final hasAdmin = fresh.any((m) => m.senderRole == SupportSenderRole.admin);
-      _messages.addAll(fresh);
-      if (hasAdmin) {
+      if (hasNewAdmin) {
         await _service.markRead(conv.id);
       }
       await _persistCache();
       notifyListeners();
     } catch (_) {}
+  }
+
+  // 撤回自己发的消息：调服务端接口，成功后原位换成撤回态并落缓存。
+  // 输入：要撤回的消息；输出：成功返回 null，失败返回给用户看的文案（页面弹提示）。
+  Future<String?> recallMessage(SupportMessage target) async {
+    final conv = _conversation;
+    if (conv == null) return '会话不存在';
+    try {
+      final updated = await _service.recallMessage(conv.id, target.id);
+      final index = _messages.indexWhere((m) => m.id == target.id);
+      if (index >= 0) {
+        _messages[index] = updated;
+      }
+      await _persistCache();
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return e.toString().replaceFirst('ApiException: ', '');
+    }
   }
 
   void _stopPolling() {

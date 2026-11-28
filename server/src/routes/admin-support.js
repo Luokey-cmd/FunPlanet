@@ -2,10 +2,12 @@ import { Router } from 'express';
 import { prisma } from '../db.js';
 import { adminAuthRequired } from '../middleware/adminAuth.js';
 import { fail, ok } from '../utils/response.js';
+import { log } from '../utils/log.js';
 import { saveSupportChatImage } from '../utils/support-media.js';
 import {
   appendMessage,
   listAdminNotifications,
+  recallSupportMessage,
   serializeConversation,
   serializeMessage,
   supportUserInclude,
@@ -109,6 +111,29 @@ router.post('/conversations/:id/messages', adminAuthRequired, async (req, res) =
     });
   } catch (error) {
     fail(res, 400, error.message || '发送失败');
+  }
+});
+
+// 撤回客服自己刚发的消息（2 分钟内）：规则与用户端共用 recallSupportMessage。
+router.post('/conversations/:id/messages/:messageId/recall', adminAuthRequired, async (req, res) => {
+  const conversation = await prisma.supportConversation.findUnique({
+    where: { id: req.params.id },
+  });
+  if (!conversation) {
+    fail(res, 404, '会话不存在');
+    return;
+  }
+
+  try {
+    const updated = await recallSupportMessage({
+      conversationId: conversation.id,
+      messageId: req.params.messageId,
+      senderRole: 'admin',
+    });
+    log.info('客服', `客服撤回一条消息（会话 id ${conversation.id}）`);
+    ok(res, { message: serializeMessage(updated) });
+  } catch (error) {
+    fail(res, 400, error.message || '撤回失败');
   }
 });
 

@@ -44,6 +44,8 @@ export default function SupportPage({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  // 消息右键菜单：记录弹出位置与目标消息，null 表示没打开。
+  const [menu, setMenu] = useState<{ x: number; y: number; message: SupportMessage } | null>(null);
 
   const conversationsQuery = useQuery({
     queryKey: ["admin-support-conversations"],
@@ -69,6 +71,13 @@ export default function SupportPage({
   useEffect(() => {
     setShowStickers(false);
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [menu]);
 
   useEffect(() => {
     if (!previewImage) return;
@@ -111,6 +120,26 @@ export default function SupportPage({
     },
     onError: (e: Error) => toast.error(e instanceof ApiError ? e.message : "发送失败"),
   });
+
+  const recallMutation = useMutation({
+    mutationFn: ({ id, messageId }: { id: string; messageId: string }) =>
+      adminApi.recallSupportMessage(id, messageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-support-messages", selectedId] });
+      queryClient.invalidateQueries({ queryKey: ["admin-support-conversations"] });
+    },
+    onError: (e: Error) => toast.error(e instanceof ApiError ? e.message : "撤回失败"),
+  });
+
+  const handleCopyMessage = async (message: SupportMessage) => {
+    setMenu(null);
+    try {
+      await navigator.clipboard.writeText(message.content);
+      toast.success("已复制");
+    } catch {
+      toast.error("复制失败");
+    }
+  };
 
   const messages = messagesQuery.data?.messages ?? [];
   const active = conversations.find((c) => c.id === selectedId) ?? messagesQuery.data?.conversation;
@@ -222,7 +251,12 @@ export default function SupportPage({
                   <p className="text-sm text-muted-foreground text-center py-8">加载消息…</p>
                 ) : (
                   messages.map((msg) => (
-                    <MessageBubble key={msg.id} message={msg} onPreviewImage={setPreviewImage} />
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      onPreviewImage={setPreviewImage}
+                      onShowMenu={(message, x, y) => setMenu({ x, y, message })}
+                    />
                   ))
                 )}
               </div>
@@ -287,6 +321,37 @@ export default function SupportPage({
       </div>
 
       {previewImage && <ImagePreviewOverlay src={previewImage} onClose={() => setPreviewImage(null)} />}
+      {menu && (
+        <div
+          className="fixed z-[110] min-w-[120px] rounded-xl border border-border bg-card shadow-custom py-1"
+          style={{
+            left: Math.min(menu.x, window.innerWidth - 140),
+            top: Math.min(menu.y, window.innerHeight - 110),
+          }}
+        >
+          {messageMenuActions(menu.message).canCopy && (
+            <button
+              type="button"
+              className="w-full px-4 py-2 text-left text-sm hover:bg-muted"
+              onClick={() => void handleCopyMessage(menu.message)}
+            >
+              复制
+            </button>
+          )}
+          {messageMenuActions(menu.message).canRecall && (
+            <button
+              type="button"
+              className="w-full px-4 py-2 text-left text-sm hover:bg-muted"
+              onClick={() => {
+                recallMutation.mutate({ id: menu.message.conversationId, messageId: menu.message.id });
+                setMenu(null);
+              }}
+            >
+              撤回
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -357,12 +422,26 @@ function StickerPanel({ onPick }: { onPick: (emoji: string) => void }) {
   );
 }
 
+// 右键菜单可用项判定，气泡（决定要不要拦下右键）与菜单（决定显示哪些项）共用一份口径：
+// 文字/表情可复制（内容就是文本），图片不给复制（有点击看大图）；客服自己发的、
+// 2 分钟内可撤回——时限最终以服务端判定为准，这里先筛掉必然失败的，免得菜单误导。
+function messageMenuActions(message: SupportMessage) {
+  const canCopy = message.messageType !== "image" && !message.recalledAt;
+  const canRecall =
+    message.senderRole === "admin" &&
+    !message.recalledAt &&
+    Date.now() - new Date(message.createdAt).getTime() <= 2 * 60 * 1000;
+  return { canCopy, canRecall, hasAny: canCopy || canRecall };
+}
+
 function MessageBubble({
   message,
   onPreviewImage,
+  onShowMenu,
 }: {
   message: SupportMessage;
   onPreviewImage: (src: string) => void;
+  onShowMenu: (message: SupportMessage, x: number, y: number) => void;
 }) {
   const isAdmin = message.senderRole === "admin";
   const isSticker = message.messageType === "sticker";
@@ -370,8 +449,26 @@ function MessageBubble({
   const stickerEmoji = getSupportStickerEmoji(message.stickerId) ?? message.content;
   const imageSrc = isImage && message.mediaUrl ? resolveAssetUrl(message.mediaUrl) : "";
 
+  // 已撤回：不再画气泡，居中一行灰字占位（谁撤的按视角说）。
+  if (message.recalledAt) {
+    return (
+      <div className="flex justify-center">
+        <p className="text-xs text-muted-foreground">
+          {isAdmin ? "你撤回了一条消息" : "用户撤回了一条消息"}
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}
+      onContextMenu={(e) => {
+        if (!messageMenuActions(message).hasAny) return;
+        e.preventDefault();
+        onShowMenu(message, e.clientX, e.clientY);
+      }}
+    >
       <div
         className={`max-w-[75%] ${
           isSticker ? "px-1 py-1 bg-transparent" : "px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed"

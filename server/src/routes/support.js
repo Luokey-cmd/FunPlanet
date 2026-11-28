@@ -7,6 +7,7 @@ import { saveSupportChatImage } from '../utils/support-media.js';
 import {
   appendMessage,
   getOrCreateConversation,
+  recallSupportMessage,
   serializeConversation,
   serializeMessage,
 } from '../utils/support-chat.js';
@@ -121,6 +122,27 @@ router.post('/conversations/:id/messages', authRequired, async (req, res) => {
     });
   } catch (error) {
     fail(res, 400, error.message || '发送失败');
+  }
+});
+
+// 撤回自己刚发的消息（2 分钟内）：标记 recalledAt，两端轮询到后显示占位。
+router.post('/conversations/:id/messages/:messageId/recall', authRequired, async (req, res) => {
+  const conversation = await loadUserConversation(req.user.sub, req.params.id);
+  if (!conversation) {
+    fail(res, 404, '会话不存在');
+    return;
+  }
+
+  try {
+    const updated = await recallSupportMessage({
+      conversationId: conversation.id,
+      messageId: req.params.messageId,
+      senderRole: 'user',
+    });
+    log.info('客服', `用户撤回一条消息（会话 id ${conversation.id}）`);
+    ok(res, { message: serializeMessage(updated) });
+  } catch (error) {
+    fail(res, 400, error.message || '撤回失败');
   }
 });
 

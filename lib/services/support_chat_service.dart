@@ -44,6 +44,17 @@ class SupportChatService {
         .toList();
   }
 
+  // 撤回自己刚发的消息（发送后 2 分钟内，规则与时限都在服务端判定）。
+  // 输入：会话 id、消息 id；输出：撤回后的消息（带 recalledAt、原文已清空）。
+  Future<SupportMessage> recallMessage(String conversationId, String messageId) async {
+    final data = await _client.post(
+      '/api/support/conversations/$conversationId/messages/$messageId/recall',
+      {},
+      auth: true,
+    );
+    return SupportMessage.fromJson(data['message'] as Map<String, dynamic>);
+  }
+
   Future<String> uploadImage(List<int> bytes, String mimeType) async {
     final data = await _client.post('/api/support/upload', {
       'imageBase64': base64Encode(bytes),

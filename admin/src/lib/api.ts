@@ -317,6 +317,11 @@ export const adminApi = {
     request<{ conversation: SupportConversation }>(`/support/conversations/${id}/read`, {
       method: "POST",
     }),
+  recallSupportMessage: (id: string, messageId: string) =>
+    request<{ message: SupportMessage }>(
+      `/support/conversations/${id}/messages/${messageId}/recall`,
+      { method: "POST" },
+    ),
 };
 
 export interface AdminSupportNotification {
@@ -356,6 +361,8 @@ export interface SupportMessage {
   mediaUrl: string | null;
   stickerId: string | null;
   createdAt: string;
+  // 撤回时间（ISO 字符串）：非空表示已撤回，原文服务端不再下发，只显示占位。
+  recalledAt: string | null;
 }
 
 export type AdminRole = "super" | "operator" | "support";

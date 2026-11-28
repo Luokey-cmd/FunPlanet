@@ -2,6 +2,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../data/support_stickers.dart';
@@ -10,6 +11,7 @@ import '../providers/support_chat_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/feature_page_style.dart';
 import '../utils/media_url.dart';
+import '../utils/snackbar_utils.dart';
 import '../widgets/app_network_image.dart';
 import '../widgets/sparkle_background.dart';
 import 'image_preview_page.dart';
@@ -89,6 +91,62 @@ class _SupportChatPageState extends State<SupportChatPage> {
     chat.send(text);
   }
 
+  void _toast(String text) {
+    showTopSnackBar(
+      context,
+      content: Text(
+        text,
+        style: TextStyle(fontSize: FeaturePageStyle.t(14), fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  // 长按消息弹操作菜单：文字/表情可复制（内容就是文本）；图片不给复制
+  // （有查看大图）；自己发的、2 分钟内的可撤回（最终时限服务端判定，
+  // 这里先按同一口径筛一遍，免得菜单里出现点了必失败的项）。
+  // 两样都不可用（比如客服的旧消息）就不弹，免得弹出个空菜单。
+  void _showMessageActions(SupportMessage message) {
+    if (message.isRecalled) return;
+    final chat = context.read<SupportChatProvider>();
+    final canCopy = message.messageType != SupportMessageType.image;
+    final canRecall = message.senderRole == SupportSenderRole.user &&
+        DateTime.now().difference(message.createdAt) <= const Duration(minutes: 2);
+    if (!canCopy && !canRecall) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (canCopy)
+              ListTile(
+                leading: const Icon(Icons.content_copy),
+                title: const Text('复制'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  await Clipboard.setData(ClipboardData(text: message.content));
+                  if (!mounted) return;
+                  _toast('已复制');
+                },
+              ),
+            if (canRecall)
+              ListTile(
+                leading: const Icon(Icons.undo),
+                title: const Text('撤回'),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  final error = await chat.recallMessage(message);
+                  if (!mounted) return;
+                  if (error != null) _toast(error);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickImage(SupportChatProvider chat) async {
     if (chat.sending) return;
     // 选图一律走 image_picker（系统相册选择器）：file_picker 安卓端选图后
@@ -160,6 +218,7 @@ class _SupportChatPageState extends State<SupportChatPage> {
                       : _MessageList(
                           controller: _scrollController,
                           messages: chat.messages,
+                          onLongPressMessage: _showMessageActions,
                         ),
             ),
             if (_showStickers)
@@ -253,10 +312,15 @@ class _ErrorState extends StatelessWidget {
 }
 
 class _MessageList extends StatelessWidget {
-  const _MessageList({required this.controller, required this.messages});
+  const _MessageList({
+    required this.controller,
+    required this.messages,
+    required this.onLongPressMessage,
+  });
 
   final ScrollController controller;
   final List<SupportMessage> messages;
+  final ValueChanged<SupportMessage> onLongPressMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -277,23 +341,42 @@ class _MessageList extends StatelessWidget {
       controller: controller,
       padding: EdgeInsets.all(FeaturePageStyle.s(16)),
       itemCount: messages.length,
-      itemBuilder: (context, index) => _MessageBubble(message: messages[index]),
+      itemBuilder: (context, index) => _MessageBubble(
+            message: messages[index],
+            onLongPress: () => onLongPressMessage(messages[index]),
+          ),
     );
   }
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
+  const _MessageBubble({required this.message, this.onLongPress});
 
   final SupportMessage message;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final isUser = message.senderRole == SupportSenderRole.user;
 
+    // 已撤回：不再画气泡，居中一行灰字占位（谁撤的按视角说）。
+    if (message.isRecalled) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: FeaturePageStyle.s(14)),
+        child: Center(
+          child: Text(
+            isUser ? '你撤回了一条消息' : '客服撤回了一条消息',
+            style: FeaturePageStyle.caption(),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.only(bottom: FeaturePageStyle.s(14)),
-      child: Row(
+      child: GestureDetector(
+        onLongPress: onLongPress,
+        child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
@@ -337,6 +420,7 @@ class _MessageBubble extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

@@ -10,6 +10,7 @@ function previewContent(content, max = 80) {
 }
 
 export function messagePreview(message) {
+  if (message.recalledAt) return '消息已撤回';
   const type = message.messageType ?? 'text';
   if (type === 'image') return '[图片]';
   if (type === 'sticker') {
@@ -19,17 +20,64 @@ export function messagePreview(message) {
 }
 
 export function serializeMessage(message) {
+  const recalled = Boolean(message.recalledAt);
   return {
     id: message.id,
     conversationId: message.conversationId,
     senderRole: message.senderRole,
     senderName: message.senderName ?? null,
     messageType: message.messageType ?? 'text',
-    content: message.content,
-    mediaUrl: message.mediaUrl ?? null,
-    stickerId: message.stickerId ?? null,
+    // 已撤回的消息原文一律不再下发：两端只拿到 recalledAt 并显示占位，
+    // 防止旧缓存或直接调接口还能看到被撤回的内容（表情靠 stickerId 还原，一并清空）。
+    content: recalled ? '' : message.content,
+    mediaUrl: recalled ? null : (message.mediaUrl ?? null),
+    stickerId: recalled ? null : (message.stickerId ?? null),
+    recalledAt: message.recalledAt ? message.recalledAt.toISOString() : null,
     createdAt: message.createdAt.toISOString(),
   };
+}
+
+// 撤回时限：发送后 2 分钟内可撤（与主流聊天软件一致），用户端与管理端共用。
+export const RECALL_WINDOW_MS = 2 * 60 * 1000;
+
+// 撤回一条客服消息（用户端、管理端共用）。
+// 输入：会话 id、消息 id、撤回方角色（'user' / 'admin'）；输出：更新后的消息行。
+// 规则：只能撤自己发的；已撤回不能重复撤；超时限拒绝。校验不过抛带中文文案的 Error，
+// 由路由层原样回给前端展示。撤回的若是会话最后一条，会话列表预览同步改成占位文案。
+export async function recallSupportMessage({ conversationId, messageId, senderRole }) {
+  const message = await prisma.supportMessage.findFirst({
+    where: { id: messageId, conversationId },
+  });
+  if (!message) {
+    throw new Error('消息不存在');
+  }
+  if (message.senderRole !== senderRole) {
+    throw new Error('只能撤回自己发的消息');
+  }
+  if (message.recalledAt) {
+    throw new Error('这条消息已经撤回过了');
+  }
+  if (Date.now() - message.createdAt.getTime() > RECALL_WINDOW_MS) {
+    throw new Error('消息发送超过 2 分钟，不能撤回了');
+  }
+
+  const updated = await prisma.supportMessage.update({
+    where: { id: message.id },
+    data: { recalledAt: new Date() },
+  });
+
+  const conversation = await prisma.supportConversation.findUnique({
+    where: { id: conversationId },
+    select: { lastMessageAt: true },
+  });
+  if (conversation?.lastMessageAt?.getTime() === message.createdAt.getTime()) {
+    await prisma.supportConversation.update({
+      where: { id: conversationId },
+      data: { lastMessagePreview: '消息已撤回' },
+    });
+  }
+
+  return updated;
 }
 
 export const supportUserInclude = {

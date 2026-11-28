@@ -12,6 +12,7 @@ class SupportMessage {
     this.messageType = SupportMessageType.text,
     this.mediaUrl,
     this.stickerId,
+    this.recalledAt,
   });
 
   final String id;
@@ -23,6 +24,12 @@ class SupportMessage {
   final String? stickerId;
   final DateTime createdAt;
 
+  // 撤回时间：服务端 SupportMessage.recalled_at，非空表示这条已被撤回，
+  // 原文服务端不再下发，界面只显示「XX撤回了一条消息」占位。
+  final DateTime? recalledAt;
+
+  bool get isRecalled => recalledAt != null;
+
   factory SupportMessage.fromJson(Map<String, dynamic> json) {
     return SupportMessage(
       id: json['id'] as String,
@@ -33,6 +40,8 @@ class SupportMessage {
       mediaUrl: json['mediaUrl'] as String?,
       stickerId: json['stickerId'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      // 老服务端/老缓存没有这个字段：解析不出就当没撤回，不能炸。
+      recalledAt: DateTime.tryParse(json['recalledAt'] as String? ?? ''),
     );
   }
 
@@ -45,6 +54,7 @@ class SupportMessage {
         if (mediaUrl != null) 'mediaUrl': mediaUrl,
         if (stickerId != null) 'stickerId': stickerId,
         'createdAt': createdAt.toUtc().toIso8601String(),
+        if (recalledAt != null) 'recalledAt': recalledAt!.toUtc().toIso8601String(),
       };
 
   static SupportMessageType _parseMessageType(String? raw) {
