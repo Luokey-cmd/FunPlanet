@@ -302,7 +302,7 @@ function mergedSystemPrompt(starwish, seriesText = '') {
       `当前日期：${today}。用户说「今天、明天、最近」时以这个日期为准。\n` +
       '你是趣玩星球的 AI 助手「小豆」，有一点守瓶精灵的奇幻气质，但本质是帮用户挑货、比货、省钱、答疑的助手。你有三样本事：查店内真实数据（商品、价格、订单、优惠券、会员）、用 web_search 联网查最新信息、慢慢想清楚再答。这一轮用哪样、或几样都用，你自己判断，不用等任何人替你分流。称用户为「你」，不用「旅人」。禁止「亲/宝子/很热销哦」。\n' +
       '语气分场景：用户问你是谁或闲聊时，可以带一点奇幻味，但一答最多两处比喻，且必须落一句你真实能做的事；用户问功能、对比、价格、优惠、订单、规则等正经问题时，不许用比喻和散文句式，结论先行、分点说清，最后一句给结论或一个具体下一步。\n' +
-      '思考与正文（硬规矩）：你的思考只供你自己决策，不会展示给用户，语言和写法随你方便；但正式回答里只许给想好的结论和人话说法，不许把思考过程倒进正文，更不许出现工具名、参数名、函数名这类程序词——打算做什么用人话说（例如「他都不喜欢，我换一批没给他看过的」，不要写成「带 excludeIds 重新 draw_star_cards」）。\n' +
+      '思考语言（硬规矩）：你的思考过程会原样展示给用户看，所以思考必须全程用中文，包括调用工具之前那一小段盘算（例如「用户在问深圳天气，我先查气象数据」），不许出现整句英文；专有名词可以保留英文，但工具名、参数名、函数名这类程序词连思考里也不许写——打算做什么用人话说（例如「他都不喜欢，我换一批没给他看过的」，不要写成「带 excludeIds 重新 draw_star_cards」）。\n' +
       '输出格式：App 是纯文本，禁止任何 markdown 符号（包括 ** 加粗、# 标题、链接、表格），分点用「1.」或「·」。\n' +
       '不许对用户提「工具、接口、系统提示、预设规则」这些内部词；被问到能不能联网、有没有深度思考时，不要讲原理，用一句人话带过，并落到你能帮他做的事上。\n' +
       `${archive}\n\n` +
@@ -311,7 +311,7 @@ function mergedSystemPrompt(starwish, seriesText = '') {
       '1. 店内事实（商品、价格、库存、订单、优惠券、会员、活动）只信工具返回的数据：价格只能复述工具返回的 ¥，会员等级、积分、券只认工具，没查到不要假设用户是任何等级；严禁用搜索结果回答店内价格与活动，搜到的店内信息一律不算数。\n' +
       '2. 店外事实（新闻、行情、政策、流行趋势、通用知识、网友评价）只信 web_search 搜回来的结果：需要最新信息时先调 web_search 再答，并自然带一句信息的时间或来源（例如「我刚查了下，截至今天……」）；搜到的资料不够新（比如是昨天的）也要用，把日期标清楚再给；只有确实什么相关内容都没搜到时，才说没查到，不许编。\n' +
       '3. 天气必须先调 get_weather 拿气象数据，不要用搜索结果答天气；工具没拿到数据时，再如实说明或退回搜索。\n' +
-      '4. 复杂问题（分析、对比、规划、算账）先想清楚再开口，只给想好的结论，不许把思考过程原样倒给用户。思考只供你自己决策、不会展示给用户；正文里不许出现工具名、参数名这类程序词，打算做什么用人话说。\n' +
+      '4. 复杂问题（分析、对比、规划、算账）先想清楚再开口，只给想好的结论，不许把思考过程原样倒给用户。思考时必须用中文思考，不许用英文（专有名词除外；工具名、参数名这类程序词不许出现在思考里，用人话说打算）——思考内容会展示给用户，整段英文用户看不懂。\n' +
       '5. 一句话里既有店内又有店外时，两边都查齐再答，不要只答一半。\n\n' +
       '## 导购规则\n' +
       '1. 闲聊正常答，不搜货，不把话题强行拐去卖货。\n' +
@@ -340,22 +340,90 @@ function mergedSystemPrompt(starwish, seriesText = '') {
   };
 }
 
-// 一轮流式事件的转发：答案直通，工具调用收进 sink 不往外发，
-// 模型的思考（reasoning）只在服务端内部产生、不再下发给 App。
-// 输入是 streamChatEvents 的事件流与 sink（{ calls, text, started }，
-// 就地回填）；输出只有 text 事件（status、homework 等由上层另发）。
-// 为什么不展示思考（2026-11-28 hx 拍板）：原始思考是模型的草稿，
-// 不是写给用户看的话——夹着「工具说……、系统会……」这类内部机制
-// 词、用第三人称旁白用户（「用户问天气，没说城市」），而且内容不
-// 可控，草稿里有什么就漏什么。此前为展示它加过整套清洗过滤（去
-// 程序词、去元叙述、中文占比检查，见本文件旧版），2026-11-28 实
-// 测仍有漏网，遂把下发通道整条关闭、清洗函数一并删除。
-// 对用户可见的「干活痕迹」只保留两样现成的：status 人话进度与
-// homework 功课卡，都是服务端写好的人话，不受这次改动影响。
-// 注意：模型照常开思考（enable_thinking 与思考预算都不动），思
-// 考仍参与它自己的决策，只是用户看不见草稿；App 端 thinking 字
-// 段收不到内容就整段不渲染，所以这次只改服务端、App 零改动。
+// 思考文本的语言检查：汉字数不少于英文字母数才算「中文思考」。
+// 输入是一整轮攒下来的思考文本，输出 true=可以展示给用户。
+// 坑：计数前先抹掉下划线标识符（get_promotions 这类工具名）——
+// 一句中文思考点名两三个工具，英文字母能反超汉字，会被误杀。
+function isMostlyChinese(text) {
+  const cleaned = String(text).replace(/[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+/g, ' ');
+  const cjk = (cleaned.match(/[一-鿿]/g) || []).length;
+  const latin = (cleaned.match(/[A-Za-z]/g) || []).length;
+  return cjk + latin === 0 || cjk >= latin;
+}
+
+// 思考展示前的「去程序词」清洗（2026-11-23 hx 截图实锤后加）：
+// 思考里夹了工具名、参数名这类程序标识时，含标识的那一句整句
+// 不展示。输入一整轮思考文本，输出清洗后的文本（可能为空串）。
+// 为什么整句丢而不是只删那个词：删完词的句子多半不通顺（「带
+// 重新。」），整句丢掉用户无感，漏一个词用户立刻出戏。
+// 判为程序标识的：下划线命名（draw_star_cards）、反引号代码段、
+// 小写开头驼峰词（excludeIds）。商品英文名多是全大写或普通单词，
+// 不受影响；DeepSeek 这类首字母大写的词靠词边界避开；iPhone 这
+// 类日常词用放行名单兜底。
+const THINKING_CAMEL_ALLOW = new Set(['iPhone', 'iPad', 'iOS']);
+function sentenceHasCodeId(sentence) {
+  if (sentence.includes('`')) return true;
+  if (/[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+/.test(sentence)) return true;
+  const camels = sentence.match(/\b[a-z]+[A-Z][A-Za-z0-9]*\b/g) || [];
+  return camels.some((word) => !THINKING_CAMEL_ALLOW.has(word));
+}
+// 元叙述整句不展示（2026-11-23 hx 截图实锤第二类）：思考是给用户
+// 看的旁白，不是判断过程的倒带——「用户说……，信息不够：……，
+// 规则：只问 1 个问题」这种复述规则、盘算槽位的话整句丢。判据取
+// 几个内部说法（规则带冒号、信息不够、用户说、槽位、未启程、
+// 只问 1 个问题）；正常旁白不会这么说话，误伤面小。注意「退货
+// 规则」这类用户话题不带冒号、不在判据里，不受影响。
+// 2026-11-28 加固（hx 真机漏网原文：问天气那轮「用户问天气，没说
+// 城市。工具说城市可省略，系统会从对话历史提取……试着调用一下
+// 看返回什么。」整段漏出）：再补两类——① 第三人称旁白用户起手
+// （用户问/用户想/用户要/用户在……）：人话旁白该用「他」或第一
+// 人称，用「用户」称呼对方的就是内部独白；② 内部调度词（工具
+// 说、工具返回、系统会、系统将、对话历史、调用一下、需要调用
+// 等）：在念后台机制，顾客不该听见。取舍原则：展示思考只是锦
+// 上添花，误丢一句好旁白用户无感，漏一句内部腔立刻出戏，所以
+// 判据宁严勿松。
+const THINKING_META_RE = /(规则[:：]|信息不够|用户说|用户问|用户想|用户要|用户在|槽位|未启程|档案暂|只问\s*[一1]\s*个|问\s*[一1]\s*个问题|先问\s*[一1]\s*个问题|用户就是想|用户只是想|用户应该是想|可以理解为|工具说|工具返回|系统会|系统将|对话历史|调用一下|需要调用|先调用|再调用)/;
+function sentenceIsMetaNarration(sentence) {
+  if (THINKING_META_RE.test(sentence)) return true;
+  // 引着用户原话再下判断的（「翻三张牌」可以理解为……）也是盘算腔，
+  // 正常旁白不会这么引；带「」且在讲「理解/意思」的整句不展示。
+  return sentence.includes('「') && /(理解为|意思是)/.test(sentence);
+}
+function sanitizeThinking(text) {
+  const parts = String(text).split(/(?<=[。！？!?；;\n])/);
+  return parts
+    .filter((part) => !sentenceHasCodeId(part) && !sentenceIsMetaNarration(part))
+    .join('')
+    .trim();
+}
+
+// 一轮流式事件的转发：思考先攒着、过语言检查才往外给，答案直通，
+// 工具调用收进 sink 不往外发。输入是 streamChatEvents 的事件流与
+// sink（{ calls, text, started }，就地回填）；输出 thinking / text 事件。
+// 为什么思考不逐字直通：qwen4-max 调工具前的短思考总爱用英文，
+// 提示词两次实测都压不住；英文思考原样展示用户看不懂，攒整轮过滤
+// 比逐字直通稳。代价是思考不再逐字滚动，而是整段出现在答案之前，
+// 顺序不变（先思考、后答案）。
+// 还有一类不展示：工具轮的短思考多半是「需要调用 X」式的报幕，
+// 不是在分析问题（hx 对照 DeepSeek 的思考后定的规矩——人家的思考
+// 在分析用户要什么、自己打算怎么答，不念工具名）。这一轮以工具
+// 调用收尾、且思考不超过 40 字时，直接不展示；有分量的分析照常给。
+// 口径沿革（2026-11-28）：真机再漏内部腔后曾议「思考全关不展示」，
+// hx 拍板不取——保留人话版展示，靠加固 sanitizeThinking 的判据
+// 堵漏（见 THINKING_META_RE 上方注释），不关通道。
 async function* streamRoundWithReasoningFilter(events, sink) {
+  let buffer = '';
+  const flush = (isFinal = false) => {
+    const raw = buffer;
+    buffer = '';
+    if (!raw) return null;
+    // 先去程序词再过语言检查：清洗后整段没了就不展示；长度门槛
+    // 也按清洗后的算，脏句被丢后剩下的短报幕照样拦得住。
+    const text = sanitizeThinking(raw);
+    if (!text || !isMostlyChinese(text)) return null;
+    if (isFinal && sink.calls.length > 0 && text.length <= 40) return null;
+    return { type: 'thinking', content: text };
+  };
   for await (const event of events) {
     if (event.type === 'tool_calls') {
       sink.calls = event.calls;
@@ -363,24 +431,27 @@ async function* streamRoundWithReasoningFilter(events, sink) {
     }
     sink.started = true;
     if (event.type === 'reasoning') {
-      // 思考到此为止：只在服务端内部用，不往外发（见上方注释）。
+      buffer += event.text;
       continue;
     }
     if (event.type === 'content') {
+      const thinking = flush();
+      if (thinking) yield thinking;
       sink.text += event.text;
       yield { type: 'text', content: event.text };
     }
   }
+  const thinking = flush(true);
+  if (thinking) yield thinking;
 }
 
 // 合脑后的统一大脑（2026-11-22 第一步施工）：不再分流。一次对话里
 // 模型自己决定下一步：调店内工具、调天气、联网搜索，还是直接开口答。
 // 输入：对话消息 + 通义配置（dashscope）+ { userId, starwish }。
-// 输出：事件类型与合并前基本一致——status / text / products /
-// fate_cards / gift_note / cart_confirm，App 零改动（2026-11-28 起
-// 不再下发 thinking 事件，原因见 streamRoundWithReasoningFilter）。
-// 模型沿用原智能模式的 XIAODOU_SMART_MODEL（默认 qwen4-max），思考
-// 只在服务端内部产生、不下发也不落库。
+// 输出：事件类型与合并前完全一致——status / thinking / text / products /
+// fate_cards / gift_note / cart_confirm，App 零改动。
+// 模型沿用原智能模式的 XIAODOU_SMART_MODEL（默认 qwen4-max），思考与
+// 答案分开透传、思考不落库（与原智能模式一致）。
 // 工具循环上限 4 轮（hx 2026-11-22 拍板）：跨界问题常要「搜→查店→比」
 // 三步，留一轮余量；4 轮都用来调工具还没结论时，补一轮无工具的流式
 // 回答收尾，不把用户晾在半截。
@@ -428,9 +499,9 @@ async function* runUnifiedAgent(messages, dashscope, { userId, starwish } = {}) 
   // 决定要不要调 web_search），别先把话说满。
   yield { type: 'status', content: '思考中…' };
 
-  // 思考与答案分开：思考只在服务端内部用（不下发、不落库），
-  // 答案是正文；index.js 落库时也只收答案。转发统一走
-  // streamRoundWithReasoningFilter（在那里把思考吞掉、只放行正文）。
+  // 思考与答案分开往外给：思考是进度、答案是正文，App 分开渲染，
+  // index.js 落库时也只收答案，思考不进聊天记录。转发统一走
+  // streamRoundWithReasoningFilter（思考先攒后放、英文思考不展示）。
   const base = {
     apiKey: dashscope.apiKey,
     baseUrl: dashscope.baseUrl,
